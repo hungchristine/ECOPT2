@@ -67,6 +67,7 @@ ICE_PROD_CINT_CSNT(prodyear)     Constant term for CO2 int. of ICE vehicle produ
 ICE_PROD_CINT(prodyear)          CO2 intensity of ICE vehicle production [kg CO2-eq per vehicle produced]
 
 **OPERATION
+**Maybe split into fuel consumption and WTT intensity of fuel...
 ICE_OPER_CINT(prodyear)          CO2 intensity of ICE vehicle operation (inc. fuel prod) [kg CO2 per km]
 
 **EOL
@@ -133,6 +134,9 @@ loop (year$(ord(year)>=2), PRODYEAR_PAR(year) = PRODYEAR_PAR(year-1)+1);
 * tau is time the of maximum gradient of = 2025
 ELC_CINT(year) = 1.3 + (0.1-1.3)/(1+exp(-0.2*(YEAR_PAR(year)-2035)));
 
+**CH: is a logistic function the best suited curve for this??
+**perhaps solve for r by making assumptions for the beginning/end years for the asymptotes...
+
 
 ***ICE VEHICLES*****************************************************************
 
@@ -180,7 +184,7 @@ ICE_PROD_CINT(prodyear) = ICE_PROD_CINT_CSNT(prodyear)+ ICE_PROD_EINT(prodyear)*
 * B = End electricity intensity of ICE Vehicle  = 0.12 kgCO2 e.g pr/km
 * r  is the the rate of change = 0.15 ;
 * tau is time the of maximum gradient of = 2025
-ICE_OPER_CINT(prodyear) = 0.19 + (0.07-0.19)/(1+exp(-0.15*(YEAR_PAR(prodyear)-2025)));
+ICE_OPER_CINT(prodyear) = 0.19 + (0.12-0.19)/(1+exp(-0.15*(YEAR_PAR(prodyear)-2025)));
 
 **EOL
 
@@ -590,7 +594,7 @@ MODEL EVD4EUR_Basic
 ********************************************************************************
 ********************************************************************************
 
-SOLVE EVD4EUR_Basic USING LP MINIMIZNIG TOTC;
+SOLVE EVD4EUR_Basic USING LP MINIMIZING TOTC;
 
 
 ********************************************************************************
