@@ -29,7 +29,7 @@
 
 SETS
 year           year /2000*2050/
-optyear(year)  years for optiomization /2020*2050/
+optyear(year)  years for optimization /2020*2050/
 inityear(year) years for initialization /2000*2020/
 age            age /0*20/
 
@@ -67,7 +67,7 @@ ICE_PROD_CINT_CSNT(prodyear)     Constant term for CO2 int. of ICE vehicle produ
 ICE_PROD_CINT(prodyear)          CO2 intensity of ICE vehicle production [kg CO2-eq per vehicle produced]
 
 **OPERATION
-**Maybe split into fuel consumption and WTT intensity of fuel...
+**CH: Maybe split into fuel consumption and WTT intensity of fuel...
 ICE_OPER_CINT(prodyear)          CO2 intensity of ICE vehicle operation (inc. fuel prod) [kg CO2 per km]
 
 **EOL
@@ -97,7 +97,7 @@ VEH_LIFT_DSTR(age)               Share of scrapping for a given age - e.g % in g
 VEH_PAY(prodyear,age,year)       Defining the correspondance between a vehicle prododuction year and its age (up to 20) in a given year
 VEH_INIT_AGE_DIST(age)           Initial age distribution of vehicle fleet
 
-***STOCK INITISATION************************************************************
+***STOCK INITIALISATION************************************************************
 
 
 ;
@@ -380,7 +380,7 @@ ICE_EOLT_TOTC(year)              Total CO2 emissions from operations of ICE vehi
 
 EQUATIONS
 
-***VEH STOCK INITISATION************************************************************
+***VEH STOCK INITIALISATION************************************************************
 EQ_VEH_STCK_DELTA_I        Changes in vehicle stock
 EQ_STCK_MOD_O
 EQ_STCK_MOD_I
@@ -388,7 +388,7 @@ EQ_STCK_MOD_II
 EQ_STCK_MOD_III
 EQ_STCK_MOD_SC
 
-***ICE and BEV STOCK INITISATION************************************************************
+***ICE and BEV STOCK INITIALISATION************************************************************
 EQ_ICE_STCK_INIT
 EQ_BEV_STCK_INIT
 
@@ -396,14 +396,14 @@ EQ_BEV_STCK_INIT
 ***ICE STOCK MODEL************************************************************
 EQ_ICE_STCK_DELTA
 EQ_ICE_STCK_MOD_I
-*EQ_ICE_STCK_MOD_II
+EQ_ICE_STCK_MOD_II
 EQ_ICE_STCK_MOD_III
 EQ_ICE_STCK_MOD_SC
 
 ***BEV STOCK MODEL************************************************************
 EQ_BEV_STCK_DELTA
 EQ_BEV_STCK_MOD_I
-*EQ_BEV_STCK_MOD_II
+EQ_BEV_STCK_MOD_II
 EQ_BEV_STCK_MOD_III
 EQ_BEV_STCK_MOD_SC
 
@@ -428,9 +428,7 @@ EQ_BEV_EOLT_TOTC         Total CO2 emissions from operations of BEVs
 EQ_ICE_TOTC              Total CO2 emissions from ICEs per year
 EQ_ICE_PROD_TOTC         Total CO2 emissions from production of ICEs
 EQ_ICE_OPER_TOTC         Total CO2 emissions from operations of ICEs
-EQ_ICE_EOLT_TOTC         Total CO2 emissions from operations of ICEs
-
-
+EQ_ICE_EOLT_TOTC         Total CO2 emissions from operati
 ;
 ********************************************************************************
 ********************************************************************************
@@ -441,20 +439,18 @@ EQ_ICE_EOLT_TOTC         Total CO2 emissions from operations of ICEs
 ********************************************************************************
 
 
-***VEH STOCK INITISATION************************************************************
+***VEH STOCK INITIALISATION************************************************************
 
 * Initiate stock age in first year
-
 EQ_VEH_STCK_DELTA_I(inityear)$(ord(inityear)>1)..                        VEH_STCK_DELTA(inityear)  =e=  VEH_STCK_TOT(inityear)-VEH_STCK_TOT(inityear-1);
 
 *initializing stock in starting year
 EQ_STCK_MOD_O(inityear,age)$(ord(inityear)=1)..                          VEH_STCK(age,inityear) =e=  VEH_STCK_TOT(inityear)*VEH_INIT_AGE_DIST(age);
 
 *calculating vehicle removals in a given year
-
 EQ_STCK_MOD_I(inityear,age)$(ord(inityear)>1)..                          VEH_STCK_REM(age,inityear) =e= VEH_STCK(age-1,inityear-1)*VEH_LIFT_DSTR(age-1);
 
-*calculating vehicle addionts in a given year - all new cars go in age class 1
+*calculating vehicle additions in a given year - all new cars go in age class 1
 EQ_STCK_MOD_II(inityear,age)$(ord(inityear)>1 and ord(age)=1)..          VEH_STCK_ADD(age,inityear)  =e=  VEH_STCK_DELTA(inityear) + sum( (agej), VEH_STCK(agej,inityear-1)*VEH_LIFT_DSTR(agej) );
 
 *calculating vehicle stock in a given year
@@ -464,12 +460,12 @@ EQ_STCK_MOD_III(inityear,age)$(ord(inityear)>1)..                        VEH_STC
 EQ_STCK_MOD_SC(inityear)..                                               VEH_STCK_TOT_CHECK(inityear) =e= sum((age), VEH_STCK(age,inityear));
 
 
-***ICE and BEV STOCK INITISATION************************************************************
+***ICE and BEV STOCK INITIALISATION************************************************************
 
-*Defining initial stock of ICE Veicles
+*Defining initial stock of ICE Vehicles
 EQ_ICE_STCK_INIT(age,inityear)..                                         ICE_STCK(age,inityear) =e= VEH_STCK(age,inityear);
 
-*Defining initial stock of BEV Veicles
+*Defining initial stock of BEV Vehicles
 EQ_BEV_STCK_INIT(age,inityear)..                                         BEV_STCK(age,inityear) =e= 0;
 
 
@@ -481,8 +477,8 @@ EQ_ICE_STCK_DELTA(optyear)$(ord(optyear)>1)..                            ICE_STC
 
 EQ_ICE_STCK_MOD_I(optyear,age)$(ord(optyear)>1)..                        ICE_STCK_REM(age,optyear) =e= ICE_STCK(age-1,optyear-1)*VEH_LIFT_DSTR(age-1);
 
-*calculating vehicle addionts in a given year - all new cars go in age class 1
-*EQ_ICE_STCK_MOD_II(optyear,age)$(ord(optyear)>1 and ord(age)=1)..        ICE_STCK_ADD(age,optyear)  =e=  ICE_STCK_DELTA(optyear) + sum( (agej), ICE_STCK(agej,optyear-1)*VEH_LIFT_DSTR(agej) );
+*calculating vehicle additions in a given year - all new cars go in age class 1
+EQ_ICE_STCK_MOD_II(optyear,age)$(ord(optyear)>1 and ord(age)=1)..        ICE_STCK_ADD(age,optyear)  =e=  ICE_STCK_DELTA(optyear) + sum( (agej), ICE_STCK(agej,optyear-1)*VEH_LIFT_DSTR(agej) );
 
 *calculating vehicle stock in a given year
 EQ_ICE_STCK_MOD_III(optyear,age)$(ord(optyear)>1)..                      ICE_STCK(age,optyear)  =e=  ICE_STCK(age-1,optyear-1) + ICE_STCK_ADD(age,optyear)- ICE_STCK_REM(age,optyear);
@@ -496,11 +492,10 @@ EQ_ICE_STCK_MOD_SC(optyear)..                                            ICE_STC
 EQ_BEV_STCK_DELTA(optyear)$(ord(optyear)>1)..                            BEV_STCK_DELTA(optyear)  =e=  sum( (agej), BEV_STCK(agej,optyear)-BEV_STCK(agej,optyear-1) );
 
 *calculating vehicle removals in a given year
-
 EQ_BEV_STCK_MOD_I(optyear,age)$(ord(optyear)>1)..                        BEV_STCK_REM(age,optyear) =e= BEV_STCK(age-1,optyear-1)*VEH_LIFT_DSTR(age-1);
 
-*calculating vehicle addionts in a given year - all new cars go in age class 1
-*EQ_BEV_STCK_MOD_II(optyear,age)$(ord(optyear)>1 and ord(age)=1)..        BEV_STCK_ADD(age,optyear)  =e=  BEV_STCK_DELTA(optyear) + sum( (agej), BEV_STCK(agej,optyear-1)*VEH_LIFT_DSTR(agej) );
+*calculating vehicle additions in a given year - all new cars go in age class 1
+EQ_BEV_STCK_MOD_II(optyear,age)$(ord(optyear)>1 and ord(age)=1)..        BEV_STCK_ADD(age,optyear)  =e=  BEV_STCK_DELTA(optyear) + sum( (agej), BEV_STCK(agej,optyear-1)*VEH_LIFT_DSTR(agej) );
 
 *calculating vehicle stock in a given year
 EQ_BEV_STCK_MOD_III(optyear,age)$(ord(optyear)>1)..                      BEV_STCK(age,optyear)  =e=  BEV_STCK(age-1,optyear-1) + BEV_STCK_ADD(age,optyear)- BEV_STCK_REM(age,optyear);
@@ -511,7 +506,7 @@ EQ_BEV_STCK_MOD_SC(optyear)..                                            BEV_STC
 
 **COMBINED ICE + BEV STOCK ADD MODEL ************************************************************
 
-EQ_CMB_STCK_MOD_II(optyear,age)$(ord(optyear)>1 and ord(age)=1)..        ICE_STCK_ADD(age,optyear) + BEV_STCK_ADD(age,optyear)  =e=  BEV_STCK_DELTA(optyear) + sum( (agej), BEV_STCK(agej,optyear-1)*VEH_LIFT_DSTR(agej) )+ ICE_STCK_DELTA(optyear) + sum( (agej), ICE_STCK(agej,optyear-1)*VEH_LIFT_DSTR(agej) );
+EQ_CMB_STCK_MOD_II(optyear,age)$(ord(optyear)>1 and ord(age)=0)..        ICE_STCK_ADD(age,optyear) + BEV_STCK_ADD(age,optyear)  =e=  BEV_STCK_DELTA(optyear) + sum( (agej), BEV_STCK(agej,optyear-1)*VEH_LIFT_DSTR(agej) )+ ICE_STCK_DELTA(optyear) + sum( (agej), ICE_STCK(agej,optyear-1)*VEH_LIFT_DSTR(agej) );
 
 
 **TOTAL BEV+ICE STOCK DEMAND************************************************************
@@ -562,7 +557,7 @@ EQ_ICE_EOLT_TOTC(optyear)..      ICE_EOLT_TOTC(optyear) =e= sum( (agej), ICE_STC
 MODEL EVD4EUR_Basic
 /ALL/
 
-* Defining Run Optoins and solver
+* Defining Run Options and solver
 
 *OPTION RESLIM = 2000000;
 *OPTION NLP = CONOPT;
@@ -600,7 +595,7 @@ SOLVE EVD4EUR_Basic USING LP MINIMIZING TOTC;
 ********************************************************************************
 ********************************************************************************
 *
-* Model Post Processiong  p.t 1 : Parameter calculations
+* Model Post Processing  p.t 1 : Parameter calculations
 *
 ********************************************************************************
 ********************************************************************************
@@ -643,7 +638,7 @@ BEV_STCK_TOT(optyear) =sum( (agej), BEV_STCK.l(agej,optyear) );
 ********************************************************************************
 ********************************************************************************
 *
-* Model Post Processiong  p.t 2 : Display Calls
+* Model Post Processing  p.t 2 : Display Calls
 *
 ********************************************************************************
 ********************************************************************************
