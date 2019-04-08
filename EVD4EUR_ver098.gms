@@ -455,7 +455,8 @@ EQ_STCK_MOD_O(inityear,age)$(ord(inityear)=1)..                          VEH_STC
 EQ_STCK_MOD_I(inityear,age)$(ord(inityear)>1)..                          VEH_STCK_REM(age,inityear) =e= VEH_STCK(age-1,inityear-1)*VEH_LIFT_DSTR(age-1);
 
 *calculating vehicle additions in a given year - all new cars go in age class 1
-EQ_STCK_MOD_II(inityear,age)$(ord(inityear)>1 and ord(age)=1)..          VEH_STCK_ADD(age,inityear)  =e=  VEH_STCK_DELTA(inityear) + sum( (agej), VEH_STCK(agej,inityear-1)*VEH_LIFT_DSTR(agej) );
+EQ_STCK_MOD_II(inityear,age)$(ord(inityear)>1 and ord(age)=1)..     VEH_STCK_ADD(age,inityear)  =e=  VEH_STCK_DELTA(inityear) + sum((agej), VEH_STCK_REM(agej,inityear));
+*EQ_STCK_MOD_II(inityear,age)$(ord(inityear)>1 and ord(age)=1)..          VEH_STCK_ADD(age,inityear)  =e=  VEH_STCK_DELTA(inityear) + sum( (agej), VEH_STCK(agej,inityear-1)*VEH_LIFT_DSTR(agej) );
 
 *calculating vehicle stock in a given year
 EQ_STCK_MOD_III(inityear,age)$(ord(inityear)>1)..                        VEH_STCK(age,inityear)  =e=  VEH_STCK(age-1,inityear-1) + VEH_STCK_ADD(age,inityear)- VEH_STCK_REM(age,inityear);
@@ -511,7 +512,9 @@ EQ_BEV_STCK_MOD_SC(optyear)..                                            BEV_STC
 
 **COMBINED ICE + BEV STOCK ADD MODEL ************************************************************
 
-EQ_CMB_STCK_MOD_II(optyear,age)$(ord(optyear)>1 and ord(age)=1)..        ICE_STCK_ADD(age,optyear) + BEV_STCK_ADD(age,optyear)  =e=  BEV_STCK_DELTA(optyear) + sum( (agej), BEV_STCK(agej,optyear-1)*VEH_LIFT_DSTR(agej) )+ ICE_STCK_DELTA(optyear) + sum( (agej), ICE_STCK(agej,optyear-1)*VEH_LIFT_DSTR(agej) );
+*EQ_CMB_STCK_MOD_II(optyear,age)$(ord(optyear)>1 and ord(age)=1)..        ICE_STCK_ADD(age,optyear) + BEV_STCK_ADD(age,optyear)  =e=  BEV_STCK_DELTA(optyear) + sum( (agej), BEV_STCK(agej,optyear-1)*VEH_LIFT_DSTR(agej) )+ ICE_STCK_DELTA(optyear) + sum( (agej), ICE_STCK(agej,optyear-1)*VEH_LIFT_DSTR(agej) );
+
+EQ_CMB_STCK_MOD_II(optyear,age)$(ord(optyear)>1 and ord(age)=1)..        ICE_STCK_ADD(age,optyear) + BEV_STCK_ADD(age,optyear)  =e=  BEV_STCK_DELTA(optyear) + sum((agej),BEV_STCK_REM(agej,optyear)) + ICE_STCK_DELTA(optyear) + sum((agej),ICE_STCK_REM(agej,optyear));
 
 
 **TOTAL BEV+ICE STOCK DEMAND************************************************************
