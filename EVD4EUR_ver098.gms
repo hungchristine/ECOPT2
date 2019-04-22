@@ -135,6 +135,8 @@ loop (year$(ord(year)>=2), PRODYEAR_PAR(year) = PRODYEAR_PAR(year-1)+1);
 * B = end CO2 intensity of el mix = 0.01kg CO2/kwh el
 * r  is the the rate of change = 0.2 ;
 * tau is time the of maximum gradient of = 2025
+
+** need to fix tau to 2025
 ELC_CINT(year) = 1.3 + (0.1-1.3)/(1+exp(-0.2*(YEAR_PAR(year)-2035)));
 
 **CH: is a logistic function the best suited curve for this??
@@ -213,7 +215,7 @@ ICE_EOLT_CINT(prodyear) = 75 + (30-75)/(1+exp(-0.15*(YEAR_PAR(prodyear)-2025)));
 * General logistic function
 * https://en.wikipedia.org/wiki/Generalised_logistic_function
 * y = A + (B-A)/(1+exp(-r*(t-tau)));
-* Y  is the electricity intensity of BEV Vehicle production
+* Y  is the electricity intensity of BEV vehicle production
 * t  is time.
 * A = Initial electricity intensity of BEV vehicle prodution = 6500 kwh
 * B = End electricity intensity of BEV vehicle prodution = 2500 kwh
@@ -316,7 +318,7 @@ VEH_LIFT_DSTR(age)  /0  0.01,  1  0.01,  2  0.02, 3  0.03, 4  0.04, 5   0.1, 6  
 loop( (prodyear,age,year)$( ord(year)= ord(prodyear)+ord(age)), VEH_PAY(prodyear,age,year) = 1);
 
 PARAMETERS
-VEH_INIT_AGE_DIST(age)  /0  0.05,  1  0.05,  2  0.05, 3  0.05, 4  0.05, 5  0.05, 6  0.05, 7  0.05, 8  0.05, 9  0.05, 10  0.05
+VEH_INIT_AGE_DIST(age)  /0  0.05,  1  0.05,  2  0.05, 3  0.05, 4  0.05, 5  0.05, 6  0.05, 7  0.05, 8  0.5, 9  0.05, 10  0.05
                          11 0.05,  12 0.05,  13 0.05, 14 0.05, 15 0.05, 16 0.05, 17 0.05, 18 0.05, 19 0.05, 20 0.00/;
 
 
@@ -367,7 +369,6 @@ BEV_EOLT_TOTC(year)              Total CO2 emissions from operations of BEV vehi
 ICE_PROD_TOTC(year)              Total CO2 emissions from production of ICE vehicles per year
 ICE_OPER_TOTC(year)              Total CO2 emissions from operations of ICE vehicles per year
 ICE_EOLT_TOTC(year)              Total CO2 emissions from operations of ICE vehicles per year
-
 ;
 
 
@@ -426,13 +427,13 @@ EQ_TOTC                  Total CO2 emissions of the whole system
 EQ_BEV_TOTC              Total CO2 emissions from BEVs per year
 EQ_BEV_PROD_TOTC         Total CO2 emissions from production of BEVs
 EQ_BEV_OPER_TOTC         Total CO2 emissions from operations of BEVs
-EQ_BEV_EOLT_TOTC         Total CO2 emissions from operations of BEVs
+EQ_BEV_EOLT_TOTC         Total CO2 emissions from end of life treatment of BEVs
 
 
 EQ_ICE_TOTC              Total CO2 emissions from ICEs per year
 EQ_ICE_PROD_TOTC         Total CO2 emissions from production of ICEs
 EQ_ICE_OPER_TOTC         Total CO2 emissions from operations of ICEs
-EQ_ICE_EOLT_TOTC         Total CO2 emissions from operati
+EQ_ICE_EOLT_TOTC         Total CO2 emissions from end of life treatment of ICEs
 ;
 ********************************************************************************
 ********************************************************************************
@@ -455,8 +456,8 @@ EQ_STCK_MOD_O(inityear,age)$(ord(inityear)=1)..                          VEH_STC
 EQ_STCK_MOD_I(inityear,age)$(ord(inityear)>1)..                          VEH_STCK_REM(age,inityear) =e= VEH_STCK(age-1,inityear-1)*VEH_LIFT_DSTR(age-1);
 
 *calculating vehicle additions in a given year - all new cars go in age class 1
-EQ_STCK_MOD_II(inityear,age)$(ord(inityear)>1 and ord(age)=1)..     VEH_STCK_ADD(age,inityear)  =e=  VEH_STCK_DELTA(inityear) + sum((agej), VEH_STCK_REM(agej,inityear));
-*EQ_STCK_MOD_II(inityear,age)$(ord(inityear)>1 and ord(age)=1)..          VEH_STCK_ADD(age,inityear)  =e=  VEH_STCK_DELTA(inityear) + sum( (agej), VEH_STCK(agej,inityear-1)*VEH_LIFT_DSTR(agej) );
+*EQ_STCK_MOD_II(inityear,age)$(ord(inityear)>1 and ord(age)=1)..     VEH_STCK_ADD(age,inityear)  =e=  VEH_STCK_DELTA(inityear) + sum((agej), VEH_STCK_REM(agej,inityear));
+EQ_STCK_MOD_II(inityear,age)$(ord(inityear)>1 and ord(age)=1)..          VEH_STCK_ADD(age,inityear)  =e=  VEH_STCK_DELTA(inityear) + sum( (agej), VEH_STCK(agej,inityear-1)*VEH_LIFT_DSTR(agej) );
 
 *calculating vehicle stock in a given year
 EQ_STCK_MOD_III(inityear,age)$(ord(inityear)>1)..                        VEH_STCK(age,inityear)  =e=  VEH_STCK(age-1,inityear-1) + VEH_STCK_ADD(age,inityear)- VEH_STCK_REM(age,inityear);
@@ -512,9 +513,9 @@ EQ_BEV_STCK_MOD_SC(optyear)..                                            BEV_STC
 
 **COMBINED ICE + BEV STOCK ADD MODEL ************************************************************
 
-*EQ_CMB_STCK_MOD_II(optyear,age)$(ord(optyear)>1 and ord(age)=1)..        ICE_STCK_ADD(age,optyear) + BEV_STCK_ADD(age,optyear)  =e=  BEV_STCK_DELTA(optyear) + sum( (agej), BEV_STCK(agej,optyear-1)*VEH_LIFT_DSTR(agej) )+ ICE_STCK_DELTA(optyear) + sum( (agej), ICE_STCK(agej,optyear-1)*VEH_LIFT_DSTR(agej) );
+EQ_CMB_STCK_MOD_II(optyear,age)$(ord(optyear)>1 and ord(age)=1)..        ICE_STCK_ADD(age,optyear) + BEV_STCK_ADD(age,optyear)  =e=  BEV_STCK_DELTA(optyear) + sum( (agej), BEV_STCK(agej,optyear-1)*VEH_LIFT_DSTR(agej) )+ ICE_STCK_DELTA(optyear) + sum( (agej), ICE_STCK(agej,optyear-1)*VEH_LIFT_DSTR(agej) );
 
-EQ_CMB_STCK_MOD_II(optyear,age)$(ord(optyear)>1 and ord(age)=1)..        ICE_STCK_ADD(age,optyear) + BEV_STCK_ADD(age,optyear)  =e=  BEV_STCK_DELTA(optyear) + sum((agej),BEV_STCK_REM(agej,optyear)) + ICE_STCK_DELTA(optyear) + sum((agej),ICE_STCK_REM(agej,optyear));
+*EQ_CMB_STCK_MOD_II(optyear,age)$(ord(optyear)>1 and ord(age)=1)..        ICE_STCK_ADD(age,optyear) + BEV_STCK_ADD(age,optyear)  =e=  BEV_STCK_DELTA(optyear) + sum((agej),BEV_STCK_REM(agej,optyear)) + ICE_STCK_DELTA(optyear) + sum((agej),ICE_STCK_REM(agej,optyear));
 
 
 **TOTAL BEV+ICE STOCK DEMAND************************************************************
@@ -562,8 +563,7 @@ EQ_ICE_EOLT_TOTC(optyear)..      ICE_EOLT_TOTC(optyear) =e= sum( (agej), ICE_STC
 
 * Defining name of model(s) and what equations are used in each model
 
-MODEL EVD4EUR_Basic
-/ALL/;
+MODEL EVD4EUR_Basic /ALL/;
 * Defining Run Options and solver
 
 *OPTION RESLIM = 2000000;
