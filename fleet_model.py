@@ -39,8 +39,13 @@ class FleetModel:
         
         """ GAMS-relevant attributes"""
         # first, sets
+
+        # NOTE: as sets are not supposed to be modified over time, it might be safer to define them as tupples instead
+        # of lists... immutable
         self.tecs = [] # list of techs
         self.cohort = []
+        self.age = []
+        self.enr = []
         self.crit_mtls = []
         
         # second, intializing data for GAMS
@@ -62,6 +67,11 @@ class FleetModel:
         self.occupancy_rate = None # vkm -> pkm conversion
         self.battery_density = None # time series of battery energy densities
         self.lightweighting_scenario = None # lightweighting scenario - yes/no (or gradient, e.g., none/mild/aggressive?)
+
+        """ Optimization Initialization """
+        self.ws = gams.GamsWorkspace()
+        self.db = self.ws.add_database()
+
         
     def main(self):
         #
@@ -101,8 +111,29 @@ class FleetModel:
 
 
     def run_GAMS(self):
-        # send stuff to GAMS and run AHS code
-        pass
+
+        def build_set(var, name, comment):
+            """ Simple convenience insert sets"""
+            a_set = self.db.add_set(name, 1, comment)
+            for v in var:
+                a_set.add_record(v)
+            return a_set
+
+        def build_param(var, domains, name, comment):
+            a_param = db.add_parameter_dc(name, domains, comment)
+            for keys, data in var.items():
+                a_param.add_record(keys).value = data
+            return a_param
+
+        # Adding sets
+        # NOTE: Check that 'cohort', 'year' and 'prodyear' work nicely together
+        cohort = build_set(self.cohort, 'year', 'year')
+        tec = build_set(self.tecs, 'tec', 'technology')
+        age = build_set(self.age, 'age', 'age')
+        enr = build_set(self.enr, 'enr', 'energy types')
+
+
+
 
     def calc_crit_materials(self):
         # performs critical material mass accounting
@@ -135,4 +166,3 @@ class EcoinventManipulator:
     def elmix_subst(self):
         # substitute MESSAGE el mixes into ecoinvent
         pass
-
