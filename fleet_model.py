@@ -4,8 +4,12 @@ Created on Sun Apr 21 13:27:57 2019
 
 @author: chrishun
 """
+import pandas as pd
+import numpy as np
+import logging
+import gams
 
-class fleetModel:
+class FleetModel:
     """
     Instance of a fleet model experiment
     Attributes:
@@ -23,7 +27,7 @@ class fleetModel:
         lightweighting_scenario: whether (how aggressively) LDVs are lightweighted in the experiment
         
     """
-    def __init__(self,data_from_message):
+    def __init__(self, data_from_message=None):
         """ static input data.....hardcoded and/or read in from Excel? """
         self.battery_specs = pd.DataFrame() # possible battery_sizes (and acceptable segment assignments, CO2 production emissions, critical material content, mass)
         self.fuelcell_specs = pd.DataFrame() # possible fuel cell powers (and acceptable segment assignments, CO2 production emissions, critical material content, fuel efficiency(?), mass)
@@ -59,11 +63,9 @@ class fleetModel:
         self.battery_density = None # time series of battery energy densities
         self.lightweighting_scenario = None # lightweighting scenario - yes/no (or gradient, e.g., none/mild/aggressive?)
         
-"""
-'Real' methods
-"""
     def main(self):
         #
+        pass
         
     def calc_op_emissions(self):
         """ calculate operation emissions from calc_cint_operation and calc_eint_operation """
@@ -115,18 +117,18 @@ class fleetModel:
         pass
 
 
-"""
-Intermediate methods
-"""
+    """
+    Intermediate methods
+    """
 
     def elmix(self):
         # produce time series of elmix intensities, regions x year 
         pass
 
-class ecoinvent_manipulator(data_from_message, A, F):
+class EcoinventManipulator:
     """ generates time series of ecoinvent using MESSAGE inputs"""
 
-    def __init__(self):
+    def __init__(self, data_from_message, A, F):
         self.A = A #default ecoinvent A matrix
         self.F = F #default ecionvent F matrix
 
