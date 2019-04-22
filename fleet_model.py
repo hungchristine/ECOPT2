@@ -23,7 +23,7 @@ class fleetModel:
         lightweighting_scenario: whether (how aggressively) LDVs are lightweighted in the experiment
         
     """
-    def __init__(self,data_from_message, A, F):
+    def __init__(self,data_from_message):
         """ static input data.....hardcoded and/or read in from Excel? """
         self.battery_specs = pd.DataFrame() # possible battery_sizes (and acceptable segment assignments, CO2 production emissions, critical material content, mass)
         self.fuelcell_specs = pd.DataFrame() # possible fuel cell powers (and acceptable segment assignments, CO2 production emissions, critical material content, fuel efficiency(?), mass)
@@ -55,63 +55,82 @@ class fleetModel:
         self.fossil_scenario = pd.DataFrame() # adoption of unconventional sources for fossil fuel chain
         self.hydrogen_scenario = pd.DataFrame()
         
-        self.occupancy_rate = occupancy_rate # vkm -> pkm conversion
-        self.battery_density = battery_density # time series of battery energy densities
-        self.lightweighting_scenario =  # lightweighting scenario - yes/no (or gradient, e.g., none/mild/aggressive?)
+        self.occupancy_rate = None # vkm -> pkm conversion
+        self.battery_density = None # time series of battery energy densities
+        self.lightweighting_scenario = None # lightweighting scenario - yes/no (or gradient, e.g., none/mild/aggressive?)
         
 """
 'Real' methods
 """
-    def main():
+    def main(self):
         #
         
-    def calc_op_emissions():
+    def calc_op_emissions(self):
         """ calculate operation emissions from calc_cint_operation and calc_eint_operation """
-    def calc_prod_emissions():
+        pass
+
+    def calc_prod_emissions(self):
         """ calculate production vehicle emissions"""
         """ glider, powertrain, RoV"""
-        
-    def calc_EOL_emissions():
+        pass
+
+    def calc_EOL_emissions(self):
         """ calculate EOL emissions"""
-        
-    def calc_cint_operation():
+        pass
+
+    def calc_cint_operation(self):
         # carbon intensity factors from literature here
         # can later update to include in modified A, F matrices
         # either use Kim's physics models or linear regression à la size & range
-    def calc_eint_oper():
+        pass
+    def calc_eint_oper(self):
         # calculate the energy intensity of driving, kWh/km
-        
-    def calc_veh_mass():
+        pass
+
+    def calc_veh_mass(self):
         # use factors to calculate vehicle total mass. 
         # used in calc_eint_oper() 
-   
-    def vehicle_builder():
+        pass
+
+    def vehicle_builder(self):
         # Assembles vehicle from powertrain, glider and BoP and checks that vehicles makes sense (i.e., no Tesla motors in a Polo or vice versa)
         # used in calc_veh_mass()
+        pass
 
-    
-    def run_GAMS():
+
+    def run_GAMS(self):
         # send stuff to GAMS and run AHS code
-        
-    def calc_crit_materials():
+        pass
+
+    def calc_crit_materials(self):
         # performs critical material mass accounting
-        
-    def post_processing():
+        pass
+
+    def post_processing(self):
         # make pretty figures?
-        
-    def vis_GAMS():
+        pass
+
+    def vis_GAMS(self):
         """ visualize key GAMS parameters for quality checks"""
+        pass
+
+
 """
 Intermediate methods
 """
-    def elmix():
-        # produce time series of elmix intensities, regions x year 
-        
-class ecoinvent_manipulator(data_from_message,A,F):
-    """" generates time series of ecoinvent using MESSAGE inputs""""
 
-    self.A = A #default ecoinvent A matrix
-    self. F = F #default ecionvent F matrix
-    def elmix_subst():
+    def elmix(self):
+        # produce time series of elmix intensities, regions x year 
+        pass
+
+class ecoinvent_manipulator(data_from_message, A, F):
+    """ generates time series of ecoinvent using MESSAGE inputs"""
+
+    def __init__(self):
+        self.A = A #default ecoinvent A matrix
+        self.F = F #default ecionvent F matrix
+
+    def elmix_subst(self):
         # substitute MESSAGE el mixes into ecoinvent
-        
+        pass
+
