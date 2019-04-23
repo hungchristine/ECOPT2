@@ -27,6 +27,7 @@
 * ver 1.00       Generalized version with technologies as sets etc (only front end).
 * ver 1.01       Generalized version with technologies as sets etc. Running version
 * ver 1.02       Tecnology gradient of change constraints added.
+* ver 1.03       Tecnology gradient of change constraints ver B added.
 
 ********************************************************************************
 ********************************************************************************
@@ -51,7 +52,7 @@ enreq          equations for energy (electricity and fuels) system /CINT/
 veheq          equations for vehicle parameters /PROD_EINT, PROD_CINT_CSNT, OPER_EINT, EOLT_CINT/
 demeq          equations for demand parameters /STCK_TOT, OPER_DIST, OCUP/
 lfteq          equations for fleet lifetime parameters /LIFT_DISTR, AGE_DISTR/
-grdeq          equations for gradient of change (fleet additions) - individual (IND) for each tech or related to all tech (ALL) /IND,ALL/
+grdeq          parameters for gradient of change (fleet additions) - individual (IND) for each tech or related to all tech (ALL) /IND,ALL/
 
 *** ABBREIVATIONS USED *********************************************************
 * PROD = Production
@@ -252,13 +253,13 @@ VEH_OPER_CINT(tec,enr,prodyear)$(ENR_VEH(enr,tec)) = VEH_OPER_EINT(tec,prodyear)
 
 VEH_EOLT_CINT(tec,prodyear) = genlogfnc(VEH_PARTAB(tec,'EOLT_CINT','A'),VEH_PARTAB(tec,'EOLT_CINT','B'),VEH_PARTAB(tec,'EOLT_CINT','r'),YEAR_PAR(prodyear),VEH_PARTAB(tec,'EOLT_CINT','u'));
 
-* Parameter for gradient of change constraint (fleet additions) - individual (IND) for each tech or related to all tech (ALL)
+* Parameter for gradient of change constraint (fleet additions) - individual (IND) for each tech
 
 PARAMETER VEH_ADD_GRD(grdeq,tec)
-/        IND    .ICE   = 1.0
-         ALL    .ICE   = 0.2
-         IND    .BEV   = 1.0
-         ALL    .BEV   = 0.2
+/        IND    .ICE   = 0.2
+         ALL    .ICE   = 0.05
+         IND    .BEV   = 0.05
+         ALL    .BEV   = 0.05
 /;
 
 
@@ -386,10 +387,7 @@ EQ_STCK_CHK
 *** Gradient of Change
 
 * Gradient of change constraint - as % of individual veh tec add in previous year
-*EQ_STCK_GRD_IND
-
-* ...and as % of veh total vehicles added in previous year
-EQ_STCK_GRD_ALL
+EQ_STCK_GRD
 
 **EMISSION and ENERGY MODELS incl OBJ. FUNCTION ************************************************************
 
@@ -448,9 +446,8 @@ EQ_STCK_CHK(year)..                                              VEH_STCK_TOT_CH
 
 *** Gradient of change constraint
 
-*EQ_STCK_GRD_IND(tec,year,age)$(ord(year)>1 and ord(age)=1)..      VEH_STCK_ADD(tec,year,age) =l= (1 + VEH_ADD_GRD('IND',tec))*VEH_STCK_ADD(tec,year-1,age);
+EQ_STCK_GRD(tec,year,age)$(ord(year)>1 and ord(age)=1)..      VEH_STCK_ADD(tec,year,age) =l= (1 + VEH_ADD_GRD('IND',tec))*VEH_STCK_ADD(tec,year-1,age) + (1 + VEH_ADD_GRD('ALL',tec))* sum( (tecj), VEH_STCK_ADD(tecj,year-1,age)); ;
 
-EQ_STCK_GRD_ALL(tec,year,age)$(ord(year)>1 and ord(age)=1)..      VEH_STCK_ADD(tec,year,age) =l= (1 + VEH_ADD_GRD('ALL',tec))* sum( (tecj), VEH_STCK_ADD(tecj,year-1,age));
 
 
 ***EMISSION and ENERGY MODELS incl OBJ. FUNCTION ************************************************************
@@ -512,7 +509,7 @@ MODEL EVD4EUR_Basic
 ********************************************************************************
 ********************************************************************************
 
-SOLVE EVD4EUR_Basic USING LP MINIMIZING TOTC;
+SOLVE EVD4EUR_Basic USING LP MINIMIZNIG TOTC;
 
 
 execute_unload 'EVD4EUR_ver102.gdx'
