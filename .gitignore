@@ -1,6 +1,5 @@
 # Ignore GAMS datafile files
 
-
 *.gdx
 *.lst
 *.log
@@ -27,5 +26,3 @@ __pycache__/
 # Python egg metadata, regenerated from source files by setuptools
 .
 /*.egg-info
-
-
