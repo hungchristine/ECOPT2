@@ -165,6 +165,32 @@ def param2series(name, db=None, ws=None, gdx_filepath=None):
     data = dict((tuple(rec.keys), rec.value) for rec in db[name])
     return pd.Series(data)
 
+def param2df(name, db=None, ws=None, gdx_filepath=None):
+    """
+    Read in a parameter from a GAMS database or gdx file
+
+    Parameters
+    ----------
+    name: str
+        Name of Gams Parameter
+    db : Gams Database or None
+        If available, read from this pre-existing database
+    ws : Gams WorkSpace or None
+        If available, use that workspace to read a gdx file, otherwise generate one
+    gdx_filepath : str or None
+        Path to gdx file,
+
+    Returns
+    -------
+    Pandas DataFrame
+        Dataframe holding the values of the parameter, with rows potentially multi-index
+    """
+    # Sort out database access or file reading
+    db = _iwantitall(db, ws, gdx_filepath)
+
+    # Read in data and recast as Pandas Series
+    data = dict((tuple(rec.keys), rec.value) for rec in db[name])
+    return pd.Series(data).unstack()
 
 def var2series(name, db=None, ws=None, gdx_filepath=None):
     """
@@ -192,6 +218,37 @@ def var2series(name, db=None, ws=None, gdx_filepath=None):
     # Read in data and recast as Pandas Series
     data = dict((tuple(rec.keys), rec.level) for rec in db[name])
     return pd.Series(data)
+
+def var2df(name, db=None, ws=None, gdx_filepath=None):
+    """
+    Read in a variable from a GAMS database or gdx file
+
+    Parameters
+    ----------
+    name: str
+        Name of Gams Variable
+    db : Gams Database or None
+        If available, read from this pre-existing database
+    ws : Gams WorkSpace or None
+        If available, use that workspace to read a gdx file, otherwise generate one
+    gdx_filepath : string or None
+        Path to gdx file,
+
+    Returns
+    -------
+    Pandas DataFrame
+        Dataframe holding the values of the variable, with row indexes potentially multiindex
+
+    See Also
+    --------
+    var2series
+    """
+    # Sort out database access or file reading
+    db = _iwantitall(db, ws, gdx_filepath)
+
+    # Read in data and recast as Pandas Series
+    data = dict((tuple(rec.keys), rec.level) for rec in db[name])
+    return pd.Series(data).unstack()
 
 
 def _iwantitall(db, ws, gdx_filepath):
