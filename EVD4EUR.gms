@@ -22,7 +22,8 @@
 * ver 0.95:      Output analysis and debogging p.t 1 - Clean up Emissions and Stock e.q.s
 * ver 0.96:      Include fix for vehicle removal-add constraint across BEV-ICE. Pref constraint forced BEVs to replace BEVs and ICEs to replace ICEs
 * ver 0.97:      Changed DELTA variables from positive to free variables
-* ver 0.98       Added gradient of change dampening constraint
+* ver 0.98:      Added gradient of change dampening constraint
+* ver 1.00:      Redesign of 'front end' 
 ********************************************************************************
 ********************************************************************************
 ********************************************************************************
