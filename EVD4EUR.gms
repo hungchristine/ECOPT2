@@ -22,12 +22,17 @@
 * ver 0.95:      Output analysis and debogging p.t 1 - Clean up Emissions and Stock e.q.s
 * ver 0.96:      Include fix for vehicle removal-add constraint across BEV-ICE. Pref constraint forced BEVs to replace BEVs and ICEs to replace ICEs
 * ver 0.97:      Changed DELTA variables from positive to free variables
-* ver 0.98:      Added gradient of change dampening constraint
-* ver 1.00:      Redesign of 'front end'
-* ver 1.01:      Complete introduction of model in ver 1.00
+* ver 0.98       Added gradient of change dampening constraint
+* ver 0.99       Added init variables for ICE_ADD and ICE_REM
+* ver 1.00       Generalized version with technologies as sets etc (only front end).
+* ver 1.01       Generalized version with technologies as sets etc. Running version
+* ver 1.02       Tecnology gradient of change constraints added.
+
 ********************************************************************************
 ********************************************************************************
 ********************************************************************************
+
+
 $funclibin stolib stodclib
 function pdfnormal     /stolib.pdfnormal     /;
 function cdfnormal     /stolib.cdfnormal     /;
@@ -35,7 +40,7 @@ function cdfnormal     /stolib.cdfnormal     /;
 
 SETS
 year           year /2000*2050/
-optyear(year)  years for optimization /2020*2050/
+optyear(year)  years for optiomization /2020*2050/
 inityear(year) years for initialization /2000*2020/
 age            age /0*20/
 tec            techlogy /ICE,BEV/
@@ -46,6 +51,7 @@ enreq          equations for energy (electricity and fuels) system /CINT/
 veheq          equations for vehicle parameters /PROD_EINT, PROD_CINT_CSNT, OPER_EINT, EOLT_CINT/
 demeq          equations for demand parameters /STCK_TOT, OPER_DIST, OCUP/
 lfteq          equations for fleet lifetime parameters /LIFT_DISTR, AGE_DISTR/
+grdeq          equations for gradient of change (fleet additions) - individual (IND) for each tech or related to all tech (ALL) /IND,ALL/
 
 *** ABBREIVATIONS USED *********************************************************
 * PROD = Production
@@ -61,6 +67,8 @@ alias (year, prodyear)
 alias (prodyear, year)
 alias (age, agej)
 alias (agej, age)
+alias (tec, tecj)
+alias (tecj, tec)
 
 *** General logistic function *************************************************
 $macro genlogfnc(A,B,r,t,u) A + (B-A)/(1+exp(-r*(t-u)));
@@ -133,7 +141,7 @@ VEH_OCUP(year)
 
 VEH_LIFT_PDF(age)                Age PDF
 VEH_LIFT_CDF(age)                Age CDF Share of scrapping for a given age - e.g % in given age class i scrapped
-VEH_LIFT_AGE(age)                  Age distribution = 1 - CDF
+VEH_LIFT_AGE(age)                Age distribution = 1 - CDF
 
 ** COMPOSITION
 
@@ -141,6 +149,8 @@ VEH_PAY(prodyear,age,year)       Correspondance between a vehicle prododuction y
 VEH_STCK_INT_TEC(tec)            Initial share of vehicles in stock tech
 VEH_STCK_INT(tec,age)            Initial size of stock of vehicles by age cohort.
 
+** GRADIENT OF CHANGE
+VEH_ADD_GRD(grdeq,tec)           Parameter for gradient of change constraint (fleet additions) - individual (IND) for each tech or related to all tech (ALL)
 
 ;
 ********************************************************************************
@@ -171,7 +181,7 @@ loop (year$(ord(year)>=2), PRODYEAR_PAR(year) = PRODYEAR_PAR(year-1)+1);
 ***ENERGY (ELECTRICITY GENERATION and FOSSIL FUEL*******************************
 * kg CO2 eg pr kWh
 PARAMETER ENR_PARTAB(enr,enreq,sigvar)
-/        ELC    .CINT    .A  = 1.3
+/        ELC    .CINT    .A  = 1.0
          ELC    .CINT    .B  = 0.1
          ELC    .CINT    .r  = 0.2
          ELC    .CINT    .u  = 2035
@@ -242,9 +252,18 @@ VEH_OPER_CINT(tec,enr,prodyear)$(ENR_VEH(enr,tec)) = VEH_OPER_EINT(tec,prodyear)
 
 VEH_EOLT_CINT(tec,prodyear) = genlogfnc(VEH_PARTAB(tec,'EOLT_CINT','A'),VEH_PARTAB(tec,'EOLT_CINT','B'),VEH_PARTAB(tec,'EOLT_CINT','r'),YEAR_PAR(prodyear),VEH_PARTAB(tec,'EOLT_CINT','u'));
 
+* Parameter for gradient of change constraint (fleet additions) - individual (IND) for each tech or related to all tech (ALL)
+
+PARAMETER VEH_ADD_GRD(grdeq,tec)
+/        IND    .ICE   = 1.0
+         ALL    .ICE   = 0.2
+         IND    .BEV   = 1.0
+         ALL    .BEV   = 0.2
+/;
 
 
-***FLEEET****************************************************************
+
+***FLEET****************************************************************
 
 *DEMAND
 
@@ -281,10 +300,10 @@ PARAMETER LFT_PARTAB(dstvar)
 /;
 
 
-
 VEH_LIFT_PDF(age) = pdfnormal(AGE_PAR(age),LFT_PARTAB('mean'),LFT_PARTAB('stdv'));
 VEH_LIFT_CDF(age) = cdfnormal(AGE_PAR(age),LFT_PARTAB('mean'),LFT_PARTAB('stdv'));
 VEH_LIFT_AGE(age) = (1 - VEH_LIFT_CDF(age))/sum(agej, VEH_LIFT_CDF(agej));
+
 
 ***COMPOSITION
 
@@ -293,8 +312,8 @@ VEH_LIFT_AGE(age) = (1 - VEH_LIFT_CDF(age))/sum(agej, VEH_LIFT_CDF(agej));
 loop( (prodyear,age,year)$( ord(year)= ord(prodyear)+ord(age)), VEH_PAY(prodyear,age,year) = 1);
 
 PARAMETER VEH_STCK_INT_TEC(tec)
-/        ICE = 0.95
-         BEV = 0.05
+/        ICE = 1.00
+         BEV = 0.00
 /;
 
 * Initial size of stock of vehicles by age cohort.
@@ -364,6 +383,14 @@ EQ_STCK_BAL
 *summing the number of vehicles in for check.
 EQ_STCK_CHK
 
+*** Gradient of Change
+
+* Gradient of change constraint - as % of individual veh tec add in previous year
+*EQ_STCK_GRD_IND
+
+* ...and as % of veh total vehicles added in previous year
+EQ_STCK_GRD_ALL
+
 **EMISSION and ENERGY MODELS incl OBJ. FUNCTION ************************************************************
 
 * Objective function
@@ -419,8 +446,14 @@ EQ_STCK_BAL(tec,year,age)$(ord(year)>1)..                        VEH_STCK(tec,ye
 *summing the number of vehicles in for check.
 EQ_STCK_CHK(year)..                                              VEH_STCK_TOT_CHECK(year) =e= sum((tec,age), VEH_STCK(tec,year,age));
 
+*** Gradient of change constraint
 
-**EMISSION and ENERGY MODELS incl OBJ. FUNCTION ************************************************************
+*EQ_STCK_GRD_IND(tec,year,age)$(ord(year)>1 and ord(age)=1)..      VEH_STCK_ADD(tec,year,age) =l= (1 + VEH_ADD_GRD('IND',tec))*VEH_STCK_ADD(tec,year-1,age);
+
+EQ_STCK_GRD_ALL(tec,year,age)$(ord(year)>1 and ord(age)=1)..      VEH_STCK_ADD(tec,year,age) =l= (1 + VEH_ADD_GRD('ALL',tec))* sum( (tecj), VEH_STCK_ADD(tecj,year-1,age));
+
+
+***EMISSION and ENERGY MODELS incl OBJ. FUNCTION ************************************************************
 
 * Objective function
 EQ_TOTC..                                TOTC =e= SUM( (tec,year), VEH_TOTC(tec,year));
@@ -430,7 +463,7 @@ EQ_TOTC..                                TOTC =e= SUM( (tec,year), VEH_TOTC(tec,
 EQ_VEH_TOTC(tec,year)..                  VEH_TOTC(tec,year) =e= VEH_PROD_TOTC(tec,year) + VEH_OPER_TOTC(tec,year) + VEH_EOLT_TOTC(tec,year);
 
 EQ_VEH_PROD_TOTC(tec,year)..             VEH_PROD_TOTC(tec,year) =e= sum( (agej)$(ord(agej)=1), VEH_STCK_ADD(tec,year,agej)*VEH_PROD_CINT(tec,year));
-EQ_VEH_OPER_TOTC(tec,year)..             VEH_OPER_TOTC(tec,year) =e= sum( (agej,enr,prodyear), VEH_STCK(tec,year,agej)*VEH_OPER_CINT(tec,enr,prodyear)*VEH_PAY(prodyear,agej,year)*ENR_VEH(enr,tec)*VEH_OPER_DIST(year) );
+EQ_VEH_OPER_TOTC(tec,year)..             VEH_OPER_TOTC(tec,year) =e= sum( (agej,enr,prodyear), VEH_STCK(tec,year,agej)*VEH_OPER_CINT(tec,enr,prodyear)*ENR_VEH(enr,tec)*VEH_PAY(prodyear,agej,year)*VEH_OPER_DIST(year) );
 EQ_VEH_EOLT_TOTC(tec,year)..             VEH_EOLT_TOTC(tec,year) =e= sum( (agej), VEH_STCK_REM(tec,year,agej))*VEH_EOLT_CINT(tec,year);
 
 
@@ -447,7 +480,7 @@ EQ_VEH_EOLT_TOTC(tec,year)..             VEH_EOLT_TOTC(tec,year) =e= sum( (agej)
 MODEL EVD4EUR_Basic
 /ALL/
 
-* Defining Run Options and solver
+* Defining Run Optoins and solver
 
 *OPTION RESLIM = 2000000;
 *OPTION NLP = CONOPT;
@@ -457,6 +490,7 @@ MODEL EVD4EUR_Basic
 *OPTION limcol = 0;
 *OPTION solprint = off;
 *OPTION sysout = off;
+
 
 ********************************************************************************
 ********************************************************************************
@@ -481,4 +515,7 @@ MODEL EVD4EUR_Basic
 SOLVE EVD4EUR_Basic USING LP MINIMIZING TOTC;
 
 
-execute_unload 'EVD4EUR_ver101.gdx'
+execute_unload 'EVD4EUR_ver102.gdx'
+*$gdxout 'EVD4EUR_ver101GU.gdx'
+*$unload
+
