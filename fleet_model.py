@@ -8,7 +8,7 @@ import gmspy
 
 import matplotlib
 import matplotlib.pyplot as plt
-from plotly import tools
+"""from plotly import tools
 import cufflinks as cf
 import plotly.plotly as py
 import plotly.offline as pyo
@@ -20,7 +20,7 @@ import plotly_express as px
 import dash_html_components as html
 import dash_core_components as dcc
 from dash.dependencies import Input, Output
-from plotly.offline import init_notebook_mode, iplot
+from plotly.offline import init_notebook_mode, iplot"""
 
 
 
@@ -217,29 +217,33 @@ class FleetModel:
         tot_stock_df = stock_df.sum(axis=1).unstack().T
         tot_stock_df.index = tot_stock_df.index.astype(int)
         tot_stock_df.sort_index(axis=0,inplace=True)
-        ax = tot_stock_df.T.plot.area(cmap='Spectral_r')
+        ax = tot_stock_df.T.plot.area(cmap='Spectral_r',title='Total stocks by vehicle age')
         patches, labels = ax.get_legend_handles_labels()
         ax.legend(bbox_to_anchor=(1.1,1), ncol=2, title='Vehicle ages')
         
         # Plot total stocks by technology
-        stock_df.groupby(level=[0]).sum(axis=1).plot(kind='area')
+        stock_df.groupby(level=[0]).sum(axis=1).plot(kind='area',title='Total stocks by technology')
         
         stock_df = pd.concat([p_dict['ICE_STCK_TOT'],p_dict['BEV_STCK_TOT']],axis=1)
         stock_df.columns=['ICE_STCK_TOT','BEV_STCK_TOT']
-        stock_df.plot()
+        stock_df.plot(title='Total stocks by technology')
         
         # Plot stock additions and removals by technology
         add_rem_df = pd.concat((v_dict['ICE_STCK_REM'].unstack(),v_dict['BEV_STCK_REM'].unstack(),v_dict['ICE_STCK_ADD'].unstack(),v_dict['BEV_STCK_ADD'].unstack()),axis=1)
         add_rem_df.columns = ['ICE_STCK_REM','BEV_STCK_REM','ICE_STCK_ADD','BEV_STCK_ADD']
-        add_rem_df.plot(subplots=True)
+        #add_rem_df.plot(subplots=True,title='Stock removal and addition variables')
+        for column in add_rem_df:
+            ax=add_rem_df[column].unstack().plot(kind='area',cmap='Spectral_r',title=column)
+            patches, labels = ax.get_legend_handles_labels()
+            ax.legend(bbox_to_anchor=(1.1,1), ncol=2, title='Vehicle ages')
 
         # Plot carbon emissions by technology and lifecycle phase
         totc_df=pd.concat((v_dict['ICE_PROD_TOTC'],v_dict['ICE_OPER_TOTC'],v_dict['ICE_EOLT_TOTC'],v_dict['ICE_TOTC'],v_dict['BEV_PROD_TOTC'],v_dict['BEV_OPER_TOTC'],v_dict['BEV_EOLT_TOTC'],v_dict['BEV_TOTC']),axis=1)
         totc_df.columns=['ICE_PROD_TOTC','ICE_OPER_TOTC','ICE_EOLT_TOTC','ICE_TOTC','BEV_PROD_TOTC','BEV_OPER_TOTC','BEV_EOLT_TOTC','BEV_TOTC']
-        totc_df.plot()
+        totc_df.plot(title='Total carbon emissions by technology and lifecycle phase')
         
         # Plot parameter values for quality assurance
-        ax= p_df.plot(subplots=True,figsize=(15,50))
+        ax= p_df.plot(subplots=True,figsize=(15,50),title='Parameter values')
         
         #dataframes = gdxpds.to_dataframes(gdx_file)
         #pyo.init_notebook_mode()
