@@ -1,9 +1,15 @@
 # -*- coding: utf-8 -*-
 
 import gdxpds
+import gams
 import pandas as pd
+import numpy as np
+import gmspy
+
 import matplotlib
+import matplotlib.pyplot as plt
 from plotly import tools
+import cufflinks as cf
 import plotly.plotly as py
 import plotly.offline as pyo
 import plotly.graph_objs as go
@@ -15,7 +21,7 @@ import dash_html_components as html
 import dash_core_components as dcc
 from dash.dependencies import Input, Output
 from plotly.offline import init_notebook_mode, iplot
-pyo.init_notebook_mode()
+
 
 
 
@@ -24,10 +30,6 @@ Created on Sun Apr 21 13:27:57 2019
 
 @author: chrishun
 """
-import pandas as pd
-import numpy as np
-import logging
-import gams
 
 class FleetModel:
     """
@@ -48,6 +50,9 @@ class FleetModel:
         
     """
     def __init__(self, data_from_message=None):
+        gdx_file = 'C:\\Users\\chrishun\\Box Sync\\YSSP_temp\\EVD4EUR_ver098.gdx'
+        dataframes = gdxpds.to_dataframes(gdx_file)
+        
         """ static input data.....hardcoded and/or read in from Excel? """
         self.battery_specs = pd.DataFrame() # possible battery_sizes (and acceptable segment assignments, CO2 production emissions, critical material content, mass)
         self.fuelcell_specs = pd.DataFrame() # possible fuel cell powers (and acceptable segment assignments, CO2 production emissions, critical material content, fuel efficiency(?), mass)
@@ -162,14 +167,85 @@ class FleetModel:
     def post_processing(self):
         # make pretty figures?
         pass
+    
 
     def vis_GAMS(self):
         """ visualize key GAMS parameters for quality checks"""
         gdx_file = 'C:\\Users\\chrishun\\Box Sync\\YSSP_temp\\EVD4EUR_ver098.gdx'
-        dataframes = gdxpds.to_dataframes(gdx_file)
+        sets = gmspy.ls(gdx_filepath=gdx_file, entity='Set')
+        parameters = gmspy.ls(gdx_filepath=gdx_file,entity='Parameter')
+        variables = gmspy.ls(gdx_filepath=gdx_file,entity='Variable')
+        ws = gams.GamsWorkspace()
+        my_db = ws.add_database()
+        
+        years = gmspy.set2list(sets[0], gdx_filepath=gdx_file)
+
+        # Export parameters
+        p_dict = {}
+        for p in parameters:
+            p_dict[p] = gmspy.param2series(p,gdx_filepath=gdx_file)
+            
+            
+        p_df = pd.DataFrame(index=years)
+        p_df.index.name='year'
+        for key in p_dict:
+            if len(p_dict[key])==len(years):
+                p_dict[key].rename_axis('year',inplace=True)
+                #p_df=pd.concat([p_df,p_dict[key]],axis=1,join_axes=[p_df.index])
+                #p_df= p_df.join(p_dict[key],how='outer')
+                p_df= pd.merge(p_df,p_dict[key].rename(key),on='year')#left_index=True,right_index=True)
+            else:
+                pass
+                    #print(key)
+        p_df.drop(['YEAR_PAR','PRODYEAR_PAR'],axis=1,inplace=True)
+        
+        
+        # Export variables
+        v_dict = {}
+        for v in variables:
+            try:
+                v_dict[v] = gmspy.var2df(v,gdx_filepath=gdx_file)
+            except ValueError:
+                try:
+                    v_dict[v] = gmspy.var2series(v,gdx_filepath=gdx_file)
+                except:
+                    pass
+
+        # Plot total stocks by age
+        stock_df = pd.concat((v_dict['ICE_STCK'].unstack(),v_dict['BEV_STCK'].unstack()),axis=1)
+        stock_df.columns=['ICE_STCK','BEV_STCK']
+        tot_stock_df = stock_df.sum(axis=1).unstack().T
+        tot_stock_df.index = tot_stock_df.index.astype(int)
+        tot_stock_df.sort_index(axis=0,inplace=True)
+        ax = tot_stock_df.T.plot.area(cmap='Spectral_r')
+        patches, labels = ax.get_legend_handles_labels()
+        ax.legend(bbox_to_anchor=(1.1,1), ncol=2, title='Vehicle ages')
+        
+        # Plot total stocks by technology
+        stock_df.groupby(level=[0]).sum(axis=1).plot(kind='area')
+        
+        stock_df = pd.concat([p_dict['ICE_STCK_TOT'],p_dict['BEV_STCK_TOT']],axis=1)
+        stock_df.columns=['ICE_STCK_TOT','BEV_STCK_TOT']
+        stock_df.plot()
+        
+        # Plot stock additions and removals by technology
+        add_rem_df = pd.concat((v_dict['ICE_STCK_REM'].unstack(),v_dict['BEV_STCK_REM'].unstack(),v_dict['ICE_STCK_ADD'].unstack(),v_dict['BEV_STCK_ADD'].unstack()),axis=1)
+        add_rem_df.columns = ['ICE_STCK_REM','BEV_STCK_REM','ICE_STCK_ADD','BEV_STCK_ADD']
+        add_rem_df.plot(subplots=True)
+
+        # Plot carbon emissions by technology and lifecycle phase
+        totc_df=pd.concat((v_dict['ICE_PROD_TOTC'],v_dict['ICE_OPER_TOTC'],v_dict['ICE_EOLT_TOTC'],v_dict['ICE_TOTC'],v_dict['BEV_PROD_TOTC'],v_dict['BEV_OPER_TOTC'],v_dict['BEV_EOLT_TOTC'],v_dict['BEV_TOTC']),axis=1)
+        totc_df.columns=['ICE_PROD_TOTC','ICE_OPER_TOTC','ICE_EOLT_TOTC','ICE_TOTC','BEV_PROD_TOTC','BEV_OPER_TOTC','BEV_EOLT_TOTC','BEV_TOTC']
+        totc_df.plot()
+        
+        # Plot parameter values for quality assurance
+        ax= p_df.plot(subplots=True,figsize=(15,50))
+        
+        #dataframes = gdxpds.to_dataframes(gdx_file)
+        #pyo.init_notebook_mode()
         
         # Make vehicle stock dataframe
-        stock_data = pd.concat((dataframes['ICE_STCK'],dataframes['BEV_STCK'].drop(columns=['age','year'])),axis=1)
+        """stock_data = pd.concat((dataframes['ICE_STCK'],dataframes['BEV_STCK'].drop(columns=['age','year'])),axis=1)
         stock_data =stock_data.set_index(['age','year'])
         stock_data.drop(columns=['Lower','Upper','Scale','Marginal'],inplace=True)
         stock_data.columns=['ICE STCK','BEV STCK']
@@ -183,16 +259,17 @@ class FleetModel:
         # Plot age distribution of fleet as time series
         ax = stock_data.T.plot.area(cmap='Spectral_r')
         patches, labels = ax.get_legend_handles_labels()
-        ax.legend(bbox_to_anchor=(1.1,1), ncol=2, title='Vehicle ages')
+        ax.legend(bbox_to_anchor=(1.1,1), ncol=2, title='Vehicle ages') """
         
         # Plot additions to stock, by technology
-        pl1=go.Bar(x=dataframes['BEV_STCK_ADD']['year'],y=dataframes['BEV_STCK_ADD']['Level'], name='BEV_STCK_ADD')
+        """pl1=go.Bar(x=dataframes['BEV_STCK_ADD']['year'],y=dataframes['BEV_STCK_ADD']['Level'], name='BEV_STCK_ADD')
         pl2=go.Bar(x=dataframes['ICE_STCK_ADD']['year'],y=dataframes['ICE_STCK_ADD']['Level'], name='ICE_STCK_ADD')
         data=[pl1, pl2]
-        iplot(data)
+        iplot(data)"""
+        
         
         # Plot removals from stock by technology
-        pl1=go.Bar(x=dataframes['BEV_STCK_REM']['year'],y=dataframes['BEV_STCK_REM']['Level'], name='BEV_STCK_REM')
+        """pl1=go.Bar(x=dataframes['BEV_STCK_REM']['year'],y=dataframes['BEV_STCK_REM']['Level'], name='BEV_STCK_REM')
         pl2=go.Bar(x=dataframes['ICE_STCK_REM']['year'],y=dataframes['ICE_STCK_REM']['Level'], name='ICE_STCK_REM')
         data=[pl1, pl2]
         iplot(data)
@@ -232,7 +309,7 @@ class FleetModel:
                 side='right')
         )
         fig=go.Figure(data,layout=layout)
-        py.iplot(fig)
+        py.iplot(fig)"""
                 
 
     """
