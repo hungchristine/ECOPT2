@@ -175,8 +175,6 @@ class FleetModel:
         sets = gmspy.ls(gdx_filepath=gdx_file, entity='Set')
         parameters = gmspy.ls(gdx_filepath=gdx_file,entity='Parameter')
         variables = gmspy.ls(gdx_filepath=gdx_file,entity='Variable')
-        ws = gams.GamsWorkspace()
-        my_db = ws.add_database()
         
         years = gmspy.set2list(sets[0], gdx_filepath=gdx_file)
 
