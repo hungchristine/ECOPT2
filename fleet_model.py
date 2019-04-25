@@ -8,6 +8,7 @@ import gmspy
 import matplotlib
 import matplotlib.pyplot as plt
 
+import os
 
 """
 Created on Sun Apr 21 13:27:57 2019
@@ -34,6 +35,7 @@ class FleetModel:
         
     """
     def __init__(self, data_from_message=None):
+        self.current_path = os.path.dirname(os.path.realpath(__file__))
         self.gdx_file = 'C:\\Users\\chrishun\\Box Sync\\YSSP_temp\\EVD4EUR_ver098.gdx'
         self.gms_file = 'C:\\Users\\chrishun\\Box Sync\\YSSP_temp\\EVD4EUR_test.gms'#EVD4EUR.gms'
         
@@ -122,15 +124,14 @@ class FleetModel:
     def run_GAMS(self):
         model_run = self.ws.add_job_from_file(self.gms_file)
         model_run.run(create_out_db = True)
-        print("Ran GAMS model:"+self.gms_file)
+        print("Ran GAMS model: "+self.gms_file)
         gams_db=model_run.out_db
-        gams_db.export(file_path='test_db')
-        print('export complete')
-        
-        trial_db = gams_db.get_parameter('BEV_ADD_FRAC')
-        print(trial_db)
+        gams_db.export(os.path.join(self.current_path,'test_db.gdx'))
+        print("Completed export of " +os.path.join(self.current_path,'test_db.gdx'))
             #print("x(" + rec.keys[0] + "," + rec.keys[1] + "): level=" + str(rec.level) + " marginal=")# + str(rec.marginal)
 
+
+    def add_to_GAMS(self):
         def build_set(var, name, comment):
             """ Simple convenience insert sets"""
             a_set = self.db.add_set(name, 1, comment)
@@ -150,10 +151,7 @@ class FleetModel:
         tec = build_set(self.tecs, 'tec', 'technology')
         age = build_set(self.age, 'age', 'age')
         enr = build_set(self.enr, 'enr', 'energy types')
-
-
-
-
+        
     def calc_crit_materials(self):
         # performs critical material mass accounting
         pass
@@ -165,11 +163,13 @@ class FleetModel:
 
     def vis_GAMS(self):
         """ visualize key GAMS parameters for quality checks"""
+        """To do: split into input/output visualization; add plotting of CO2 and stocks together"""
+        
         gdx_file = 'C:\\Users\\chrishun\\Box Sync\\YSSP_temp\\EVD4EUR_ver098.gdx'
         sets = gmspy.ls(gdx_filepath=gdx_file, entity='Set')
         parameters = gmspy.ls(gdx_filepath=gdx_file,entity='Parameter')
         variables = gmspy.ls(gdx_filepath=gdx_file,entity='Variable')
-        
+        """os.path.join(ws.working_directory,".gdx'0"""
         years = gmspy.set2list(sets[0], gdx_filepath=gdx_file)
 
         # Export parameters
