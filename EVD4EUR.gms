@@ -28,6 +28,7 @@
 * ver 1.01       Generalized version with technologies as sets etc. Running version
 * ver 1.02       Tecnology gradient of change constraints added.
 * ver 1.03       Tecnology gradient of change constraints ver B added.
+* ver 1.04       Initiaton resolved
 
 ********************************************************************************
 ********************************************************************************
@@ -41,7 +42,7 @@ function cdfnormal     /stolib.cdfnormal     /;
 
 SETS
 year           year /2000*2050/
-optyear(year)  years for optiomization /2020*2050/
+optyear(year)  years for optimization /2020*2050/
 inityear(year) years for initialization /2000*2020/
 age            age /0*20/
 tec            techlogy /ICE,BEV/
@@ -63,7 +64,7 @@ grdeq          parameters for gradient of change (fleet additions) - individual 
 
 
 
-* alias call for prodyear = produyction year is identical set to year
+* alias call for prodyear = production year is identical set to year
 alias (year, prodyear)
 alias (prodyear, year)
 alias (age, agej)
@@ -143,6 +144,7 @@ VEH_OCUP(year)
 VEH_LIFT_PDF(age)                Age PDF
 VEH_LIFT_CDF(age)                Age CDF Share of scrapping for a given age - e.g % in given age class i scrapped
 VEH_LIFT_AGE(age)                Age distribution = 1 - CDF
+VEH_LIFT_MOR(age)                Age distribution = 1 - CDF
 
 ** COMPOSITION
 
@@ -257,9 +259,9 @@ VEH_EOLT_CINT(tec,prodyear) = genlogfnc(VEH_PARTAB(tec,'EOLT_CINT','A'),VEH_PART
 
 PARAMETER VEH_ADD_GRD(grdeq,tec)
 /        IND    .ICE   = 0.2
-         ALL    .ICE   = 0.05
-         IND    .BEV   = 0.05
-         ALL    .BEV   = 0.05
+         ALL    .ICE   = 0.2
+         IND    .BEV   = 0.2
+         ALL    .BEV   = 0.2
 /;
 
 
@@ -270,8 +272,8 @@ PARAMETER VEH_ADD_GRD(grdeq,tec)
 
 
 PARAMETER DEM_PARTAB(demeq,sigvar)
-/        STCK_TOT   .A  = 20e6
-         STCK_TOT   .B  = 40e6
+/        STCK_TOT   .A  = 100000
+         STCK_TOT   .B  = 100000
          STCK_TOT   .r  = 0.1
          STCK_TOT   .u  = 2025
          OPER_DIST  .A  = 15000
@@ -301,10 +303,11 @@ PARAMETER LFT_PARTAB(dstvar)
 /;
 
 
-VEH_LIFT_PDF(age) = pdfnormal(AGE_PAR(age),LFT_PARTAB('mean'),LFT_PARTAB('stdv'));
+*VEH_LIFT_PDF(age) = pdfnormal(AGE_PAR(age),LFT_PARTAB('mean'),LFT_PARTAB('stdv'));
 VEH_LIFT_CDF(age) = cdfnormal(AGE_PAR(age),LFT_PARTAB('mean'),LFT_PARTAB('stdv'));
-VEH_LIFT_AGE(age) = (1 - VEH_LIFT_CDF(age))/sum(agej, VEH_LIFT_CDF(agej));
-
+VEH_LIFT_AGE(age) = (1 - VEH_LIFT_CDF(age))/sum(agej, VEH_LIFT_CDF(agej)) ;
+VEH_LIFT_MOR(age)$(ord(age)< 20) = 1 - VEH_LIFT_AGE(age+1)/VEH_LIFT_AGE(age);
+VEH_LIFT_MOR(age)$(ord(age)= 20) = 1 ;
 
 ***COMPOSITION
 
@@ -338,7 +341,7 @@ VEH_STCK_INT(tec,age) = VEH_STCK_INT_TEC(tec)*VEH_LIFT_AGE(age)*VEH_STCK_TOT('20
 FREE VARIABLES
 TOTC                                 Total CO2 emissions for the whole system over the whole period
 VEH_STCK_DELTA(year)                 Delta stock from one year to the next
-
+;
 
 POSITIVE VARIABLES
 VEH_STCK(tec,year,age)               Number of vehicles of a given age in a given year
@@ -419,21 +422,21 @@ EQ_VEH_EOLT_TOTC
 ***  Initiate stock in first year
 
 *removals
-EQ_STCK_REM_T1(tec,year,age)$(ord(year)=1 )..                    VEH_STCK_REM(tec,year,age) =e=  VEH_STCK_TOT(year)*VEH_STCK_INT_TEC(tec)*VEH_LIFT_AGE(age)*VEH_LIFT_CDF(age);
+EQ_STCK_REM_T1(tec,year,age)$(ord(year)=1)..                     VEH_STCK_REM(tec,year,age) =e=  VEH_STCK_TOT(year)*VEH_STCK_INT_TEC(tec)*VEH_LIFT_AGE(age)*VEH_LIFT_MOR(age);
 
 *stock additions
-EQ_STCK_ADD_T1(tec,year,age)$(ord(year)=1 and ord(age)=1)..      VEH_STCK_ADD(tec,year,age) =e=  VEH_STCK_TOT(year)*VEH_STCK_INT_TEC(tec)*VEH_LIFT_AGE(age);
+*EQ_STCK_ADD_T1(tec,year,age)$(ord(year)=1 and ord(age)=1)..      VEH_STCK_ADD(tec,year,age) =e=  VEH_STCK_TOT(year)*VEH_STCK_INT_TEC(tec)*VEH_LIFT_AGE(age);
+EQ_STCK_ADD_T1(year,age)$(ord(year)=1 and ord(age)=1)..      sum( (tec), VEH_STCK_ADD(tec,year,age) ) =e=  sum( (tec,agej), VEH_STCK_REM(tec,year,agej));
 
 *stock
 EQ_STCK_BAL_T1(tec,year,age)$(ord(year)=1)..                     VEH_STCK(tec,year,age) =e=  VEH_STCK_TOT(year)*VEH_STCK_INT_TEC(tec)*VEH_LIFT_AGE(age);
-
 
 
 ***  Main Model
 EQ_STCK_DELTA(year)$(ord(year)>1)..                              VEH_STCK_DELTA(year)  =e=  VEH_STCK_TOT(year)-VEH_STCK_TOT(year-1);
 
 *removals
-EQ_STCK_REM(tec,year,age)$(ord(year)>1)..                        VEH_STCK_REM(tec,year,age) =e= VEH_STCK(tec,year-1,age-1)*VEH_LIFT_CDF(age);
+EQ_STCK_REM(tec,year,age)$(ord(year)>1)..                        VEH_STCK_REM(tec,year,age) =e= VEH_STCK(tec,year-1,age-1)*VEH_LIFT_MOR(age-1);
 
 *stock additions
 EQ_STCK_ADD(year,age)$(ord(year)>1 and ord(age)=1)..             sum( (tec), VEH_STCK_ADD(tec,year,age)- sum( (agej), VEH_STCK_REM(tec,year,agej) ) ) =e= VEH_STCK_DELTA(year);
@@ -446,7 +449,7 @@ EQ_STCK_CHK(year)..                                              VEH_STCK_TOT_CH
 
 *** Gradient of change constraint
 
-EQ_STCK_GRD(tec,year,age)$(ord(year)>1 and ord(age)=1)..      VEH_STCK_ADD(tec,year,age) =l= (1 + VEH_ADD_GRD('IND',tec))*VEH_STCK_ADD(tec,year-1,age) + (1 + VEH_ADD_GRD('ALL',tec))* sum( (tecj), VEH_STCK_ADD(tecj,year-1,age)); ;
+EQ_STCK_GRD(tec,year,age)$(ord(year)>1 and ord(age)=1)..         VEH_STCK_ADD(tec,year,age) =l= (1 + VEH_ADD_GRD('IND',tec))*VEH_STCK_ADD(tec,year-1,age) + 5e6; ;
 
 
 
@@ -476,7 +479,7 @@ EQ_VEH_EOLT_TOTC(tec,year)..             VEH_EOLT_TOTC(tec,year) =e= sum( (agej)
 
 MODEL EVD4EUR_Basic
 /ALL/
-
+;
 * Defining Run Optoins and solver
 
 *OPTION RESLIM = 2000000;
@@ -509,10 +512,11 @@ MODEL EVD4EUR_Basic
 ********************************************************************************
 ********************************************************************************
 
-SOLVE EVD4EUR_Basic USING LP MINIMIZNIG TOTC;
+SOLVE EVD4EUR_Basic USING LP MINIMIZING TOTC;
+
+DISPLAY VEH_STCK_TOT
+DISPLAY VEH_STCK_TOT_CHECK.l
 
 
-execute_unload 'EVD4EUR_ver102.gdx'
-*$gdxout 'EVD4EUR_ver101GU.gdx'
-*$unload
+execute_unload 'EVD4EUR.gdx'
 
