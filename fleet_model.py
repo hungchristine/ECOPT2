@@ -50,24 +50,39 @@ class FleetModel:
         """ boundary conditions for constraints, e.g., electricity market supply constraints, crit. material reserves? could possibly belong in experiment specifications as well..."""
         
         """ GAMS-relevant attributes"""
-        # first, sets
-
-        # NOTE: as sets are not supposed to be modified over time, it might be safer to define them as tupples instead
-        # of lists... immutable
-        self.tecs = [] # list of techs
+        #  --------------- GAMS sets / domains ----------------------
+        self.tecs = []
         self.cohort = []
         self.age = []
         self.enr = []
         self.crit_mtls = []
-        
-        # second, intializing data for GAMS
-        self.init_stock = []
-        self.lifetime_distr = []
-    
+
+        # --------------- GAMS Parameters ---------------------------
+
+        # "Functional unit"
+        self.veh_oper_dist = pd.Series() # driving distance each year # TODO: rename?
+        self.veh_stck_tot = pd.Series()
+
+        # Life cycle intensities
+        self.veh_prod_cint = pd.DataFrame()
+        self.veh_oper_cint = pd.DataFrame()
+        self.veh_eolt_cint = pd.DataFrame()
+
+        # Fleet dynamics
+        self.veh_lift_cdf = pd.DataFrame() # TODO Is it this one we feed to gams?
+        self.veh_lift_age = pd.Series()
+
+        # Initial stocks
+        self.veh_stck_int = pd.DataFrame() # TODO Is this the right one
+
+        # filters
+        self.enr_veh = pd.DataFrame()
+        self.veh_pay = pd.DataFrame()
+
         # second, expected GAMS outputs
-        self.BEV_fraction = pd.DataFrame()
-        self.ICEV_fraction = pd.DataFrame()            
         self.totc = 0
+        self.BEV_fraction = pd.DataFrame()
+        self.ICEV_fraction = pd.DataFrame()
         self.BEV_ADD_blaaaah = pd.DataFrame()
         self.VEH_STCK = pd.DataFrame()
         
