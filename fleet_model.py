@@ -287,3 +287,46 @@ class EcoinventManipulator:
     def elmix_subst(self):
         # substitute MESSAGE el mixes into ecoinvent
         pass
+
+def genlogfnc(t, a=0.0, b=1.0, r=None, u=None, r0=10.):
+    """ Generalized Logistic function
+
+    Parameters
+    ----------
+    t : 1-dimensional numpy array, or list
+        Time values
+    a : float, default 0.0
+        Initial asymptote
+    b : float, default 1.0
+        Final asymptote
+    r : float, or None (default)
+        Rate of change. If None, defaults to r0 divided by the range of t
+    u : float, or None (default)
+        Time of maximum growth rate. If None, defaults to the median of t
+    r0 : float
+        A proportionality constant to help scale default r values
+
+
+    Returns
+    -------
+    y : 1-dimensional numpy array
+    """
+    # Convert t to numpy array (if needed), and calculate t_range at the same time
+    try:
+        t_range = t.ptp()
+    except AttributeError:
+        t = np.array(t)
+        t_range = t.ptp()
+
+    # Define default inflection point
+    if u is None:
+        u = np.median(t)
+
+    # Define default rate
+    if r is None:
+        r = r0 / t_range
+
+    # The actual Calculation
+    y = a + (b - a) / (1 + np.exp(-r * (t - u)))
+
+    return y
