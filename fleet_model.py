@@ -129,6 +129,29 @@ class FleetModel:
         self.enr_veh = gmspy.param2df('ENR_VEH', db)
         self.veh_pay = gmspy.param2series('VEH_PAY', db)
 
+
+    def _load_experiment_data_in_gams(self):
+        tecs = gmspy.list2set(self.db, self.tecs, 'tec')
+        cohort = gmspy.list2set(self.db, self.cohort, 'year')
+        age = gmspy.list2set(self.db, self.age, 'age')
+        enr = gmspy.list2set(self.db, self.enr, 'enr')
+
+        veh_oper_dist = gmspy.df2param(self.db, self.veh_oper_dist, ['year'], 'VEH_OPER_DIST')
+        veh_stck_tot = gmspy.df2param(self.db, self.veh_stck_tot, ['year'], 'VEH_STCK_TOT')
+
+        veh_prod_cint = gmspy.df2param(self.db, self.veh_prod_cint, [tecs, cohort], 'VEH_PROD_CINT')
+        veh_oper_cint = gmspy.df2param(self.db, self.veh_oper_cint, [tecs, enr, cohort], 'VEH_OPER_CINT')
+        veh_eolt_cint = gmspy.df2param(self.db, self.veh_eolt_cint, [tecs, cohort], 'VEH_EOLT_CINT')
+
+        veh_lift_cdf = gmspy.df2param(self.db, self.veh_lift_cdf, [age], 'VEH_LIFT_CDF')
+        veh_lift_age = gmspy.df2param(self.db, self.veh_lift_age, [age], 'VEH_LIFT_AGE')
+
+        veh_stck_int = gmspy.df2param(self.db, self.veh_stck_int, [tecs, cohort], 'VEH_STCK_INT')
+
+        enr_veh = gmspy.df2param(self.db, self.enr_veh, [enr, tecs], 'ENR_VEH')
+
+        veh_pay = gmspy.df2param(self.db, self.veh_pay, [cohort, age, cohort], 'VEH_PAY')
+
     def calc_op_emissions(self):
         """ calculate operation emissions from calc_cint_operation and calc_eint_operation """
         pass
@@ -163,6 +186,11 @@ class FleetModel:
 
 
     def run_GAMS(self):
+
+        # Pass to GAMS all necessary sets and parameters
+        self._load_experiment_data_in_gams()
+
+        # Run GMS Optimization
         model_run = self.ws.add_job_from_file(self.gms_file)
         model_run.run(create_out_db = True)
         print("Ran GAMS model: "+self.gms_file)
