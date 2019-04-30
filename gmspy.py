@@ -162,8 +162,7 @@ def param2series(name, db=None, ws=None, gdx_filepath=None):
     db = _iwantitall(db, ws, gdx_filepath)
 
     # Read in data and recast as Pandas Series
-    data = dict((tuple(rec.keys), rec.value) for rec in db[name])
-    return pd.Series(data)
+    return pd.Series(dict((tuple(rec.keys), rec.value) for rec in db[name]))
 
 def param2df(name, db=None, ws=None, gdx_filepath=None):
     """
@@ -182,15 +181,23 @@ def param2df(name, db=None, ws=None, gdx_filepath=None):
 
     Returns
     -------
-    Pandas DataFrame
+    df : Pandas DataFrame
         Dataframe holding the values of the parameter, with rows potentially multi-index
     """
     # Sort out database access or file reading
     db = _iwantitall(db, ws, gdx_filepath)
 
     # Read in data and recast as Pandas Series
-    data = dict((tuple(rec.keys), rec.value) for rec in db[name])
-    return pd.Series(data).unstack()
+    ds = pd.Series(dict((tuple(rec.keys), rec.value) for rec in db[name]))
+    df = ds.unstack()
+
+    # Ensure that the unstacked columns are ordered as in Data Series
+    ix_len = len(ds.index.levels[-1])
+    cols = ds.index.get_level_values(-1)[:ix_len]
+    df = df.reindex(columns=cols)
+
+    return df
+
 
 def var2series(name, db=None, ws=None, gdx_filepath=None):
     """
