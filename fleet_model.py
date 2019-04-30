@@ -50,36 +50,36 @@ class FleetModel:
         """ boundary conditions for constraints, e.g., electricity market supply constraints, crit. material reserves? could possibly belong in experiment specifications as well..."""
         
         """ GAMS-relevant attributes"""
-        #  --------------- GAMS sets / domains ----------------------
+        #  --------------- GAMS sets / domains -------------------------------
         self.tecs = []
         self.cohort = []
         self.age = []
         self.enr = []
-        self.crit_mtls = []
 
-        # --------------- GAMS Parameters ---------------------------
+        # --------------- GAMS Parameters -------------------------------------
 
-        # "Functional unit"
-        self.veh_oper_dist = pd.Series() # driving distance each year # TODO: rename?
-        self.veh_stck_tot = pd.Series()
+        # "Functional unit" # TODO: this is redud
+        self.veh_oper_dist = pd.Series()     # [years] driving distance each year # TODO: rename?
+        self.veh_stck_tot = pd.Series()      # [years]
 
         # Life cycle intensities
-        self.veh_prod_cint = pd.DataFrame()
-        self.veh_oper_cint = pd.DataFrame()
-        self.veh_eolt_cint = pd.DataFrame()
+        self.veh_prod_cint = pd.DataFrame()  # [tecs, cohort]
+        self.veh_oper_cint = pd.DataFrame()  # [[tecs, enr], cohort]
+        self.veh_eolt_cint = pd.DataFrame()  # [tecs, cohort]
 
         # Fleet dynamics
-        self.veh_lift_cdf = pd.DataFrame() # TODO Is it this one we feed to gams?
-        self.veh_lift_age = pd.Series()
+        self.veh_lift_cdf = pd.DataFrame()  # [age] TODO Is it this one we feed to gams?
+        self.veh_lift_age = pd.Series()     # [age]
 
         # Initial stocks
-        self.veh_stck_int = pd.DataFrame() # TODO Is this the right one
+        self.veh_stck_int = pd.DataFrame()  # [tech, age] TODO Is this the right one
 
         # filters
-        self.enr_veh = pd.DataFrame()
-        self.veh_pay = pd.DataFrame()
+        self.enr_veh = pd.DataFrame()       # [enr, tec]
+        self.veh_pay = pd.DataFrame()       # [cohort, age, year]
 
-        # second, expected GAMS outputs
+        # --------------- Expected GAMS Outputs ------------------------------
+
         self.totc = 0
         self.BEV_fraction = pd.DataFrame()
         self.ICEV_fraction = pd.DataFrame()
@@ -104,6 +104,31 @@ class FleetModel:
         #
         pass
         
+    def read_all_sets(self, gdx_file):
+        db = gmspy._iwantitall(None, None, gdx_file)
+        self.tecs = gmspy.set2list('tec', db)
+        self.cohort = gmspy.set2list('year', db)
+        self.age = gmspy.set2list('age', db)
+        self.enr = gmspy.set2list('enr', db)
+
+    def _read_all_final_parameters(self, a_file):
+        db = gmspy._iwantitall(None, None, a_file)
+
+        self.veh_oper_dist = gmspy.param2series('VEH_OPER_DIST', db)
+        self.veh_stck_tot = gmspy.param2series('VEH_STCK_TOT', db)
+
+        self.veh_prod_cint = gmspy.param2df('VEH_PROD_CINT', db)
+        self.veh_oper_cint = gmspy.param2df('VEH_OPER_CINT', db)
+        self.veh_eolt_cint = gmspy.param2df('VEH_EOLT_CINT', db)
+
+        self.veh_lift_cdf = gmspy.param2series('VEH_LIFT_CDF', db)
+        self.veh_lift_age = gmspy.param2series('VEH_LIFT_AGE', db)
+
+        self.veh_stck_int = gmspy.param2df('VEH_STCK_INT', db)
+
+        self.enr_veh = gmspy.param2df('ENR_VEH', db)
+        self.veh_pay = gmspy.param2series('VEH_PAY', db)
+
     def calc_op_emissions(self):
         """ calculate operation emissions from calc_cint_operation and calc_eint_operation """
         pass
