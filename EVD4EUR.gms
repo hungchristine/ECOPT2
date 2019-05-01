@@ -42,19 +42,33 @@ function cdfnormal     /stolib.cdfnormal     /;
 
 
 SETS
-year           year /2000*2050/
-optyear(year)  years for optiomization /2020*2050/
-inityear(year) years for initialization /2000*2020/
-age            age /0*20/
-tec            techlogy /ICE,BEV/
-enr            energy /ELC,FOS/
-sigvar         variables for sigmoid equations /A,B,r,t,u/
-dstvar         variables for statistical distributions /mean,stdv/
-enreq          equations for energy (electricity and fuels) system /CINT/
-veheq          equations for vehicle parameters /PROD_EINT, PROD_CINT_CSNT, OPER_EINT, EOLT_CINT/
-demeq          equations for demand parameters /STCK_TOT, OPER_DIST, OCUP/
-lfteq          equations for fleet lifetime parameters /LIFT_DISTR, AGE_DISTR/
-grdeq          parameters for gradient of change (fleet additions) - individual (IND) for each tech or related to all tech (ALL) /IND,ALL/
+year           year 
+optyear(year)  years for optimization
+inityear(year) years for initialization
+age            age
+tec            techlogy
+enr            energy
+sigvar         variables for sigmoid equations
+dstvar         variables for statistical distributions
+enreq          equations for energy (electricity and fuels) system
+veheq          equations for vehicle parameters
+demeq          equations for demand parameters
+lfteq          equations for fleet lifetime parameters
+grdeq          parameters for gradient of change (fleet additions) - individual (IND) for each tech or related to all tech (ALL)
+
+*year           year /2000*2050/
+*optyear(year)  years for optimization /2020*2050/
+*inityear(year) years for initialization /2000*2020/
+*age            age /0*20/
+*tec            techlogy /ICE,BEV/
+*enr            energy /ELC,FOS/
+*sigvar         variables for sigmoid equations /A,B,r,t,u/
+*dstvar         variables for statistical distributions /mean,stdv/
+*enreq          equations for energy (electricity and fuels) system /CINT/
+*veheq          equations for vehicle parameters /PROD_EINT, PROD_CINT_CSNT, OPER_EINT, EOLT_CINT/
+*demeq          equations for demand parameters /STCK_TOT, OPER_DIST, OCUP/
+*lfteq          equations for fleet lifetime parameters /LIFT_DISTR, AGE_DISTR/
+*grdeq          parameters for gradient of change (fleet additions) - individual (IND) for each tech or related to all tech (ALL) /IND,ALL/
 
 *** ABBREIVATIONS USED *********************************************************
 * PROD = Production
@@ -65,8 +79,9 @@ grdeq          parameters for gradient of change (fleet additions) - individual 
 ;
 
 $GDXIN 'EVD4EUR_input'
-*$LOAD year optyear inityear age tec enr sigvar dstvar enreq veheq demeq lfteq grdeq prodyear agej tecj
-$LOAD
+$LOADM year optyear inityear age tec enr sigvar dstvar enreq veheq demeq lfteq grdeq
+*prodyear agej tecj
+*$LOAD
 $GDXIN
 
 
