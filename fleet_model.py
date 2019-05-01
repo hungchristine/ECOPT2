@@ -1,15 +1,15 @@
 # -*- coding: utf-8 -*-
 
-import gams
+import os
 import pandas as pd
 import numpy as np
-import gmspy
-
+from scipy.stats import norm
 import matplotlib
 import matplotlib.pyplot as plt
 
-import os
+import gams
 
+import gmspy
 """
 Created on Sun Apr 21 13:27:57 2019
 
@@ -383,3 +383,148 @@ def genlogfnc(t, a=0.0, b=1.0, r=None, u=None, r0=10.):
     y = a + (b - a) / (1 + np.exp(-r * (t - u)))
 
     return y
+
+def calc_steadystate_vehicle_age_distributions(ages, average_expectancy=10.0, standard_dev=3.0):
+    """ Calc a steady-state age distribution consistent with a normal distribution around an average life expectancy
+
+    Parameters
+    ----------
+    ages : 1-dimensional numpy array
+        The range of ages that we are investigating
+    average_expectancy : float
+        Average age at which a typical car dies
+    standard_deviation: float
+        Standard deviation around that average death age
+
+    Returns
+    -------
+    q : The fraction
+
+    Example
+    -------
+    Assming
+    - Average age of death (loc): 10
+    - Standard Deviation: 3
+
+                          AGE DISTRIBUTION AT STEADY STATE
+
+      10%  +----------------------------------------------------------------------+
+           |*************                                                         |
+           |             *******                                                  |
+       9%  |                    ***                                               |
+           |                       *                                              |
+       8%  |                        ***                                           |
+           |                                                                      |
+           |                           **                                         |
+       7%  |                             **                                       |
+           |                                                                      |
+       6%  |                               *                                      |
+           |                                *                                     |
+           |                                 *                                    |
+       5%  |                                  *                                   |
+           |                                   *                                  |
+           |                                    *                                 |
+       4%  |                                     *                                |
+           |                                      **                              |
+       3%  |                                        **                            |
+           |                                                                      |
+           |                                          ***                         |
+       2%  |                                                                      |
+           |                                             ***                      |
+       1%  |                                                *                     |
+           |                                                 ***                  |
+           |                                                    *******           |
+       0%  +----------------------------------------------------------------------+
+         0      2      4      6      8       10     12     14     16     18     20
+                                        VEHICLE AGE
+    """
+
+    h = 1 - norm.cdf(ages, loc=average_expectancy, scale=standard_dev)
+    q = h / h.sum()
+    return q
+
+
+def calculate_probability_of_vehicle_retirement(ages, age_distribution):
+    """ Calculate probability of any given car dying during the year, depending on its age.
+    This probability is calculated from the age distribution of a population, that is assumed to be and to have been at
+    steady state
+
+    This is only valid if we can assume that the population is at steady state.  If in doubt, it is probably best to
+    rely on some idealized population distribution, such as the one calculated by
+    `calc_steadystate_vehicle_age_distributions()`
+
+    Parameters
+    ----------
+    ages : 1-dimensional numpy array
+        The range of ages that we are investigating
+
+    age_distribution: 1-dimensional numpy array
+        The fraction of vehicles that have a certain age
+
+
+    Returns
+    -------
+    g : 1-dimensional numpy array
+        The probability that a car of a given age will die during the year
+
+    See Also
+    --------
+
+    `calc_steadystate_vehicle_age_distributions()`
+
+    Example
+    --------
+
+    Given an age distribution consistent with an average life expectancy of 10 years (SD 3 years), we get the following
+
+              PROBABILITY OF DEATH DURING THE YEAR, AS FUNCTION OF AGE
+
+        1 +---------------------------------------------------------------------+
+          |                                                                  *  |
+          |                                                                 *   |
+      0.9 |                                                                 *   |
+          |                                                                *    |
+      0.8 |                                                                *    |
+          |                                                               *     |
+          |                                                               *     |
+      0.7 |                                                              *      |
+          |                                                             **      |
+      0.6 |                                                         ****        |
+          |                                                      ***            |
+          |                                                   ***               |
+      0.5 |                                                 **                  |
+          |                                               **                    |
+          |                                           ****                      |
+      0.4 |                                         **                          |
+          |                                       **                            |
+      0.3 |                                    ***                              |
+          |                                  **                                 |
+          |                                **                                   |
+      0.2 |                             ***                                     |
+          |                          ***                                        |
+      0.1 |                      ****                                           |
+          |                   ***                                               |
+          |            *******                                                  |
+        0 +---------------------------------------------------------------------+
+          0      2      4      6      8      10     12     14     16     18     20
+                                         AGE OF CAR
+
+    """
+    # Initialize
+    g = np.zeros_like(age_distribution)
+
+
+    for a in ages[:-1]:
+        if age_distribution[a] > 0:
+            # Probability of dying is 1 minus the factions of cars that make it to the next year
+            g[a] = 1 - age_distribution[a + 1] / age_distribution[a]
+
+        else:
+            # If no car left, then 100% death (just to avoid NaN)
+            g[a] = 1.0
+
+    # At the end of the time window, force exactly 100% probability of death
+    g[-1] = 1.0
+
+    return g
+
