@@ -36,7 +36,7 @@ class FleetModel:
     """
     def __init__(self, data_from_message=None):
         self.current_path = os.path.dirname(os.path.realpath(__file__))
-        self.gdx_file = 'C:\\Users\\chrishun\\Box Sync\\YSSP_temp\\EVD4EUR_ver098.gdx'
+        self.gdx_file = 'C:\\Users\\chrishun\\Box Sync\\YSSP_temp\\EVD4EUR_input.gdx'#EVD4EUR_ver098.gdx'
         self.gms_file = 'C:\\Users\\chrishun\\Box Sync\\YSSP_temp\\EVD4EUR.gms'#_test.gms'#EVD4EUR.gms'
         self.export_fp = ''
         
@@ -96,7 +96,7 @@ class FleetModel:
         self.lightweighting_scenario = None # lightweighting scenario - yes/no (or gradient, e.g., none/mild/aggressive?)
 
         """ Optimization Initialization """
-        self.ws = gams.GamsWorkspace()
+        self.ws = gams.GamsWorkspace(working_directory=self.current_path,debug=2)
         self.db = self.ws.add_database()
 
         
@@ -195,8 +195,8 @@ class FleetModel:
         model_run.run(create_out_db = True)
         print("Ran GAMS model: "+self.gms_file)
         gams_db=model_run.out_db
-        gams_db.export(os.path.join(self.current_path,'test_db.gdx'))
-        self.export_fp = os.path.join(self.current_path,'test_db.gdx')
+        gams_db.export(os.path.join(self.current_path,'test_v2_db.gdx'))
+        self.export_fp = os.path.join(self.current_path,'test_v2_db.gdx')
         print("Completed export of " + self.export_fp)
             #print("x(" + rec.keys[0] + "," + rec.keys[1] + "): level=" + str(rec.level) + " marginal=")# + str(rec.marginal)
 
