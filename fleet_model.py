@@ -398,11 +398,12 @@ def calc_steadystate_vehicle_age_distributions(ages, average_expectancy=10.0, st
 
     Returns
     -------
-    q : The fraction
+    q : 1-dimensional numpy array
+        The fraction of cars for each age
 
     Example
     -------
-    Assming
+    Assuming
     - Average age of death (loc): 10
     - Standard Deviation: 3
 
@@ -439,12 +440,15 @@ def calc_steadystate_vehicle_age_distributions(ages, average_expectancy=10.0, st
                                         VEHICLE AGE
     """
 
+    # The total (100%) minus the cummulation of all the cars retired by the time they reach a certain age
     h = 1 - norm.cdf(ages, loc=average_expectancy, scale=standard_dev)
+
+    # Normalize to represent a _fraction_ of the total fleet
     q = h / h.sum()
     return q
 
 
-def calculate_probability_of_vehicle_retirement(ages, age_distribution):
+def calc_probability_of_vehicle_retirement(ages, age_distribution):
     """ Calculate probability of any given car dying during the year, depending on its age.
     This probability is calculated from the age distribution of a population, that is assumed to be and to have been at
     steady state
