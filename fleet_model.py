@@ -36,7 +36,7 @@ class FleetModel:
     """
     def __init__(self, data_from_message=None):
         self.current_path = os.path.dirname(os.path.realpath(__file__))
-        self.gdx_file = 'C:\\Users\\chrishun\\Box Sync\\YSSP_temp\\EVD4EUR_input.gdx'#EVD4EUR_ver098.gdx'
+       #self.gdx_file = 'C:\\Users\\chrishun\\Box Sync\\YSSP_temp\\EVD4EUR_input.gdx'#EVD4EUR_ver098.gdx'
         self.gms_file = 'C:\\Users\\chrishun\\Box Sync\\YSSP_temp\\EVD4EUR.gms'#_test.gms'#EVD4EUR.gms'
         self.export_fp = ''
         
@@ -51,14 +51,23 @@ class FleetModel:
         
         """ GAMS-relevant attributes"""
         #  --------------- GAMS sets / domains -------------------------------
-        self.tecs = []
-        self.cohort = []
-        self.age = []
-        self.enr = []
-
+        self.tecs = ['ICE','BEV']
+        self.cohort = [2000+i for i in range(51)]
+        self.age = [i for i in range(21)]
+        self.enr = ['ELC','FOS']
+        self.demeq= ['STCK_TOT','OPER_DIST','OCUP']
+        self.dstvar=['mean','stdv']
+        self.enreq=['CINT']
+        self.grdeq=['IND','ALL']
+        self.inityear=[2000+i for i in range(21)]
+        self.lfteq=['LFT_DISTR','AGE_DISTR']
+        self.sigvar=['A','B','r','t','u']
         # --------------- GAMS Parameters -------------------------------------
 
         # "Functional unit" # TODO: this is redud
+        # Eurostat road_tf_veh [vkm]
+        # Eurostat road_tf_vehage [vkm, cohort] NB: very limited geographic spectrum
+        # Eurostat road_pa_mov [pkm]
         self.veh_oper_dist = pd.Series()     # [years] driving distance each year # TODO: rename?
         self.veh_stck_tot = pd.Series()      # [years]
 
@@ -72,11 +81,16 @@ class FleetModel:
         self.veh_lift_age = pd.Series()     # [age]
 
         # Initial stocks
+        # Eurostat road_eqs_carpda[tec]
+        # Eurostat road_eqs_carage [age - <2, 2-5, 5-10, 10-20]; 
         self.veh_stck_int = pd.DataFrame()  # [tech, age] TODO Is this the right one
 
         # filters
         self.enr_veh = pd.DataFrame()       # [enr, tec]
         self.veh_pay = pd.DataFrame()       # [cohort, age, year]
+        
+        #self.age_par = pd.DataFrame()
+        #self.year_par = pd.DataFrame()
 
         # --------------- Expected GAMS Outputs ------------------------------
 
@@ -97,7 +111,10 @@ class FleetModel:
 
         """ Optimization Initialization """
         self.ws = gams.GamsWorkspace(working_directory=self.current_path,debug=2)
-        self.db = self.ws.add_database()
+        self.db = self.ws.add_database(database_name='pyGAMSdb')
+        self.opt = self.ws.add_options()
+        self.opt.DumpParms = 2
+        self.opt.ForceWork = 1
 
         
     def main(self):
@@ -127,14 +144,24 @@ class FleetModel:
         self.veh_stck_int = gmspy.param2df('VEH_STCK_INT', db)
 
         self.enr_veh = gmspy.param2df('ENR_VEH', db)
-        self.veh_pay = gmspy.param2series('VEH_PAY', db)
+        self.veh_pay = gmspy.param2series('VEH_PAY', db) # series, otherwise makes giant sparse dataframe
 
 
-    def _load_experiment_data_in_gams(self):
+    def _load_experiment_data_in_gams(self): # will become unnecessary as we start calculating/defining sets and/or parameters within the class
         tecs = gmspy.list2set(self.db, self.tecs, 'tec')
         cohort = gmspy.list2set(self.db, self.cohort, 'year')
         age = gmspy.list2set(self.db, self.age, 'age')
         enr = gmspy.list2set(self.db, self.enr, 'enr')
+        demeq=  gmspy.list2set(self.db, self.demeq, 'demeq')
+        dstvar = gmspy.list2set(self.db,self.dstvar,'dstvar')
+        enreq = gmspy.list2set(self.db,self.enreq,'enreq')
+        grdeq = gmspy.list2set(self.db,self.grdeq,'grdeq')
+        inityear = gmspy.list2set(self.db,self.inityear,'inityear')
+        lfteq = gmspy.list2set(self.db,self.lfteq,'lfteq')
+        sigvar = gmspy.list2set(self.db,self.sigvar,'sigvar')
+        
+      
+        #self.add_to_GAMS()
 
         veh_oper_dist = gmspy.df2param(self.db, self.veh_oper_dist, ['year'], 'VEH_OPER_DIST')
         veh_stck_tot = gmspy.df2param(self.db, self.veh_stck_tot, ['year'], 'VEH_STCK_TOT')
@@ -146,11 +173,17 @@ class FleetModel:
         veh_lift_cdf = gmspy.df2param(self.db, self.veh_lift_cdf, [age], 'VEH_LIFT_CDF')
         veh_lift_age = gmspy.df2param(self.db, self.veh_lift_age, [age], 'VEH_LIFT_AGE')
 
-        veh_stck_int = gmspy.df2param(self.db, self.veh_stck_int, [tecs, cohort], 'VEH_STCK_INT')
+        veh_stck_int = gmspy.df2param(self.db, self.veh_stck_int, [tecs, age], 'VEH_STCK_INT')#cohort], 'VEH_STCK_INT')
 
         enr_veh = gmspy.df2param(self.db, self.enr_veh, [enr, tecs], 'ENR_VEH')
 
         veh_pay = gmspy.df2param(self.db, self.veh_pay, [cohort, age, cohort], 'VEH_PAY')
+        
+        #age_par = gmspy.df2param(self.db,self.age_par, [age], 'AGE_PAR')
+        #year_par = gmspy.df2param(self.db,self.year_par, [year], 'YEAR_PAR')
+        
+        print('exporting database...')
+        self.db.export(os.path.join(self.current_path,'troubleshooting_params'))
 
     def calc_op_emissions(self):
         """ calculate operation emissions from calc_cint_operation and calc_eint_operation """
@@ -189,19 +222,30 @@ class FleetModel:
 
         # Pass to GAMS all necessary sets and parameters
         self._load_experiment_data_in_gams()
-
-        # Run GMS Optimization
-        model_run = self.ws.add_job_from_file(self.gms_file)
-        model_run.run(create_out_db = True)
-        print("Ran GAMS model: "+self.gms_file)
-        gams_db=model_run.out_db
-        gams_db.export(os.path.join(self.current_path,'test_v2_db.gdx'))
-        self.export_fp = os.path.join(self.current_path,'test_v2_db.gdx')
-        print("Completed export of " + self.export_fp)
-            #print("x(" + rec.keys[0] + "," + rec.keys[1] + "): level=" + str(rec.level) + " marginal=")# + str(rec.marginal)
+        #self.db.export('troubleshooting.gdx')
+        #Run GMS Optimization
+        try:
+            model_run = self.ws.add_job_from_file(self.gms_file)
+        
+            model_run.run(databases=self.db,create_out_db = True)
+            print("Ran GAMS model: "+self.gms_file)
+            gams_db=model_run.out_db
+            gams_db.export(os.path.join(self.current_path,'test_v2_db.gdx'))
+            self.export_fp = os.path.join(self.current_path,'test_v2_db.gdx')
+            print("Completed export of " + self.export_fp)
+        #print("x(" + rec.keys[0] + "," + rec.keys[1] + "): level=" + str(rec.level) + " marginal=")# + str(rec.marginal)
+        except:
+            exceptions = fleet.db.get_database_dvs()
+            print(exceptions.symbol.name)
+           # self.db.export(os.path.join(self.current_path,'troubleshooting_tryexcept'))
 
     def add_to_GAMS(self):
         # Adding sets
+        def build_set(set_list=None,name=None,desc=None):
+            i = self.db.add_set(name,1,desc)
+            for s in set_list:
+                i.add_record(str(s))
+                
         # NOTE: Check that 'cohort', 'year' and 'prodyear' work nicely together
         cohort = build_set(self.cohort, 'year', 'year')
         tec = build_set(self.tecs, 'tec', 'technology')
