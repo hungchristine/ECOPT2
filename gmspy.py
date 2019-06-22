@@ -9,7 +9,7 @@ import numpy as np
 import pandas as pd
 import gams
 import warnings
-
+from gams import *
 
 def list2set(db, var, name, comment='', verbose=True):
     """ Insert GAMS set based on python list
@@ -65,10 +65,12 @@ def df2param(db, df, domains, name, comment=''):
     a_param : GamsParameter instance
 
     """
+   
     a_param = db.add_parameter_dc(name, domains, comment)
     if df.ndim > 1:
         df = df.stack()
-    for keys, data in df.items():
+    df = df.to_dict()
+    for keys, data in iter(df.items()):#iter(df.items()):
         a_param.add_record(keys).value = data
     return a_param
 
