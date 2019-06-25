@@ -78,15 +78,22 @@ grdeq          parameters for gradient of change (fleet additions) - individual 
 * CNST = b in y = ax + b
 ;
 
+** Load sets from dummy file
 $GDXIN 'EVD4EUR_input'
-$LOADM year optyear inityear age tec enr sigvar dstvar enreq veheq demeq lfteq grdeq
+$LOADM year optyear inityear tec enr sigvar dstvar enreq veheq demeq lfteq grdeq
 *prodyear agej tecj
 *$LOAD
 $GDXIN
 
 
+** Load sets defined in Python class 
+$GDXIN 'troubleshooting_params'
+$LOAD age
+$GDXIN
+
 * alias call for prodyear = production year is identical set to year
-alias (year, prodyear)
+* change prodyear to cohort later
+alias (year, prodyear) 
 alias (prodyear, year)
 alias (age, agej)
 alias (agej, age)
@@ -131,7 +138,7 @@ LFT_PARTAB(dstvar)               variables for fleet lifetime equations
 ENR_CINT(enr,year)               CO2 intensity of the energy  [kg CO2-eq pr kwh]
 
 ***ENERGY and VEHICLE TECHONLOGY COMBINATIONS **********************************
-ENR_VEH(enr,tec)                 feasbile cominations of vehivle technology and energy (fuel).
+ENR_VEH(enr,tec)                 feasible cominations of vehivle technology and energy (fuel).
 
 
 ***All VEHICLES*****************************************************************
@@ -178,12 +185,52 @@ VEH_ADD_GRD(grdeq,tec)           Parameter for gradient of change constraint (fl
 
 ;
 
-* Load in parameter values from Python-generated .gdx file
+*$call ="c:\gams\win64\26.1\xls2gms.exe" I="C:\Users\chrishun\Box Sync\YSSP_temp\GAMS_input.xls" *O="VEH_OPER_DIST.inc" R="Sheet2!A2:B52"
+*PARAMETER VEH_OPER_DIST(year)
+*/
+*$include VEH_OPER_DIST.inc
+*/
+*$onecho > commands.txt
+*I=C:\Users\chrishun\Box Sync\YSSP_temp\GAMS_input.xls
+*O=VEH_OPER_DIST.inc
+*R=Sheet2!A2:B52
+*$offecho
 
+*$call ="c:\gams\win64\26.1\xls2gms.exe" @commands.txt
+
+
+* Load in parameter values from Python-generated .gdx file [dummy data]
+$ONMULTI
 $GDXIN 'EVD4EUR_input'
 *$LOADR
-$LOAD AGE_PAR YEAR_PAR PRODYEAR_PAR VEH_PARTAB DEM_PARTAB ENR_PARTAB LFT_PARTAB ENR_CINT ENR_VEH VEH_PROD_EINT VEH_PROD_CINT_CSNT VEH_PROD_CINT VEH_OPER_EINT VEH_OPER_CINT VEH_EOLT_CINT VEH_STCK_TOT VEH_OPER_DIST VEH_OCUP VEH_LIFT_PDF VEH_LIFT_CDF VEH_LIFT_AGE VEH_LIFT_MOR VEH_PAY VEH_STCK_INT_TEC VEH_STCK_INT VEH_ADD_GRD
+$LOAD PRODYEAR_PAR
+$LOAD VEH_PARTAB
+$LOAD DEM_PARTAB
+$LOAD ENR_PARTAB
+$LOAD LFT_PARTAB
+$LOAD ENR_CINT
+$LOAD ENR_VEH
+$LOAD VEH_PROD_CINT_CSNT
+$LOAD VEH_PROD_EINT
+$LOAD VEH_OPER_EINT
+*$LOAD VEH_OPER_CINT
+$LOAD VEH_EOLT_CINT
+$LOAD VEH_OCUP
+$LOAD VEH_LIFT_PDF
+$LOAD VEH_LIFT_MOR
+$LOAD VEH_PAY
+$LOAD VEH_STCK_INT_TEC
+$LOAD VEH_STCK_INT
+$LOAD VEH_ADD_GRD
+*VEH_OPER_DIST VEH_LIFT_CDF VEH_STCK_TOT VEH_PROD_CINT
 $GDXIN
+
+* Load in parameter values defined in Python class
+$GDXIN 'troubleshooting_params'
+$LOAD VEH_OPER_DIST VEH_STCK_TOT VEH_LIFT_CDF VEH_LIFT_AGE AGE_PAR YEAR_PAR VEH_PROD_CINT VEH_OPER_CINT
+$OFFMULTI
+$GDXIN
+;
 
 
 ********************************************************************************
