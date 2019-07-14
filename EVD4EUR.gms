@@ -78,17 +78,21 @@ grdeq          parameters for gradient of change (fleet additions) - individual 
 * CNST = b in y = ax + b
 ;
 
-** Load sets from dummy file
-$GDXIN 'EVD4EUR_input'
-$LOADM year optyear inityear tec enr sigvar dstvar enreq veheq demeq lfteq grdeq
-*prodyear agej tecj
-*$LOAD
-$GDXIN
-
-
 ** Load sets defined in Python class 
 $GDXIN 'troubleshooting_params'
+$LOAD year
+$LOAD tec
 $LOAD age
+$LOAD enr
+$LOAD demeq
+$LOAD dstvar
+$LOAD enreq
+$LOAD grdeq
+$LOAD inityear
+$LOAD lfteq
+$LOAD sigvar
+$LOAD veheq
+$LOAD optyear
 $GDXIN
 
 * alias call for prodyear = production year is identical set to year
@@ -199,7 +203,7 @@ VEH_ADD_GRD(grdeq,tec)           Parameter for gradient of change constraint (fl
 *$call ="c:\gams\win64\26.1\xls2gms.exe" @commands.txt
 
 
-* Load in parameter values from Python-generated .gdx file [dummy data]
+* Load in parameter values from .gdx file [dummy data]
 $ONMULTI
 $GDXIN 'EVD4EUR_input'
 *$LOADR
@@ -209,25 +213,26 @@ $LOAD DEM_PARTAB
 $LOAD ENR_PARTAB
 $LOAD LFT_PARTAB
 $LOAD ENR_CINT
-$LOAD ENR_VEH
+*$LOAD ENR_VEH
 $LOAD VEH_PROD_CINT_CSNT
 $LOAD VEH_PROD_EINT
 $LOAD VEH_OPER_EINT
 *$LOAD VEH_OPER_CINT
-$LOAD VEH_EOLT_CINT
+*$LOAD VEH_EOLT_CINT
 $LOAD VEH_OCUP
 $LOAD VEH_LIFT_PDF
 $LOAD VEH_LIFT_MOR
-$LOAD VEH_PAY
+*$LOAD VEH_PAY
 $LOAD VEH_STCK_INT_TEC
-$LOAD VEH_STCK_INT
+*$LOAD VEH_STCK_INT
 $LOAD VEH_ADD_GRD
 *VEH_OPER_DIST VEH_LIFT_CDF VEH_STCK_TOT VEH_PROD_CINT
 $GDXIN
 
 * Load in parameter values defined in Python class
 $GDXIN 'troubleshooting_params'
-$LOAD VEH_OPER_DIST VEH_STCK_TOT VEH_LIFT_CDF VEH_LIFT_AGE AGE_PAR YEAR_PAR VEH_PROD_CINT VEH_OPER_CINT
+$LOAD VEH_OPER_DIST VEH_STCK_TOT VEH_LIFT_CDF VEH_LIFT_AGE AGE_PAR YEAR_PAR VEH_PROD_CINT VEH_OPER_CINT VEH_STCK_INT VEH_PAY VEH_EOLT_CINT ENR_VEH
+*PRODYEAR_PAR
 $OFFMULTI
 $GDXIN
 ;
