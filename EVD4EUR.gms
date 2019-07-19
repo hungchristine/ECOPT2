@@ -1,6 +1,4 @@
-********************************************************************************
-********************************************************************************
-********************************************************************************
+*-----------------------------------------------------------------------------------
 * EVD4EUR Model
 * Basic Edition
 * Januar 2018
@@ -30,10 +28,7 @@
 * ver 1.03       Tecnology gradient of change constraints ver B added.
 * ver 1.04       Initiaton resolved
 
-********************************************************************************
-********************************************************************************
-********************************************************************************
-
+*-----------------------------------------------------------------------------------
 
 $funclibin stolib stodclib
 function pdfnormal     /stolib.pdfnormal     /;
@@ -48,13 +43,14 @@ inityear(year) years for initialization
 age            age
 tec            techlogy
 enr            energy
+seg            segment or size class
 sigvar         variables for sigmoid equations
 dstvar         variables for statistical distributions
 enreq          equations for energy (electricity and fuels) system
 veheq          equations for vehicle parameters
 demeq          equations for demand parameters
 lfteq          equations for fleet lifetime parameters
-grdeq          parameters for gradient of change (fleet additions) - individual (IND) for each tech or related to all tech (ALL)
+grdeq          parameters for gradient of change (fleet additions) - individual (IND) for each tech or related to all tech (ALL)\
 
 *year           year /2000*2050/
 *optyear(year)  years for optimization /2020*2050/
@@ -70,7 +66,7 @@ grdeq          parameters for gradient of change (fleet additions) - individual 
 *lfteq          equations for fleet lifetime parameters /LIFT_DISTR, AGE_DISTR/
 *grdeq          parameters for gradient of change (fleet additions) - individual (IND) for each tech or related to all tech (ALL) /IND,ALL/
 
-*** ABBREIVATIONS USED *********************************************************
+*---- ABBREIVATIONS USED *-----------------------------------------------------------------------------------
 * PROD = Production
 * OPER = Operation
 * ENIT = Enerqy intensity
@@ -84,6 +80,7 @@ $LOAD year
 $LOAD tec
 $LOAD age
 $LOAD enr
+$LOAD seg
 $LOAD demeq
 $LOAD dstvar
 $LOAD enreq
@@ -104,7 +101,7 @@ alias (agej, age)
 alias (tec, tecj)
 alias (tecj, tec)
 
-**** General logistic function *************************************************
+*--- General logistic function -----------------------------------------------------------------------------------
 $macro genlogfnc(A,B,r,t,u) A + (B-A)/(1+exp(-r*(t-u)));
 **
 ** https://en.wikipedia.org/wiki/Generalised_logistic_function
@@ -119,16 +116,13 @@ $macro genlogfnc(A,B,r,t,u) A + (B-A)/(1+exp(-r*(t-u)));
 *
 *
 PARAMETERS
-*********************************************************************************
-*********************************************************************************
+**-----------------------------------------------------------------------------------
 **
 ** Parameter Definitions p.t 1 : Parameter Declarations
 **
-*********************************************************************************
-*********************************************************************************
-*
-*
-****TIME*************************************************************************
+**-----------------------------------------------------------------------------------
+
+**-- TIME ---------------------------------------------------------------------------
 *Declaraton of year as both a set and a parameter
 AGE_PAR(age)                     age
 YEAR_PAR(year)                   year
@@ -138,31 +132,31 @@ DEM_PARTAB(demeq,sigvar)         variables for demand equationions
 ENR_PARTAB(enr,enreq,sigvar)     variables for each energy (fos or elc) equation
 LFT_PARTAB(dstvar)               variables for fleet lifetime equations
 
-***ENERGY (ELECTRICITY GENERATION and FUEL) ************************************
+***ENERGY (ELECTRICITY GENERATION and FUEL) ------------------------------------------
 ENR_CINT(enr,year)               CO2 intensity of the energy  [kg CO2-eq pr kwh]
 
-***ENERGY and VEHICLE TECHONLOGY COMBINATIONS **********************************
-ENR_VEH(enr,tec)                 feasible cominations of vehivle technology and energy (fuel).
+***ENERGY and VEHICLE TECHONLOGY COMBINATIONS ----------------------------------------
+ENR_VEH(enr,tec)                 feasible cominations of vehicle technology and energy (fuel).
 
 
-***All VEHICLES*****************************************************************
+***All VEHICLES ----------------------------------------------------------------------
 
 **PRODUCTION
-VEH_PROD_EINT(tec,prodyear)        Electricity intensity of vehicle prod [kwh el required per vehicle produced]
-VEH_PROD_CINT_CSNT(tec,prodyear)   Constant term for CO2 int. of vehicle production [kg CO2-eq per vehicle produced]
-VEH_PROD_CINT(tec,prodyear)        CO2 intensity of vehicle production [kg CO2-eq per vehicle produced]
+*VEH_PROD_EINT(tec,prodyear)        Electricity intensity of vehicle prod [kwh el required per vehicle produced]
+*VEH_PROD_CINT_CSNT(tec,prodyear)   Constant term for CO2 int. of vehicle production [kg CO2-eq per vehicle produced]
+VEH_PROD_CINT(tec,prodyear,seg)        CO2 intensity of vehicle production [kg CO2-eq per vehicle produced]
 
 **OPERATION
 VEH_OPER_EINT(tec,prodyear)        Energy intensity of vehicle operation [kwh per km]
-VEH_OPER_CINT(tec,enr,prodyear)    CO2 intensity of vehicle operation    [kg CO2 per km]
+VEH_OPER_CINT(tec,enr,prodyear,seg)    CO2 intensity of vehicle operation    [kg CO2 per km]
 
 **EOL
-VEH_EOLT_CINT(tec,year)            CO2 intensity of ICE vehicle EOL - [kg CO2-eq per vehicle in EOL treatment]
+VEH_EOLT_CINT(tec,year,seg)            CO2 intensity of ICE vehicle EOL - [kg CO2-eq per vehicle in EOL treatment]
 
 
 
 
-***FLEET ****************************************************************
+***FLEET -------------------------------------------------------------------------------
 
 **DEMAND
 
@@ -170,7 +164,7 @@ VEH_EOLT_CINT(tec,year)            CO2 intensity of ICE vehicle EOL - [kg CO2-eq
 VEH_STCK_TOT(year)               Number of vehicles - #
 VEH_OPER_DIST(year)              Annual driving distance per vehicles - km
 VEH_OCUP(year)
-
+VEH_SEG_INT(seg)                 temporary factors for segments
 ** LIFETIME
 
 VEH_LIFT_PDF(age)                Age PDF
@@ -180,14 +174,22 @@ VEH_LIFT_MOR(age)                Age distribution = 1 - CDF
 
 ** COMPOSITION
 
-VEH_PAY(prodyear,age,year)       Correspondance between a vehicle prododuction year and its age (up to 20) in a given year
+VEH_PAY(prodyear,age,year)       Correspondance between a vehicle production year and its age (up to 20) in a given year
 VEH_STCK_INT_TEC(tec)            Initial share of vehicles in stock tech
-VEH_STCK_INT(tec,age)            Initial size of stock of vehicles by age cohort.
+VEH_STCK_INT(tec,age,seg)        Initial size of stock of vehicles by age cohort and segment
 
 ** GRADIENT OF CHANGE
 VEH_ADD_GRD(grdeq,tec)           Parameter for gradient of change constraint (fleet additions) - individual (IND) for each tech or related to all tech (ALL)
 
 ;
+
+PARAMETER VEH_SEG_INT(seg)
+/       B = 0.8
+        C = 1.0
+        D = 1.2
+        E = 1.5
+/;
+
 
 *$call ="c:\gams\win64\26.1\xls2gms.exe" I="C:\Users\chrishun\Box Sync\YSSP_temp\GAMS_input.xls" *O="VEH_OPER_DIST.inc" R="Sheet2!A2:B52"
 *PARAMETER VEH_OPER_DIST(year)
@@ -214,14 +216,14 @@ $LOAD ENR_PARTAB
 $LOAD LFT_PARTAB
 $LOAD ENR_CINT
 *$LOAD ENR_VEH
-$LOAD VEH_PROD_CINT_CSNT
-$LOAD VEH_PROD_EINT
+*$LOAD VEH_PROD_CINT_CSNT
+*$LOAD VEH_PROD_EINT
 $LOAD VEH_OPER_EINT
 *$LOAD VEH_OPER_CINT
 *$LOAD VEH_EOLT_CINT
 $LOAD VEH_OCUP
-$LOAD VEH_LIFT_PDF
-$LOAD VEH_LIFT_MOR
+*$LOAD VEH_LIFT_PDF
+*$LOAD VEH_LIFT_MOR
 *$LOAD VEH_PAY
 $LOAD VEH_STCK_INT_TEC
 *$LOAD VEH_STCK_INT
@@ -231,23 +233,35 @@ $GDXIN
 
 * Load in parameter values defined in Python class
 $GDXIN 'troubleshooting_params'
-$LOAD VEH_OPER_DIST VEH_STCK_TOT VEH_LIFT_CDF VEH_LIFT_AGE AGE_PAR YEAR_PAR VEH_PROD_CINT VEH_OPER_CINT VEH_STCK_INT VEH_PAY VEH_EOLT_CINT ENR_VEH
+$LOAD VEH_OPER_DIST
+$LOAD VEH_STCK_TOT
+$LOAD VEH_LIFT_CDF
+$LOAD VEH_LIFT_AGE
+$LOAD AGE_PAR
+$LOAD YEAR_PAR
+$LOAD VEH_PROD_CINT
+$LOAD VEH_OPER_CINT
+$LOAD VEH_STCK_INT
+$LOAD VEH_PAY
+$LOAD VEH_EOLT_CINT
+$LOAD ENR_VEH
+$LOAD VEH_LIFT_PDF
+$LOAD VEH_LIFT_MOR
 *PRODYEAR_PAR
 $OFFMULTI
 $GDXIN
 ;
 
+*VEH_PROD_EINT(tec,prodyear) = genlogfnc(VEH_PARTAB(tec,'PROD_EINT','A'),VEH_PARTAB(tec,'PROD_EINT','B'),VEH_PARTAB(tec,'PROD_EINT','r'),YEAR_PAR(prodyear),VEH_PARTAB(tec,'PROD_EINT','u'));
 
-********************************************************************************
-********************************************************************************
+*-----------------------------------------------------------------------------------
 *
 * Model Definition  p.t 1 : Variable Definitions
 *
-********************************************************************************
-********************************************************************************
+*-----------------------------------------------------------------------------------
 
 
-***FREE VARIABLES***************************************************************
+***FREE VARIABLES ------------------------------------------------------------------
 * Objective value to be minimized must be a free variable
 
 
@@ -257,30 +271,28 @@ VEH_STCK_DELTA(year)                 Delta stock from one year to the next
 ;
 
 POSITIVE VARIABLES
-VEH_STCK(tec,year,age)               Number of vehicles of a given age in a given year
-VEH_STCK_REM(tec,year,age)           Number of vehicles of a given age retired in a given year
-VEH_STCK_TOT_CHECK(year)             Check on number of vehicles
-VEH_STCK_ADD(tec,year,age)           Stock additions (new car sales)
+VEH_STCK(tec,year,age,seg)               Number of vehicles of a given age in a given year
+VEH_STCK_REM(tec,year,age,seg)           Number of vehicles of a given age retired in a given year
+VEH_STCK_TOT_CHECK(year)                 Check on number of vehicles
+VEH_STCK_ADD(tec,year,age,seg)           Stock additions (new car sales)
 
-VEH_TOTC(tec,year)                   Total CO2 emissions of BEV vehicles per year
+VEH_TOTC(tec,year,seg)                   Total CO2 emissions of vehicles per year, by technology
 
-VEH_PROD_TOTC(tec,year)              Total CO2 emissions from production of BEV vehicles per year
-VEH_OPER_TOTC(tec,year)              Total CO2 emissions from operations of BEV vehicles per year
-VEH_EOLT_TOTC(tec,year)              Total CO2 emissions from operations of BEV vehicles per year
+VEH_PROD_TOTC(tec,year,seg)              Total CO2 emissions from production of vehicles per year
+VEH_OPER_TOTC(tec,year,seg)              Total CO2 emissions from operations of vehicles per year
+VEH_EOLT_TOTC(tec,year,seg)              Total CO2 emissions from operations of vehicles per year
 ;
 
 
-********************************************************************************
-********************************************************************************
+*-----------------------------------------------------------------------------------
 *
 * Model Definition  p.t 2 : Model Equation Declarations
 *
-********************************************************************************
-********************************************************************************
+*-----------------------------------------------------------------------------------
 
 EQUATIONS
 
-***VEHICLE STOCK MODEL  ************************************************************
+***VEHICLE STOCK MODEL  ------------------------------------------------------------
 
 ***  Initiate stock in first year
 EQ_STCK_REM_T1
@@ -305,7 +317,7 @@ EQ_STCK_CHK
 * Gradient of change constraint - as % of individual veh tec add in previous year
 EQ_STCK_GRD
 
-**EMISSION and ENERGY MODELS incl OBJ. FUNCTION ************************************************************
+**EMISSION and ENERGY MODELS incl OBJ. FUNCTION --------------------------------------
 
 * Objective function
 EQ_TOTC
@@ -320,74 +332,68 @@ EQ_VEH_EOLT_TOTC
 
 ;
 
-********************************************************************************
-********************************************************************************
+*-----------------------------------------------------------------------------------
 *
 * Model Definition  p.t 3 : Model Equations
 *
-********************************************************************************
-********************************************************************************
+*-----------------------------------------------------------------------------------
 
-
-***VEHICLE STOCK MODEL  ************************************************************
+***VEHICLE STOCK MODEL  ------------------------------------------------------------
 
 
 
 ***  Initiate stock in first year
 
 *removals
-EQ_STCK_REM_T1(tec,year,age)$(ord(year)=1)..                     VEH_STCK_REM(tec,year,age) =e=  VEH_STCK_TOT(year)*VEH_STCK_INT_TEC(tec)*VEH_LIFT_AGE(age)*VEH_LIFT_MOR(age);
+EQ_STCK_REM_T1(tec,year,age,seg)$(ord(year)=1)..                     VEH_STCK_REM(tec,year,age,seg) =e=  VEH_STCK_TOT(year)*VEH_STCK_INT_TEC(tec)*VEH_LIFT_AGE(age)*VEH_LIFT_MOR(age);
 
 *stock additions
 *EQ_STCK_ADD_T1(tec,year,age)$(ord(year)=1 and ord(age)=1)..      VEH_STCK_ADD(tec,year,age) =e=  VEH_STCK_TOT(year)*VEH_STCK_INT_TEC(tec)*VEH_LIFT_AGE(age);
-EQ_STCK_ADD_T1(year,age)$(ord(year)=1 and ord(age)=1)..      sum( (tec), VEH_STCK_ADD(tec,year,age) ) =e=  sum( (tec,agej), VEH_STCK_REM(tec,year,agej));
+EQ_STCK_ADD_T1(year,age)$(ord(year)=1 and ord(age)=1)..      sum( (tec,seg), VEH_STCK_ADD(tec,year,age,seg) ) =e=  sum( (tec,agej,seg), VEH_STCK_REM(tec,year,agej,seg));
 
 *stock
-EQ_STCK_BAL_T1(tec,year,age)$(ord(year)=1)..                     VEH_STCK(tec,year,age) =e=  VEH_STCK_TOT(year)*VEH_STCK_INT_TEC(tec)*VEH_LIFT_AGE(age);
+EQ_STCK_BAL_T1(tec,year,age,seg)$(ord(year)=1)..                     VEH_STCK(tec,year,age,seg) =e=  VEH_STCK_TOT(year)*VEH_STCK_INT_TEC(tec)*VEH_LIFT_AGE(age);
 
 
 ***  Main Model
 EQ_STCK_DELTA(year)$(ord(year)>1)..                              VEH_STCK_DELTA(year)  =e=  VEH_STCK_TOT(year)-VEH_STCK_TOT(year-1);
 
 *removals
-EQ_STCK_REM(tec,year,age)$(ord(year)>1)..                        VEH_STCK_REM(tec,year,age) =e= VEH_STCK(tec,year-1,age-1)*VEH_LIFT_MOR(age-1);
+EQ_STCK_REM(tec,year,age,seg)$(ord(year)>1)..                        VEH_STCK_REM(tec,year,age,seg) =e= VEH_STCK(tec,year-1,age-1,seg)*VEH_LIFT_MOR(age-1);
 
 *stock additions
-EQ_STCK_ADD(year,age)$(ord(year)>1 and ord(age)=1)..             sum( (tec), VEH_STCK_ADD(tec,year,age)- sum( (agej), VEH_STCK_REM(tec,year,agej) ) ) =e= VEH_STCK_DELTA(year);
+EQ_STCK_ADD(year,age)$(ord(year)>1 and ord(age)=1)..             sum( (tec,seg), VEH_STCK_ADD(tec,year,age,seg)- sum( (agej), VEH_STCK_REM(tec,year,agej,seg) ) ) =e= VEH_STCK_DELTA(year);
 
 *calculating vehicle stock in a given year
-EQ_STCK_BAL(tec,year,age)$(ord(year)>1)..                        VEH_STCK(tec,year,age)  =e=  VEH_STCK(tec,year-1,age-1) + VEH_STCK_ADD(tec,year,age) - VEH_STCK_REM(tec,year,age);
+EQ_STCK_BAL(tec,year,age,seg)$(ord(year)>1)..                        VEH_STCK(tec,year,age,seg)  =e=  VEH_STCK(tec,year-1,age-1,seg) + VEH_STCK_ADD(tec,year,age,seg) - VEH_STCK_REM(tec,year,age,seg);
 
 *summing the number of vehicles in for check.
-EQ_STCK_CHK(year)..                                              VEH_STCK_TOT_CHECK(year) =e= sum((tec,age), VEH_STCK(tec,year,age));
+EQ_STCK_CHK(year)..                                              VEH_STCK_TOT_CHECK(year) =e= sum((tec,age,seg), VEH_STCK(tec,year,age,seg));
 
 *** Gradient of change constraint
 
-EQ_STCK_GRD(tec,year,age)$(ord(year)>1 and ord(age)=1)..         VEH_STCK_ADD(tec,year,age) =l= (1 + VEH_ADD_GRD('IND',tec))*VEH_STCK_ADD(tec,year-1,age) + 5e6; ;
+EQ_STCK_GRD(tec,year,age)$(ord(year)>1 and ord(age)=1)..         sum((seg), VEH_STCK_ADD(tec,year,age,seg)) =l= (1 + sum((seg), VEH_ADD_GRD('IND',tec)*VEH_STCK_ADD(tec,year-1,age,seg))) + 5e6; ;
 
 
 
-***EMISSION and ENERGY MODELS incl OBJ. FUNCTION ************************************************************
-
+***EMISSION and ENERGY MODELS incl OBJ. FUNCTION ------------------------------------
 * Objective function
-EQ_TOTC..                                TOTC =e= SUM( (tec,year), VEH_TOTC(tec,year));
+EQ_TOTC..                                TOTC =e= SUM( (tec,year,seg), VEH_TOTC(tec,year,seg));
 
 
-* Calculation of Emissions from all vehivles classes per year
-EQ_VEH_TOTC(tec,year)..                  VEH_TOTC(tec,year) =e= VEH_PROD_TOTC(tec,year) + VEH_OPER_TOTC(tec,year) + VEH_EOLT_TOTC(tec,year);
+* Calculation of Emissions from all vehicle classes per year
+EQ_VEH_TOTC(tec,year,seg)..                  VEH_TOTC(tec,year,seg) =e= VEH_PROD_TOTC(tec,year,seg) + VEH_OPER_TOTC(tec,year,seg) + VEH_EOLT_TOTC(tec,year,seg);
 
-EQ_VEH_PROD_TOTC(tec,year)..             VEH_PROD_TOTC(tec,year) =e= sum( (agej)$(ord(agej)=1), VEH_STCK_ADD(tec,year,agej)*VEH_PROD_CINT(tec,year));
-EQ_VEH_OPER_TOTC(tec,year)..             VEH_OPER_TOTC(tec,year) =e= sum( (agej,enr,prodyear), VEH_STCK(tec,year,agej)*VEH_OPER_CINT(tec,enr,prodyear)*ENR_VEH(enr,tec)*VEH_PAY(prodyear,agej,year)*VEH_OPER_DIST(year) );
-EQ_VEH_EOLT_TOTC(tec,year)..             VEH_EOLT_TOTC(tec,year) =e= sum( (agej), VEH_STCK_REM(tec,year,agej))*VEH_EOLT_CINT(tec,year);
+EQ_VEH_PROD_TOTC(tec,year,seg)..             VEH_PROD_TOTC(tec,year,seg) =e= sum( (agej)$(ord(agej)=1), VEH_STCK_ADD(tec,year,agej,seg)*VEH_PROD_CINT(tec,year,seg));
+EQ_VEH_OPER_TOTC(tec,year,seg)..             VEH_OPER_TOTC(tec,year,seg) =e= sum( (agej,enr,prodyear), VEH_STCK(tec,year,agej,seg)*VEH_OPER_CINT(tec,enr,prodyear,seg)*ENR_VEH(enr,tec)*VEH_PAY(prodyear,agej,year)*VEH_OPER_DIST(year) );
+EQ_VEH_EOLT_TOTC(tec,year,seg)..             VEH_EOLT_TOTC(tec,year,seg) =e= sum( (agej), VEH_STCK_REM(tec,year,agej,seg))*VEH_EOLT_CINT(tec,year,seg);
 
 
-********************************************************************************
-********************************************************************************
+*-----------------------------------------------------------------------------------
 *
 * Model Execution  p.t 1 : Model Definition and Options
 *
-********************************************************************************
-********************************************************************************
+*-----------------------------------------------------------------------------------
 
 * Defining Name of Model(s) and what Equations are used in each Model
 
@@ -405,26 +411,19 @@ MODEL EVD4EUR_Basic
 *OPTION solprint = off;
 *OPTION sysout = off;
 
-
-********************************************************************************
-********************************************************************************
+*-----------------------------------------------------------------------------------
 *
 * Model Execution  p.t 2 : Variables Initial Values
 *
-********************************************************************************
-********************************************************************************
+*-----------------------------------------------------------------------------------
 
 *Not required
 
-
-
-********************************************************************************
-********************************************************************************
+*-----------------------------------------------------------------------------------
 *
 * Model Execution  p.t 3 : Solve Call
 *
-********************************************************************************
-********************************************************************************
+*-----------------------------------------------------------------------------------
 
 SOLVE EVD4EUR_Basic USING LP MINIMIZING TOTC;
 
