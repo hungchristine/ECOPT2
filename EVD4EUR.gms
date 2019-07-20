@@ -191,6 +191,14 @@ PARAMETER VEH_SEG_INT(seg)
 /;
 
 
+PARAMETER VEH_ADD_GRD(grdeq,tec)
+/        IND    .ICE   = 0.4
+         ALL    .ICE   = 0.4
+         IND    .BEV   = 0.4
+         ALL    .BEV   = 0.4
+/;
+
+
 *$call ="c:\gams\win64\26.1\xls2gms.exe" I="C:\Users\chrishun\Box Sync\YSSP_temp\GAMS_input.xls" *O="VEH_OPER_DIST.inc" R="Sheet2!A2:B52"
 *PARAMETER VEH_OPER_DIST(year)
 */
@@ -227,7 +235,7 @@ $LOAD VEH_OCUP
 *$LOAD VEH_PAY
 $LOAD VEH_STCK_INT_TEC
 *$LOAD VEH_STCK_INT
-$LOAD VEH_ADD_GRD
+*$LOAD VEH_ADD_GRD
 *VEH_OPER_DIST VEH_LIFT_CDF VEH_STCK_TOT VEH_PROD_CINT
 $GDXIN
 
@@ -372,7 +380,7 @@ EQ_STCK_CHK(year)..                                              VEH_STCK_TOT_CH
 
 *** Gradient of change constraint
 
-EQ_STCK_GRD(tec,year,age)$(ord(year)>1 and ord(age)=1)..         sum((seg), VEH_STCK_ADD(tec,year,age,seg)) =l= (1 + sum((seg), VEH_ADD_GRD('IND',tec)*VEH_STCK_ADD(tec,year-1,age,seg))) + 5e6; ;
+EQ_STCK_GRD(tec,year,age)$(ord(year)>1 and ord(age)=1)..         sum((seg), VEH_STCK_ADD(tec,year,age,seg)) =l= (1 + (VEH_ADD_GRD('IND',tec)))*sum((seg),VEH_STCK_ADD(tec,year-1,age,seg)) + 1e5;
 
 
 
