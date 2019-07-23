@@ -1,4 +1,9 @@
 # -*- coding: utf-8 -*-
+"""
+Created on Sun Apr 21 13:27:57 2019
+
+@author: chrishun
+"""
 
 import os
 import pandas as pd
@@ -11,13 +16,8 @@ from datetime import datetime
 
 
 import gams
-
 import gmspy
-"""
-Created on Sun Apr 21 13:27:57 2019
 
-@author: chrishun
-"""
 
 class FleetModel:
     """
@@ -40,7 +40,7 @@ class FleetModel:
     def __init__(self, data_from_message=None):
         self.current_path = os.path.dirname(os.path.realpath(__file__))
        #self.gdx_file = 'C:\\Users\\chrishun\\Box Sync\\YSSP_temp\\EVD4EUR_input.gdx'#EVD4EUR_ver098.gdx'
-        self.gms_file = 'C:\\Users\\chrishun\\Box Sync\\YSSP_temp\\EVD4EUR.gms'
+        self.gms_file = 'C:\\Users\\chrishun\\Box Sync\\YSSP_temp\\EVD4EUR.gms' # GAMS model file
         self.import_fp = 'C:\\Users\\chrishun\\Box Sync\\YSSP_temp\\data\\'
         self.export_fp = ''
         
@@ -56,19 +56,26 @@ class FleetModel:
         """ GAMS-relevant attributes"""
         #  --------------- GAMS sets / domains -------------------------------
         self.tecs = ['ICE','BEV']                           # drivetrain technologies; can include e.g., alternative battery chemistries
+        self.year = [str(2000+i) for i in range(51)]
         self.cohort = [str(2000+i) for i in range(51)]      # vehicle cohorts (production year)
+        self.optyear = [str(2020+i) for i in range(31)]
         self.age = [str(i) for i in range(28)]              # vehicle age, up to 27 years old
         self.enr = ['ELC','FOS']                            # fuel types; later include H2, 
+        self.seg = ['B','C','D','E']                    # From ACEA: Small, lower medium, upper medium, executive
         self.demeq= ['STCK_TOT','OPER_DIST','OCUP']         # definition of 
         self.dstvar=['mean','stdv']
         self.enreq=['CINT']
         self.grdeq=['IND','ALL']
+        self.veheq = ['PROD_EINT','PROD_CINT_CSNT','OPER_EINT','EOLT_CINT']
         self.inityear=[str(2000+i) for i in range(21)]      # reduce to one/five year(s)? Originally 2000-2020
         self.lfteq=['LFT_DISTR','AGE_DISTR']
         self.sigvar=['A','B','r','t','u']                   # S-curve terms
+        self.critmats = ['Cu','Li','Co','Pt','','']         # critical elements to count for; to incorporate later
+        self.age_int = list(map(int,self.age))
         
         # --------------- GAMS Parameters -------------------------------------
 
+        
         # "Functional unit" # TODO: this is redund
         # Eurostat road_tf_veh [vkm]
         # Eurostat road_tf_vehage [vkm, cohort] NB: very limited geographic spectrum
@@ -78,36 +85,77 @@ class FleetModel:
         self.veh_oper_dist = pd.Series([-97.052*i+207474 for i in range(2000,2051)],index=[str(i) for i in range(2000,2051)]) 
         #self.veh_oper_dist.index.names=['year']
         # [years] driving distance each year # TODO: rename?
-        self.veh_stck_tot = pd.Series([10050]*len(self.cohort),index=[str(i) for i in range(2000,2051)])      # [years]
-
-        # Life cycle intensities
-        self.veh_prod_cint = pd.DataFrame(pd.read_excel('GAMS_input.xls',sheet_name='Sheet1',header=None,usecols='A:C',skiprows=[0]))  # [tecs, cohort]
-        self.veh_prod_cint = self._process_df_to_series(self.veh_prod_cint)
         
-        self.veh_oper_cint = pd.DataFrame(pd.read_excel('GAMS_input.xls',sheet_name='Sheet1',header=None,usecols='F:I',skiprows=[0]))  # [[tecs, enr], cohort]
+        """needs to be made in terms of tec as well??"""
+        """Currently uses generalized logistic growth curve"""
+        """TODO: make veh_stck_tot a variable with occupancy rate"""
+        #self.veh_stck_tot = pd.Series([100500000]*len(self.cohort),index=[str(i) for i in range(2000,2051)])  
+        self.veh_stck_tot = pd.DataFrame(pd.read_excel('GAMS_input_new.xls',sheet_name='VEH_STCK_TOT',header=None,usecols='A:B',skiprows=[0]))
+        self.veh_stck_tot = self._process_df_to_series(self.veh_stck_tot)
+        
+        ################ Life cycle intensities ################
+        """These factors are usually calculated using the general logistic function"""
+        self.veh_prod_cint = pd.DataFrame(pd.read_excel('GAMS_input_new.xls',sheet_name='VEH_PROD_CINT',header=None,usecols='A:D',skiprows=[0]))  # [tecs, cohort]
+        self.veh_prod_cint = self._process_df_to_series(self.veh_prod_cint)
+
+        self.veh_oper_cint = pd.DataFrame(pd.read_excel('GAMS_input_new.xls',sheet_name='VEH_OPER_CINT',header=None,usecols='A:E',skiprows=[0]))  # [[tecs, enr], cohort]
         self.veh_oper_cint = self._process_df_to_series(self.veh_oper_cint)
-#        
-        self.veh_eolt_cint = pd.DataFrame()  # [tecs, cohort]
+        
+        """Trial for calculating general logistic function in-code""" 
+        """self.veh_partab = pd.DataFrame(pd.read_excel('GAMS_input_new.xls',sheet_name='VEH_PARTAB',header=None,usecols='A:D',skiprows=[0]))
+        self.veh_partab = self._process_df_to_series(self.veh_partab)
+        print(self.veh_partab)
+        self.trial_oper_eint = self.veh_partab['OPER_EINT']
+        self.oper_eint = self.trial_oper_eint['A']+(trial_oper_eint['B']-trial_oper_eint['A'])/(1+exp(-trial_oper_eint['r']*(self.year-trial_oper_eint['u'])))
+        #A, B, r, u"""
 
-        # Fleet dynamics
-        self.veh_lift_cdf = pd.Series(pd.read_pickle(self.import_fp+'input.pkl'))#pd.DataFrame()  # [age] TODO Is it this one we feed to gams?
+        self.veh_eolt_cint = pd.DataFrame(pd.read_excel('GAMS_input_new.xls',sheet_name='VEH_EOLT_CINT',header=None,usecols='A:D',skiprows=[0]))  # [[tecs, enr], cohort]
+        self.veh_eolt_cint = self._process_df_to_series(self.veh_eolt_cint)  # [tecs, cohort]
+
+        ################ Fleet dynamics ################
+        """VEH_LIFT_CDF(age) = cdfnormal(AGE_PAR(age),LFT_PARTAB('mean'),LFT_PARTAB('stdv'));
+        VEH_LIFT_AGE(age) = (1 - VEH_LIFT_CDF(age))/sum(agej, VEH_LIFT_CDF(agej)) ;
+        VEH_LIFT_MOR(age)$(ord(age)< 20) = 1 - VEH_LIFT_AGE(age+1)/VEH_LIFT_AGE(age);
+        VEH_LIFT_MOR(age)$(ord(age)= 20) = 1"""
+        avg_age = 11.1 # From ACEA 2019-2020 report
+        std_dev_age = 2.21
+        self.veh_lift_cdf = pd.Series(norm.cdf(self.age_int,avg_age,std_dev_age),index=self.age)#pd.Series(pd.read_pickle(self.import_fp+'input.pkl'))#pd.DataFrame()  # [age] TODO Is it this one we feed to gams?
         self.veh_lift_cdf.index = self.veh_lift_cdf.index.astype('str')
+        
         self.veh_lift_age = pd.Series(1-self.veh_lift_cdf)     # [age] # probability of car of age x to die in current year
+        
+        #lifetime = [1-self.veh_lift_age[i+1]/self.veh_lift_age[i] for i in range(len(self.age)-1)]
+        self.veh_lift_pdf = pd.Series(calc_steadystate_vehicle_age_distributions(self.age_int,avg_age,std_dev_age), index = self.age)   # idealized age PDF given avg fleet age and std dev
+        self.veh_lift_pdf.index = self.veh_lift_pdf.index.astype('str')
+        
+        self.veh_lift_mor = pd.Series(calc_probability_of_vehicle_retirement(self.age_int,self.veh_lift_pdf), index = self.age)
+        self.veh_lift_mor.index = self.veh_lift_mor.index.astype('str')
 
+        
         # Initial stocks
         """# Eurostat road_eqs_carpda[tec]
         # Eurostat road_eqs_carage [age - <2, 2-5, 5-10, 10-20]; 
-        # ACEA [age in year divisions up to 10 years] """
-        self.veh_stck_int = pd.DataFrame()  # [tech, age] TODO Is this the right one
+        # ACEA [age in year divisions up to 10 years]
+        # Also check pb2018-section2016.xls for more cohesive, EU28++ data"""
+        self.veh_stck_int = pd.DataFrame(pd.read_excel('GAMS_input_new.xls',sheet_name='VEH_STCK_INT',header=None,usecols='A:D',skiprows=[0]))  # [tec, age]
+        self.veh_stck_int = self._process_df_to_series(self.veh_stck_int)
 
-        # filters
-        self.enr_veh = pd.DataFrame()       # [enr, tec]
-        self.veh_pay = pd.DataFrame()       # [cohort, age, year]
+
+        ################ filters and parameter aliases ################
+        self.enr_veh = pd.DataFrame(pd.read_excel('GAMS_input_new.xls',sheet_name='ENR_VEH',header=None,usecols='A:C',skiprows=[0]))            # [enr, tec]
+        self.enr_veh = self._process_df_to_series(self.enr_veh)
+
+        self.veh_pay = pd.DataFrame(pd.read_excel('GAMS_input_new.xls',sheet_name='VEH_PAY',header=None,usecols='A:D',skiprows=[0]))            # [cohort, age, year]
+        self.veh_pay = self._process_df_to_series(self.veh_pay)
         
         self.age_par = pd.Series([float(i) for i in self.age])
         self.age_par.index = self.age_par.index.astype('str')
+        
         self.year_par = pd.Series([float(i) for i in self.cohort],index = self.cohort)
         self.year_par.index = self.year_par.index.astype('str')
+        
+        self.prodyear_par = pd.Series([int(i) for i in self.cohort],index = self.cohort)
+        self.prodyear_par.index = self.prodyear_par.index.astype('str')
         
         """# ACEA.be has segment division for Western Europe
         # https://www.acea.be/statistics/tag/category/segments-body-country
@@ -189,30 +237,16 @@ class FleetModel:
         self.age = gmspy.set2list('age', db)
         self.enr = gmspy.set2list('enr', db)"""
 
-    def _read_all_final_parameters(self, a_file):
-        # will become unnecessary as we start internally defining all parameters
-        db = gmspy._iwantitall(None, None, a_file)
-
-        #self.veh_oper_dist = gmspy.param2series('VEH_OPER_DIST', db)
-        #self.veh_stck_tot = gmspy.param2series('VEH_STCK_TOT', db)
-        #self.veh_lift_cdf = gmspy.param2series('VEH_LIFT_CDF', db)
-        #self.veh_lift_age = gmspy.param2series('VEH_LIFT_AGE', db)
-
-        #self.veh_prod_cint = gmspy.param2df('VEH_PROD_CINT', db)
-        #self.veh_oper_cint = gmspy.param2df('VEH_OPER_CINT', db)
-        self.veh_eolt_cint = gmspy.param2df('VEH_EOLT_CINT', db)
-
-        self.veh_stck_int = gmspy.param2df('VEH_STCK_INT', db)
-
-        self.enr_veh = gmspy.param2df('ENR_VEH', db)
-        self.veh_pay = gmspy.param2series('VEH_PAY', db) # series, otherwise makes giant sparse dataframe        
+         #spy.param2series('VEH_PAY', db) # series, otherwise makes giant sparse dataframe        
 
 
     def _load_experiment_data_in_gams(self): # will become unnecessary as we start calculating/defining sets and/or parameters within the class
+        years = gmspy.list2set(self.db,self.year,'year')
         tecs = gmspy.list2set(self.db, self.tecs, 'tec')
-        cohort = gmspy.list2set(self.db, self.cohort, 'prodyear')
+        #cohort = gmspy.list2set(self.db, self.cohort, 'prodyear') ## prodyear is an alias of year, not a set of its own
         age = gmspy.list2set(self.db, self.age, 'age')
         enr = gmspy.list2set(self.db, self.enr, 'enr')
+        seg = gmspy.list2set(self.db, self.seg, 'seg')
         demeq =  gmspy.list2set(self.db, self.demeq, 'demeq')
         dstvar = gmspy.list2set(self.db,self.dstvar,'dstvar')
         enreq = gmspy.list2set(self.db,self.enreq,'enreq')
@@ -220,21 +254,25 @@ class FleetModel:
         inityear = gmspy.list2set(self.db,self.inityear,'inityear')
         lfteq = gmspy.list2set(self.db,self.lfteq,'lfteq')
         sigvar = gmspy.list2set(self.db,self.sigvar,'sigvar')
-        
+        veheq = gmspy.list2set(self.db, self.veheq,'veheq')
+        optyear = gmspy.list2set(self.db,self.optyear,'optyear')
         # Add sets to GAMS
         #self.add_to_GAMS()
 
         veh_oper_dist = gmspy.df2param(self.db, self.veh_oper_dist, ['year'], 'VEH_OPER_DIST')
-        veh_stck_tot = gmspy.df2param(self.db, self.veh_stck_tot, ['year'], 'VEH_STCK_TOT') # keys = ('2000','VEH_OPER_DIST')
+        veh_stck_tot = gmspy.df2param(self.db, self.veh_stck_tot, ['year'], 'VEH_STCK_TOT')
         
-        veh_prod_cint = gmspy.df2param(self.db, self.veh_prod_cint, ['tec', 'prodyear'], 'VEH_PROD_CINT')
-        veh_oper_cint = gmspy.df2param(self.db, self.veh_oper_cint, ['tec', 'enr', 'prodyear'], 'VEH_OPER_CINT')
-        veh_eolt_cint = gmspy.df2param(self.db, self.veh_eolt_cint, ['tec', 'prodyear'], 'VEH_EOLT_CINT')
+        veh_prod_cint = gmspy.df2param(self.db, self.veh_prod_cint, ['tec','seg', 'prodyear'], 'VEH_PROD_CINT')
+        veh_oper_cint = gmspy.df2param(self.db, self.veh_oper_cint, ['tec', 'enr','seg', 'prodyear'], 'VEH_OPER_CINT')
+        veh_eolt_cint = gmspy.df2param(self.db, self.veh_eolt_cint, ['tec','seg', 'prodyear'], 'VEH_EOLT_CINT')
 
         veh_lift_cdf = gmspy.df2param(self.db, self.veh_lift_cdf, ['age'], 'VEH_LIFT_CDF')
+        veh_lift_pdf = gmspy.df2param(self.db, self.veh_lift_pdf, ['age'], 'VEH_LIFT_PDF')
         veh_lift_age = gmspy.df2param(self.db, self.veh_lift_age, ['age'], 'VEH_LIFT_AGE')
-
-        veh_stck_int = gmspy.df2param(self.db, self.veh_stck_int, ['tec', 'age'], 'VEH_STCK_INT')#cohort], 'VEH_STCK_INT')
+        veh_lift_mor = gmspy.df2param(self.db, self.veh_lift_mor, ['age'], 'VEH_LIFT_MOR' )
+    
+        ######  OBS: Originally calculated using VEH_STCK_INT_TEC, VEH_LIFT_AGE, VEH_STCK_TOT
+        veh_stck_int = gmspy.df2param(self.db, self.veh_stck_int, ['tec','seg', 'age'], 'VEH_STCK_INT')
 
         enr_veh = gmspy.df2param(self.db, self.enr_veh, ['enr', 'tec'], 'ENR_VEH')
 
@@ -277,12 +315,12 @@ class FleetModel:
         # Assembles vehicle from powertrain, glider and BoP and checks that vehicles makes sense (i.e., no Tesla motors in a Polo or vice versa)
         # used in calc_veh_mass()
         pass
-
+              
     def run_GAMS(self):
 
         # Pass to GAMS all necessary sets and parameters
         self._load_experiment_data_in_gams()
-        self.db.export('troubleshooting_custom.gdx')
+        #self.db.export('troubleshooting_custom.gdx')
         
         #Run GMS Optimization
         try:
@@ -291,12 +329,19 @@ class FleetModel:
             model_run.run(databases=self.db,create_out_db = True)
             print("Ran GAMS model: "+self.gms_file)
             gams_db = model_run.out_db
-            gams_db.export(os.path.join(self.current_path,'test_v2_db.gdx'))
-            self.export_fp = os.path.join(self.current_path,'test_v2_db.gdx')
+            self.export_fp = os.path.join(self.current_path,'fleet_model_output.gdx')
+            gams_db.export(self.export_fp)
             print("Completed export of " + self.export_fp)
-            print(gams_db)
             
-        #print("x(" + rec.keys[0] + "," + rec.keys[1] + "): level=" + str(rec.level) + " marginal=")# + str(rec.marginal)
+            self.totc = self.get_output_from_GAMS(gams_db,'TOTC')
+            self.veh_stck_add = self.get_output_from_GAMS(gams_db,'VEH_STCK_ADD')
+            self.veh_stck = self.get_output_from_GAMS(gams_db,'VEH_STCK')
+            self.veh_totc = self.get_output_from_GAMS(gams_db,'VEH_TOTC')
+            self.veh_prod_totc = self.get_output_from_GAMS(gams_db,'VEH_PROD_TOTC')
+            self.veh_oper_totc = self.get_output_from_GAMS(gams_db,'VEH_OPER_TOTC')
+            self.veh_eolt_totc = self.get_output_from_GAMS(gams_db,'VEH_EOLT_TOTC')
+            
+
         except:
             exceptions = self.db.get_database_dvs()
             try:
@@ -304,7 +349,7 @@ class FleetModel:
             except:
                 print(exceptions)
            # self.db.export(os.path.join(self.current_path,'troubleshooting_tryexcept'))
-
+        
     def add_to_GAMS(self):
         # Adding sets
         def build_set(set_list=None,name=None,desc=None):
@@ -321,6 +366,25 @@ class FleetModel:
         # Export for troubleshooting
         #self.db.export('add_sets.gdx')
         
+    def get_output_from_GAMS(self,gams_db,output_var):
+         temp_GMS_output = []
+         temp_index_list = []
+         
+         for rec in gams_db[output_var]:
+            if gams_db[output_var].number_records ==1: # special case for totc
+                temp_output_df = gams_db[output_var].first_record().level
+                return temp_output_df
+            
+            dict1 = {}
+            dict1.update({'level':rec.level})
+            temp_GMS_output.append(dict1)
+            temp_index_list.append(rec.keys)
+            
+         temp_index = pd.DataFrame(temp_index_list)
+         temp_output_df = pd.DataFrame(temp_GMS_output,index = temp_index)
+
+         return temp_output_df
+        
     def calc_crit_materials(self):
         # performs critical material mass accounting
         pass
@@ -329,11 +393,15 @@ class FleetModel:
         # make pretty figures?
         pass
     
+    def import_from_MESSAGE(self):
+        pass
 
     def vis_GAMS(self):
         """ visualize key GAMS parameters for quality checks"""
         """To do: split into input/output visualization; add plotting of CO2 and stocks together"""
         keeper = "{:%d-%m-%y, %H_%M}".format(datetime.now())
+        ch_path = os.path.dirname(os.path.abspath(__file__))+r'\visualization output\ '
+        os.chdir(ch_path)
         pp = PdfPages('output_vis_'+keeper+'.pdf')
         
         gdx_file = self.export_fp #'C:\\Users\\chrishun\\Box Sync\\YSSP_temp\\EVD4EUR_ver098.gdx'
@@ -381,6 +449,8 @@ class FleetModel:
                     v_dict[v] = gmspy.var2series(v,gdx_filepath=gdx_file)
                 except:
                     pass
+            except TypeError: # This is specifically for seg_add
+                pass
 
         def reorder_age_headers(df_unordered):
             temp = df_unordered
@@ -390,54 +460,95 @@ class FleetModel:
         
         def fix_age_legend(ax):
             patches, labels = ax.get_legend_handles_labels()
-            ax.legend(bbox_to_anchor=(1.1,1), ncol=2, title='Vehicle ages')
+            leg = ax.legend(bbox_to_anchor=(1.1,1), ncol=2, title='Vehicle ages')
+            pp.savefig(bbox_extra_artists=(leg))
 
         # Plot total stocks by age
-        stock_df=v_dict['VEH_STCK']
-        stock_df.columns = stock_df.columns.astype(int)
-        stock_df.sort_index(axis=1,inplace=True)
-                
-        stock_df_grouped =stock_df.groupby(level=[0])
-        for name, group in stock_df_grouped:
-            ax=group.plot(kind='area',cmap='Spectral_r',title=name+' stock by age')
-            fix_age_legend(ax)
-            pp.savefig()
+        self.stock_df = v_dict['VEH_STCK']
+        #stock_df.loc['BEV'].sum(axis=1).unstack('age').plot(kind='area',cmap='Spectral_r') # aggregate segments, plot by age
+        #stock_df.loc['ICE'].sum(axis=1).unstack('age').plot(kind='area',cmap='Spectral_r') # aggregate segments, plot by age
+        self.stock_df_plot = self.stock_df.stack().unstack('age')  
+        self.stock_df_plot.columns = self.stock_df_plot.columns.astype(int)
+        self.stock_df_plot.sort_index(axis=1,inplace=True)
+        
+        #stock_df_plot.unstack('seg')
+        self.stock_df_plot_grouped = self.stock_df_plot.groupby(['tec','seg'])
 
-        stock_df.columns = stock_df.columns.astype(int)
-        stock_df.sort_index(axis=1,inplace=True)
-        tot_stock_df=stock_df.sum(axis=0,level=1)
-        ax = tot_stock_df.plot.area(cmap='Spectral_r',title='Total stocks by vehicle age',figsize = (10,6))
-        fix_age_legend(ax)
-        plt.savefig('total_stocks_by_age.png',pad_inches=2)
-        pp.savefig()
+        fig, axes = plt.subplots(4,2, figsize=(12,12), sharey=True)
+        for (key, ax) in zip(self.stock_df_plot_grouped.groups.keys(), axes.flatten()):
+            self.stock_df_plot_grouped.get_group(key).plot(ax=ax,kind='area',cmap='Spectral_r',legend=False)
+            handles,labels = ax.get_legend_handles_labels()
+            ax.set_xticklabels([2000,2010,2020,2030,2040,2050])
+            ax.set_title(key)
+        fig.legend(labels=labels, ncol=2,title="age")  # Title for the legend
+        fig.suptitle('Vehicle stock by technology and segment')
+        pp.savefig(pad_inches=0.5)
+#        for (key, ax) in zip(self.stock_df_plot_grouped.groups.keys(), axes.flatten()):
+ #           self.stock_df_plot_grouped.get_group(key).plot(ax=ax,kind='area',cmap='Spectral_r')
+
+    
+#        ax = self.stock_df_plot.loc['BEV'].groupby('seg').plot(kind='area',cmap='Spectral_r',title='BEV stocks by age and segment')
+#        ax = stock_df_plot.loc['BEV'].plot(kind='area',cmap='Spectral_r',title='BEV stocks by age and segment')
+#        fix_age_legend(ax)  
+#        ax = self.stock_df_plot.loc['ICE'].groupby('seg').plot(kind='area',cmap='Spectral_r',title='ICE stocks by age and segment')
+#        ax = stock_df_plot.loc['ICE'].plot(kind='area',cmap='Spectral_r',title='ICE stocks by age and segment')
+#        fix_age_legend(ax) 
+#        ax = self.stock_df_plot.sum(axis=1).unstack('seg').sum(axis=0,level=1).plot(kind='area',cmap='Spectral_r',title='Total stocks by segment')
+#        fix_age_legend(ax) 
+        
+        #stock_df_plot = stock_df_plot.sum(axis=1,level=1) # aggregates segments
+        ax = self.stock_df_plot.sum(level=2).plot(kind='area',cmap='Spectral_r',title='Total stocks by age') 
+        fix_age_legend(ax)     
+        
+        
+        ax = self.stock_df_plot.loc['BEV'].sum(level=1).plot(kind='area',cmap='Spectral_r',title='BEV stocks by age')
+        fix_age_legend(ax)  
+        
+        ax = self.stock_df_plot.loc['ICE'].sum(level=1).plot(kind='area',cmap='Spectral_r',title='ICE stocks by age')
+        fix_age_legend(ax)  
+        
+        
+        #stock_df_grouped =stock_df.groupby(level=[0])
+#        for name, group in stock_df_grouped:
+#            ax=group.plot(kind='area',cmap='Spectral_r',title=name+' stock by age')
+#            fix_age_legend(ax)
+#            pp.savefig()
+
+        #stock_df.columns = stock_df.columns.astype(int)
+        #stock_df.sort_index(axis=1,inplace=True)
+        #tot_stock_df=stock_df.sum(axis=0,level=1)
+        #ax = tot_stock_df.plot.area(cmap='Spectral_r',title='Total stocks by vehicle age',figsize = (10,6))
+        #fix_age_legend(ax)
+        #plt.savefig('total_stocks_by_age.png',pad_inches=2)
+        #pp.savefig()
         
         # Plot total stocks by technology
-        stock_df.sum(axis=1).unstack().T.plot(kind='area', title='Total stocks by technology')  
-        stock_df.sum(axis=1).unstack().T.plot(title='Total stocks by technology')
-        plt.savefig('total_stocks_by_tec.png',dpi=600)
-        pp.savefig()
+#        stock_df.sum(axis=1).unstack().T.plot(kind='area', title='Total stocks by technology')  
+#        stock_df.sum(axis=1).unstack().T.plot(title='Total stocks by technology')
+#        plt.savefig('total_stocks_by_tec.png',dpi=600)
+#        pp.savefig()
         
         # Plot stock additions and removals by technology
-        temp_vdict_a = reorder_age_headers(v_dict['VEH_STCK_REM']).stack()
-        temp_vdict_b = reorder_age_headers(v_dict['VEH_STCK_ADD']).stack()
-        add_rem_df = pd.concat([temp_vdict_a, temp_vdict_b],axis=1,keys=('VEH_STCK_REM','VEH_STCK_ADD'))
-        
-        add_rem_df_2=add_rem_df.stack().unstack(level=[0,3])
-        
-        for column,variable in add_rem_df_2:
-            ax = add_rem_df_2[column][variable].unstack().plot(kind='area',cmap='Spectral_r',title=column+" "+variable)
-            fix_age_legend(ax)
-        
-        add_rem_df_2.plot(subplots=True,title='Stock removal and addition variables')
-        pp.savefig()
-
-        # Plot carbon emissions by technology and lifecycle phase
-        totc_df=pd.concat((v_dict['VEH_PROD_TOTC'],v_dict['VEH_OPER_TOTC'],v_dict['VEH_EOLT_TOTC'],v_dict['VEH_TOTC']),axis=0,keys=('VEH_PROD_TOTC','VEH_OPER_TOTC','VEH_EOLT_TOTC','VEH_TOTC'))
-        totc_df=totc_df.T.swaplevel(0,1,axis=1)
-        ax = totc_df.plot(figsize = (10,6))
-        fix_age_legend(ax)
-        plt.savefig('CO2.png',pad_inches=2, dpi=600)
-        pp.savefig()
+#        temp_vdict_a = reorder_age_headers(v_dict['VEH_STCK_REM']).stack()
+#        temp_vdict_b = reorder_age_headers(v_dict['VEH_STCK_ADD']).stack()
+#        add_rem_df = pd.concat([temp_vdict_a, temp_vdict_b],axis=1,keys=('VEH_STCK_REM','VEH_STCK_ADD'))
+#        
+#        add_rem_df_2=add_rem_df.stack().unstack(level=[0,3])
+#        
+#        for column,variable in add_rem_df_2:
+#            ax = add_rem_df_2[column][variable].unstack().plot(kind='area',cmap='Spectral_r',title=column+" "+variable)
+#            fix_age_legend(ax)
+#        
+#        add_rem_df_2.plot(subplots=True,title='Stock removal and addition variables')
+#        pp.savefig()
+#
+#        # Plot carbon emissions by technology and lifecycle phase
+#        totc_df=pd.concat((v_dict['VEH_PROD_TOTC'],v_dict['VEH_OPER_TOTC'],v_dict['VEH_EOLT_TOTC'],v_dict['VEH_TOTC']),axis=0,keys=('VEH_PROD_TOTC','VEH_OPER_TOTC','VEH_EOLT_TOTC','VEH_TOTC'))
+#        totc_df=totc_df.T.swaplevel(0,1,axis=1)
+#        ax = totc_df.plot(figsize = (10,6))
+#        fix_age_legend(ax)
+#        plt.savefig('CO2.png',pad_inches=2, dpi=600)
+#        pp.savefig()
         pp.close()
         
         """For later: introduce figure plotting vehicle stock vs emissions"""
@@ -453,6 +564,24 @@ class FleetModel:
     def elmix(self):
         # produce time series of elmix intensities, regions x year 
         pass
+
+    def _read_all_final_parameters(self, a_file):
+        # will become unnecessary as we start internally defining all parameters
+        db = gmspy._iwantitall(None, None, a_file)
+
+        #self.veh_oper_dist = gmspy.param2series('VEH_OPER_DIST', db)
+        #self.veh_stck_tot = gmspy.param2series('VEH_STCK_TOT', db)
+        #self.veh_lift_cdf = gmspy.param2series('VEH_LIFT_CDF', db)
+        #self.veh_lift_age = gmspy.param2series('VEH_LIFT_AGE', db)
+
+        #self.veh_prod_cint = gmspy.param2df('VEH_PROD_CINT', db)
+        #self.veh_oper_cint = gmspy.param2df('VEH_OPER_CINT', db)
+        #self.veh_eolt_cint = gmspy.param2df('VEH_EOLT_CINT', db)
+
+        #self.veh_stck_int = gmspy.param2df('VEH_STCK_INT', db)
+
+        #self.enr_veh = gmspy.param2df('ENR_VEH', db)
+        #self.veh_pay = gm
     
        
 
@@ -566,7 +695,7 @@ def calc_steadystate_vehicle_age_distributions(ages, average_expectancy=10.0, st
                                         VEHICLE AGE
     """
 
-    # The total (100%) minus the cummulation of all the cars retired by the time they reach a certain age
+    # The total (100%) minus the cumulation of all the cars retired by the time they reach a certain age
     h = 1 - norm.cdf(ages, loc=average_expectancy, scale=standard_dev)
 
     # Normalize to represent a _fraction_ of the total fleet
