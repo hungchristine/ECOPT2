@@ -2,7 +2,7 @@
 * EVD4EUR Model
 * Basic Edition
 * Januar 2018
-* Anders Hammer Strømman
+* Anders Hammer Strï¿½mman
 *
 * ver 0.1:       basic parameters and structires
 * ver 0.2:       refinement of basic parameters and initiation period
@@ -37,7 +37,7 @@ function cdfnormal     /stolib.cdfnormal     /;
 
 
 SETS
-year           year 
+year           year
 optyear(year)  years for optimization
 inityear(year) years for initialization
 age            age
@@ -74,7 +74,7 @@ grdeq          parameters for gradient of change (fleet additions) - individual 
 * CNST = b in y = ax + b
 ;
 
-** Load sets defined in Python class 
+** Load sets defined in Python class
 $GDXIN 'troubleshooting_params'
 $LOAD year
 $LOAD tec
@@ -94,7 +94,7 @@ $GDXIN
 
 * alias call for prodyear = production year is identical set to year
 * change prodyear to cohort later
-alias (year, prodyear) 
+alias (year, prodyear)
 alias (prodyear, year)
 alias (age, agej)
 alias (agej, age)
@@ -179,6 +179,7 @@ VEH_LIFT_MOR(age)                Age distribution = 1 - CDF
 VEH_PAY(prodyear,age,year)       Correspondance between a vehicle production year and its age (up to 20) in a given year
 VEH_STCK_INT_TEC(tec)            Initial share of vehicles in stock tech
 VEH_STCK_INT(tec,seg,age)        Initial size of stock of vehicles by age cohort and segment
+VEH_STCK_INT_SEG(seg)            Initial share of vehicles by segment
 
 ** GRADIENT OF CHANGE
 VEH_ADD_GRD(grdeq,tec)           Parameter for gradient of change constraint (fleet additions) - individual (IND) for each tech or related to all tech (ALL)
@@ -208,6 +209,7 @@ PARAMETER VEH_SEG_SHR(seg)
         E = 0.2
 /;
 
+VEH_STCK_INT_SEG(seg) = 1 / 6;
 
 *$call ="c:\gams\win64\26.1\xls2gms.exe" I="C:\Users\chrishun\Box Sync\YSSP_temp\GAMS_input.xls" *O="VEH_OPER_DIST.inc" R="Sheet2!A2:B52"
 *PARAMETER VEH_OPER_DIST(year)
@@ -376,7 +378,7 @@ EQ_STCK_REM_T1(tec,seg,inityear,age)..                 VEH_STCK_REM(tec,seg,init
 *stock additions
 EQ_STCK_ADD_T1(inityear,age)$(ord(age)=1)..          sum( (tec,seg), VEH_STCK_ADD(tec,seg,inityear,age) ) =e=  sum( (tec,agej,seg), VEH_STCK_REM(tec,seg,inityear,agej));
 *stock
-EQ_STCK_BAL_T1(tec,seg,inityear,age)..                 VEH_STCK(tec,seg,inityear,age) =e=  VEH_STCK_TOT(inityear)*VEH_STCK_INT_TEC(tec)*VEH_LIFT_AGE(age);
+EQ_STCK_BAL_T1(tec,seg,inityear,age)..                 VEH_STCK(tec,seg,inityear,age) =e=  VEH_STCK_TOT(inityear)*VEH_STCK_INT_TEC(tec)*VEH_LIFT_AGE(age) * VEH_STCK_INT_SEG(seg);
 
 ***  Main Model -----------------------------------------------
 EQ_STCK_DELTA(optyear)$(ord(optyear)>1)..                              VEH_STCK_DELTA(optyear)  =e=  VEH_STCK_TOT(optyear)-VEH_STCK_TOT(optyear-1);
@@ -393,14 +395,15 @@ EQ_STCK_BAL(tec,seg,optyear,age)$(ord(optyear)>1)..                    VEH_STCK(
 *-----calculate segment market shares-----
 * Calculate total addition to stock independent of technology and segment
 EQ_TOT_ADD(optyear,age)$(ord(optyear)>1 and ord(age)=1)..              VEH_TOT_ADD(optyear,age) =e= sum((tec,seg),VEH_STCK_ADD(tec,seg,optyear,age));
+
 * Calculate total addition to stock by segment
 EQ_SEG_ADD(seg,optyear,age)$(ord(optyear)>1 and ord(age)=1)..          VEH_SEG_ADD(seg,optyear,age) =e= sum(tec,VEH_STCK_ADD(tec,seg,optyear,age));
 
 * Calculate market shares for each segment (i.e., addition by segment/total added)
 * Gives error:  56  Endogenous operands for * not allowed in linear models
 
-*EQ_SEG_SHR(seg,optyear,age)$(ord(optyear)>1 and ord(age)=1)..          VEH_SEG_ADD_SHR(seg,optyear,age)*VEH_TOT_ADD(optyear,age) =e= VEH_SEG_ADD(seg,optyear,age);
-****  
+EQ_SEG_SHR(seg,optyear)$(ord(optyear) > 1)..          VEH_SEG_ADD_SHR(seg,optyear,'0') * VEH_TOT_ADD(optyear,'0') =e= VEH_SEG_ADD(seg,optyear,'0');
+****
 
 
 *summing the number of vehicles in for check.
@@ -463,7 +466,8 @@ MODEL EVD4EUR_Basic
 *
 *-----------------------------------------------------------------------------------
 
-SOLVE EVD4EUR_Basic USING LP MINIMIZING TOTC;
+EVD4EUR_Basic.optfile = 1;
+SOLVE EVD4EUR_Basic USING NLP MINIMIZING TOTC;
 
 DISPLAY VEH_STCK_TOT
 DISPLAY VEH_STCK_TOT_CHECK.l
