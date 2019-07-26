@@ -66,11 +66,20 @@ def df2param(db, df, domains, name, comment=''):
 
     """
    
+    ## if df is a single-column dataframe (i.e., series cast as dataframe), the below doesn't work; keys uses the index-column name pair...
+    
     a_param = db.add_parameter_dc(name, domains, comment)
     if df.ndim > 1:
         df = df.stack()
     df = df.to_dict()
+#    print(name)
     for keys, data in iter(df.items()):#iter(df.items()):
+#        if name == 'VEH_PROD_CINT':
+#            print('keys..'+str(keys))
+#            print(type(keys))
+#            print('data..'+str(data))
+#            print(type(data))
+#            print(df)
         a_param.add_record(keys).value = data
     return a_param
 
@@ -226,7 +235,9 @@ def var2series(name, db=None, ws=None, gdx_filepath=None):
 
     # Read in data and recast as Pandas Series
     data = dict((tuple(rec.keys), rec.level) for rec in db[name])
-    return pd.Series(data)
+    df = pd.Series(data)
+    df.index.rename(db[name].domains_as_strings,inplace=True)
+    return df
 
 def var2df(name, db=None, ws=None, gdx_filepath=None):
     """
@@ -257,7 +268,10 @@ def var2df(name, db=None, ws=None, gdx_filepath=None):
 
     # Read in data and recast as Pandas Series
     data = dict((tuple(rec.keys), rec.level) for rec in db[name])
-    return pd.Series(data).unstack()
+    df = pd.Series(data)
+    df.index.rename(db[name].domains_as_strings,inplace=True)
+    df = df.unstack()
+    return df#pd.Series(data).unstack()
 
 
 def _iwantitall(db, ws, gdx_filepath):
