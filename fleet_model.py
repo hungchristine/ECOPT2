@@ -6,6 +6,7 @@ Created on Sun Apr 21 13:27:57 2019
 """
 
 import os
+import sys
 import pandas as pd
 import numpy as np
 from scipy.stats import norm
@@ -61,7 +62,7 @@ class FleetModel:
         self.optyear = [str(2020+i) for i in range(31)]
         self.age = [str(i) for i in range(28)]              # vehicle age, up to 27 years old
         self.enr = ['ELC','FOS']                            # fuel types; later include H2, 
-        self.seg = ['B','C','D','E']                    # From ACEA: Small, lower medium, upper medium, executive
+        self.seg = ['A','B','C','D','E','F']                    # From ACEA: Small, lower medium, upper medium, executive
         self.demeq= ['STCK_TOT','OPER_DIST','OCUP']         # definition of 
         self.dstvar=['mean','stdv']
         self.enreq=['CINT']
@@ -332,15 +333,17 @@ class FleetModel:
             self.export_fp = os.path.join(self.current_path,'fleet_model_output.gdx')
             gams_db.export(self.export_fp)
             print("Completed export of " + self.export_fp)
-            
-            self.totc = self.get_output_from_GAMS(gams_db,'TOTC')
-            self.veh_stck_add = self.get_output_from_GAMS(gams_db,'VEH_STCK_ADD')
-            self.veh_stck = self.get_output_from_GAMS(gams_db,'VEH_STCK')
-            self.veh_totc = self.get_output_from_GAMS(gams_db,'VEH_TOTC')
-            self.veh_prod_totc = self.get_output_from_GAMS(gams_db,'VEH_PROD_TOTC')
-            self.veh_oper_totc = self.get_output_from_GAMS(gams_db,'VEH_OPER_TOTC')
-            self.veh_eolt_totc = self.get_output_from_GAMS(gams_db,'VEH_EOLT_TOTC')
-            
+            print(self.ws.ModelStat())
+            if self.ws.ModelStat == 19:     
+                sys.exit('Model infeasible!')
+            else:
+                self.totc = self.get_output_from_GAMS(gams_db,'TOTC')
+                self.veh_stck_add = self.get_output_from_GAMS(gams_db,'VEH_STCK_ADD')
+                self.veh_stck = self.get_output_from_GAMS(gams_db,'VEH_STCK')
+                self.veh_totc = self.get_output_from_GAMS(gams_db,'VEH_TOTC')
+                self.veh_prod_totc = self.get_output_from_GAMS(gams_db,'VEH_PROD_TOTC')
+                self.veh_oper_totc = self.get_output_from_GAMS(gams_db,'VEH_OPER_TOTC')
+                self.veh_eolt_totc = self.get_output_from_GAMS(gams_db,'VEH_EOLT_TOTC')
 
         except:
             exceptions = self.db.get_database_dvs()
@@ -458,30 +461,41 @@ class FleetModel:
             temp.sort_index(inplace=True,axis=1)
             return temp
         
-        def fix_age_legend(ax):
+        def fix_age_legend(ax,title='Vehicle ages'):
             patches, labels = ax.get_legend_handles_labels()
-            leg = ax.legend(bbox_to_anchor=(1.1,1), ncol=2, title='Vehicle ages')
+            leg = ax.legend(bbox_to_anchor=(1.05,1), ncol=2, title=title)
             pp.savefig(bbox_extra_artists=(leg))
 
         # Plot total stocks by age
         self.stock_df = v_dict['VEH_STCK']
+        self.stock_df = reorder_age_headers(self.stock_df)
+        self.stock_add = v_dict['VEH_STCK_ADD']
+        self.stock_add = reorder_age_headers(self.stock_add)
+        self.stock_add = self.stock_add.dropna(axis=1,how='any')
         #stock_df.loc['BEV'].sum(axis=1).unstack('age').plot(kind='area',cmap='Spectral_r') # aggregate segments, plot by age
         #stock_df.loc['ICE'].sum(axis=1).unstack('age').plot(kind='area',cmap='Spectral_r') # aggregate segments, plot by age
         self.stock_df_plot = self.stock_df.stack().unstack('age')  
-        self.stock_df_plot.columns = self.stock_df_plot.columns.astype(int)
-        self.stock_df_plot.sort_index(axis=1,inplace=True)
-        
+        self.stock_df_plot = reorder_age_headers(self.stock_df_plot)
+
         #stock_df_plot.unstack('seg')
         self.stock_df_plot_grouped = self.stock_df_plot.groupby(['tec','seg'])
 
         fig, axes = plt.subplots(4,2, figsize=(12,12), sharey=True)
         for (key, ax) in zip(self.stock_df_plot_grouped.groups.keys(), axes.flatten()):
+            #print(key)
+            if(key==('BEV','B')):
+                fix_age_legend(ax)
+                print(key)
             self.stock_df_plot_grouped.get_group(key).plot(ax=ax,kind='area',cmap='Spectral_r',legend=False)
             handles,labels = ax.get_legend_handles_labels()
             ax.set_xticklabels([2000,2010,2020,2030,2040,2050])
-            ax.set_title(key)
-        fig.legend(labels=labels, ncol=2,title="age")  # Title for the legend
+            ax.set_xlabel('year')
+            ax.set_title(key,fontsize=10,fontweight='bold')
+            """" Does not work, need a non-'aliased' reference to datapoint """
+            #ax.axvline(x=2020,ls='dotted',color='k')
+        #fig.legend(labels=labels, ncol=2,title="age",loc='upper left',bbox_to_anchor=(0.78,0.8))#,loc='upper left')  # Title for the legend
         fig.suptitle('Vehicle stock by technology and segment')
+        plt.subplots_adjust(hspace=0.42)#right=0.82,
         pp.savefig(pad_inches=0.5)
 #        for (key, ax) in zip(self.stock_df_plot_grouped.groups.keys(), axes.flatten()):
  #           self.stock_df_plot_grouped.get_group(key).plot(ax=ax,kind='area',cmap='Spectral_r')
@@ -493,21 +507,42 @@ class FleetModel:
 #        ax = self.stock_df_plot.loc['ICE'].groupby('seg').plot(kind='area',cmap='Spectral_r',title='ICE stocks by age and segment')
 #        ax = stock_df_plot.loc['ICE'].plot(kind='area',cmap='Spectral_r',title='ICE stocks by age and segment')
 #        fix_age_legend(ax) 
-#        ax = self.stock_df_plot.sum(axis=1).unstack('seg').sum(axis=0,level=1).plot(kind='area',cmap='Spectral_r',title='Total stocks by segment')
-#        fix_age_legend(ax) 
+        ax = self.stock_df_plot.sum(axis=1).unstack('seg').sum(axis=0,level=1).plot(kind='area',cmap='jet',title='Total stocks by segment')
+        fix_age_legend(ax,'Vehicle segments') 
+          
+        ax = self.stock_df_plot.sum(axis=1).unstack('seg').unstack('tec').plot(kind='area',cmap='tab20b',title='Total stocks by segment and technology')
+        fix_age_legend(ax,'Vehicle segment and technology') 
+
         
         #stock_df_plot = stock_df_plot.sum(axis=1,level=1) # aggregates segments
         ax = self.stock_df_plot.sum(level=2).plot(kind='area',cmap='Spectral_r',title='Total stocks by age') 
-        fix_age_legend(ax)     
+        fix_age_legend(ax)
         
+        
+        #ax = self.stock_df_plot.sum(level=2).plot.barh()
         
         ax = self.stock_df_plot.loc['BEV'].sum(level=1).plot(kind='area',cmap='Spectral_r',title='BEV stocks by age')
         fix_age_legend(ax)  
         
         ax = self.stock_df_plot.loc['ICE'].sum(level=1).plot(kind='area',cmap='Spectral_r',title='ICE stocks by age')
         fix_age_legend(ax)  
-        
-        
+        ax.axvline(2020,ls='dotted',color='k')
+                
+        fig,axes = plt.subplots(1,2)
+        stock_add_grouped = self.stock_add.unstack('seg').groupby('tec')
+        for (key,ax) in zip(stock_add_grouped.groups.keys(),axes.flatten()):
+            stock_add_grouped.get_group(key).plot(ax=ax,kind='area',cmap='jet',legend=False)
+            ax.set_xticklabels([2000,2010,2020,2030,2040,2050])
+            ax.set_xlabel('year')
+            ax.set_title(key,fontsize=10,fontweight='bold')
+            #ax.axvline(x=('BEV',2020),ls='dotted')
+            ax.set_label('segment')
+        #axes = self.stock_add.unstack('seg').groupby('tec').plot(kind='area',cmap='jet',title='Stock additions by segment and technology')
+        #ax.set_xticklabels([2000,2010,2020,2030,2040,2050])
+        #ax.set_xlabel('year')
+        #ax.axvline(x=2020,ls='dotted')
+        ax.set_label('segment')
+        ax.legend()
         #stock_df_grouped =stock_df.groupby(level=[0])
 #        for name, group in stock_df_grouped:
 #            ax=group.plot(kind='area',cmap='Spectral_r',title=name+' stock by age')
