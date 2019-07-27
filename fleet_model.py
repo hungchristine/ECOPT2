@@ -12,6 +12,7 @@ import numpy as np
 from scipy.stats import norm
 import matplotlib
 import matplotlib.pyplot as plt
+import seaborn
 from matplotlib.backends.backend_pdf import PdfPages
 from datetime import datetime
 
@@ -510,7 +511,11 @@ class FleetModel:
         ax = self.stock_df_plot.sum(axis=1).unstack('seg').sum(axis=0,level=1).plot(kind='area',cmap='jet',title='Total stocks by segment')
         fix_age_legend(ax,'Vehicle segments') 
           
-        ax = self.stock_df_plot.sum(axis=1).unstack('seg').unstack('tec').plot(kind='area',cmap='tab20b',title='Total stocks by segment and technology')
+        co = plt.get_cmap('tab20')
+        paired = matplotlib.colors.LinearSegmentedColormap.from_list('paired',co.colors[:12],N=12)
+        
+        ax = self.stock_df_plot.sum(axis=1).unstack('seg').unstack('tec').plot(kind='area',cmap=paired,title='Total stocks by segment and technology')
+        
         fix_age_legend(ax,'Vehicle segment and technology') 
 
         
