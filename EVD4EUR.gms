@@ -1,8 +1,8 @@
-*-----------------------------------------------------------------------------------
+ï»¿*-----------------------------------------------------------------------------------
 * EVD4EUR Model
 * Basic Edition
 * Januar 2018
-* Anders Hammer Strømman
+* Anders Hammer Strï¿½mman
 *
 * ver 0.1:       basic parameters and structires
 * ver 0.2:       refinement of basic parameters and initiation period
@@ -37,7 +37,7 @@ function cdfnormal     /stolib.cdfnormal     /;
 
 
 SETS
-year           year 
+year           year
 optyear(year)  years for optimization
 inityear(year) years for initialization
 age            age
@@ -74,7 +74,7 @@ grdeq          parameters for gradient of change (fleet additions) - individual 
 * CNST = b in y = ax + b
 ;
 
-** Load sets defined in Python class 
+** Load sets defined in Python class
 $GDXIN 'troubleshooting_params'
 $LOAD year
 $LOAD tec
@@ -94,7 +94,7 @@ $GDXIN
 
 * alias call for prodyear = production year is identical set to year
 * change prodyear to cohort later
-alias (year, prodyear) 
+alias (year, prodyear)
 alias (prodyear, year)
 alias (age, agej)
 alias (agej, age)
@@ -391,10 +391,10 @@ EQ_STCK_ADD_T1(seg,inityear,age)$(ord(age)=1)..          sum( (tec), VEH_STCK_AD
 *-- Makes assumption that retired segments are replaced by the same segment
 *EQ_TRIAL(seg,inityear,age)$(ord(age)=1)..           sum(tec, VEH_TRIAL(tec,seg,inityear,'0')) =e=  sum( (tec,agej), VEH_STCK_REM(tec,seg,inityear,agej)*VEH_STCK_INT_SEG(seg)); 
 * VEH_SEG_SHR(seg);
+
 *stock
 EQ_STCK_BAL_T1(tec,seg,inityear,age)..                VEH_STCK(tec,seg,inityear,age) =e=  VEH_STCK_TOT(inityear)*(VEH_STCK_INT_TEC(tec)*VEH_LIFT_PDF(age)*VEH_SEG_SHR(seg));
 *VEH_STCK_INT_SEG(seg));
-
 
 ***  Main Model -----------------------------------------------
 EQ_STCK_DELTA(optyear)$(ord(optyear)>1)..                              VEH_STCK_DELTA(optyear)  =e=  VEH_STCK_TOT(optyear)-VEH_STCK_TOT(optyear-1);
@@ -412,15 +412,14 @@ EQ_STCK_BAL(tec,seg,optyear,age)$(ord(optyear)>1)..                    VEH_STCK(
 *-----calculate segment market shares-----
 * Calculate total addition to stock independent of technology and segment
 EQ_TOT_ADD(year,age)$(ord(age)=1)..                                    VEH_TOT_ADD(year,age) =e= sum((tec,seg),VEH_STCK_ADD(tec,seg,year,age));
+
 * Calculate total addition to stock by segment
 *EQ_SEG_ADD_INIT(seg,'2020','0')..                                      VEH_SEG_ADD(seg,'2020','0') =e= sum(tec,VEH_STCK_ADD(tec,seg,'2020','0'))/6;
 *VEH_SEG_SHR(seg);
 
 *EQ_SEG_ADD(seg,optyear,age)$(ord(optyear)>1 and ord(age)=1)..          VEH_SEG_ADD(seg,optyear,age) =e= sum(tec,VEH_STCK_ADD(tec,seg,optyear,age));
 
-
 *EQ_SEG_SHR(seg,optyear,age)$(ord(optyear)>1 and ord(age)=1)..          VEH_SEG_ADD_SHR(seg,optyear,age)*VEH_TOT_ADD(optyear,age) =e= VEH_SEG_ADD(seg,optyear,age);
-***
 
 * Temp constraint with scalar
 *EQ_SEG_SHR(seg,optyear)$(ord(optyear)>1)..                             VEH_SEG_ADD_SHR(seg,optyear,'0')* VEH_TOT_ADD(optyear,'0') =e= VEH_SEG_ADD(seg,optyear,'0');
