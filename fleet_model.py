@@ -12,6 +12,8 @@ import numpy as np
 from scipy.stats import norm
 import matplotlib
 import matplotlib.pyplot as plt
+from matplotlib.ticker import (MultipleLocator, FormatStrFormatter, AutoMinorLocator)
+
 import seaborn
 from matplotlib.backends.backend_pdf import PdfPages
 from datetime import datetime
@@ -336,23 +338,20 @@ class FleetModel:
             self.export_fp = os.path.join(self.current_path,'fleet_model_output.gdx')
             gams_db.export(self.export_fp)
             print("Completed export of " + self.export_fp)
-            print(self.ws.ModelStat())
-            if self.ws.ModelStat == 19:     
-                sys.exit('Model infeasible!')
-            else:
-                self.totc = self.get_output_from_GAMS(gams_db,'TOTC')
-                self.totc.to_excel(self.xl_writer,sheet_name='TOTC')
-                self.veh_stck_add = self.get_output_from_GAMS(gams_db,'VEH_STCK_ADD')
-                self.veh_stck_add.to_excel(self.xl_writer,sheet_name='VEH_STCK_ADD')
-                self.veh_stck = self.get_output_from_GAMS(gams_db,'VEH_STCK')
-                self.veh_stck.to_excel(self.xl_writer,sheet_name='TOTC')
+            
+            self.totc = self.get_output_from_GAMS(gams_db,'TOTC')
+            #self.totc.to_excel(self.xl_writer,sheet_name='TOTC')
+            self.veh_stck_add = self.get_output_from_GAMS(gams_db,'VEH_STCK_ADD')
+#            self.veh_stck_add.to_excel(self.xl_writer,sheet_name='VEH_STCK_ADD')
+            self.veh_stck = self.get_output_from_GAMS(gams_db,'VEH_STCK')
+#            self.veh_stck.to_excel(self.xl_writer,sheet_name='TOTC')
 
-                self.veh_totc = self.get_output_from_GAMS(gams_db,'VEH_TOTC')
-                self.veh_totc.to_excel(self.xl_writer,sheet_name='TOTC')
+            self.veh_totc = self.get_output_from_GAMS(gams_db,'VEH_TOTC')
+#            self.veh_totc.to_excel(self.xl_writer,sheet_name='TOTC')
 
-                self.veh_prod_totc = self.get_output_from_GAMS(gams_db,'VEH_PROD_TOTC')
-                self.veh_oper_totc = self.get_output_from_GAMS(gams_db,'VEH_OPER_TOTC')
-                self.veh_eolt_totc = self.get_output_from_GAMS(gams_db,'VEH_EOLT_TOTC')
+            self.veh_prod_totc = self.get_output_from_GAMS(gams_db,'VEH_PROD_TOTC')
+            self.veh_oper_totc = self.get_output_from_GAMS(gams_db,'VEH_OPER_TOTC')
+            self.veh_eolt_totc = self.get_output_from_GAMS(gams_db,'VEH_EOLT_TOTC')
 
         except:
             exceptions = self.db.get_database_dvs()
@@ -391,8 +390,8 @@ class FleetModel:
             dict1.update({'level':rec.level})
             temp_GMS_output.append(dict1)
             temp_index_list.append(rec.keys)
-            
-         temp_index = pd.DataFrame(temp_index_list)
+         temp_domain_list = list(gams_db[output_var].domains_as_strings)
+         temp_index = pd.MultiIndex.from_tuples(temp_index_list,names=temp_domain_list)
          temp_output_df = pd.DataFrame(temp_GMS_output,index = temp_index)
 
          return temp_output_df
@@ -473,9 +472,27 @@ class FleetModel:
             patches, labels = ax.get_legend_handles_labels()
             ax.legend(patches,labels,bbox_to_anchor=(1.05,1), ncol=2, title=title)
             pp.savefig(bbox_inches='tight')
-           
+            
+        def plot_subplots(grouped_df,title,labels):
+            for (key,ax) in zip(grouped_df.groups.keys(),axes.flatten()):
+                grouped_df.get_group(key).plot(ax=ax,cmap='jet',legend=False)
+                ax.set_xticklabels([2000,2010,2020,2030,2040,2050])
+                ax.set_xlabel('year')
+                ax.set_title(key,fontsize=10,fontweight='bold')
+                
+                ax.xaxis.set_minor_locator(MultipleLocator(1))
+                ax.grid(which='minor',axis='x',c='lightgrey',alpha=0.55,linestyle=':',lw=0.3)
+                ax.grid(which='major',axis='x',c='darkgrey',alpha=0.75,linestyle='--',lw=1)
 
-        # Plot total stocks by age
+                plt.subplots_adjust(hspace=0.45)
+                fig.suptitle(title)
+            ax.legend(labels=labels,bbox_to_anchor=(0.2,-0.3),ncol=2,fontsize='large')    
+
+        ## Make paired colormap for comparing tecs
+        co = plt.get_cmap('tab20')
+        paired = matplotlib.colors.LinearSegmentedColormap.from_list('paired',co.colors[:12],N=12)
+
+        # Prepare dataframes
         self.stock_df = v_dict['VEH_STCK']
         self.stock_df = reorder_age_headers(self.stock_df)
         self.stock_add = v_dict['VEH_STCK_ADD']
@@ -489,19 +506,21 @@ class FleetModel:
         #stock_df_plot.unstack('seg')
         self.stock_df_plot_grouped = self.stock_df_plot.groupby(['tec','seg'])
 
+        """--- Plot total stocks by age, technology, and segment---"""   
         fig, axes = plt.subplots(4,2, figsize=(12,12), sharey=True)
         for (key, ax) in zip(self.stock_df_plot_grouped.groups.keys(), axes.flatten()):
             #print(key)
-            if(key==('BEV','B')):
-                fix_age_legend(ax)
+#            if(key==('BEV','B')):
+#                fix_age_legend(ax)
             self.stock_df_plot_grouped.get_group(key).plot(ax=ax,kind='area',cmap='Spectral_r',legend=False)
-            handles,labels = ax.get_legend_handles_labels()
+            #handles,labels = ax.get_legend_handles_labels()
             ax.set_xticklabels([2000,2010,2020,2030,2040,2050])
             ax.set_xlabel('year')
             ax.set_title(key,fontsize=10,fontweight='bold')
-            """" Does not work, need a non-'aliased' reference to datapoint """
-            #ax.axvline(x=2020,ls='dotted',color='k')
-        #fig.legend(labels=labels, ncol=2,title="age",loc='upper left',bbox_to_anchor=(0.78,0.8))#,loc='upper left')  # Title for the legend
+        patches, labels = ax.get_legend_handles_labels()
+        ax.legend(patches,labels,bbox_to_anchor=(1.52,5.32), ncol=2, title='Age')
+        """" Does not work, need a non-'aliased' reference to datapoint """
+        #ax.axvline(x=2020,ls='dotted',color='k')
         fig.suptitle('Vehicle stock by technology and segment')
         plt.subplots_adjust(hspace=0.42)#right=0.82,
         pp.savefig(bbox_inches='tight')
@@ -516,23 +535,26 @@ class FleetModel:
 #        ax = self.stock_df_plot.loc['ICE'].groupby('seg').plot(kind='area',cmap='Spectral_r',title='ICE stocks by age and segment')
 #        ax = stock_df_plot.loc['ICE'].plot(kind='area',cmap='Spectral_r',title='ICE stocks by age and segment')
 #        fix_age_legend(ax) 
+         
+        """--- Plot total stocks by segment ---"""   
         ax = self.stock_df_plot.sum(axis=1).unstack('seg').sum(axis=0,level=1).plot(kind='area',cmap='jet',title='Total stocks by segment')
         fix_age_legend(ax,'Vehicle segments') 
           
-        co = plt.get_cmap('tab20')
-        paired = matplotlib.colors.LinearSegmentedColormap.from_list('paired',co.colors[:12],N=12)
         
+        
+        """--- Plot total stocks by age, segment and technology ---"""   
         ax = self.stock_df_plot.sum(axis=1).unstack('seg').unstack('tec').plot(kind='area',cmap=paired,title='Total stocks by segment and technology')
         fix_age_legend(ax,'Vehicle segment and technology') 
 
-        
+    
+        """--- Plot total stocks by age ---"""   
         #stock_df_plot = stock_df_plot.sum(axis=1,level=1) # aggregates segments
         ax = self.stock_df_plot.sum(level=2).plot(kind='area',cmap='Spectral_r',title='Total stocks by age') 
         fix_age_legend(ax)
         
         
         #ax = self.stock_df_plot.sum(level=2).plot.barh()
-        
+        """--- Plot total stocks by age and technology ---"""
         ax = self.stock_df_plot.loc['BEV'].sum(level=1).plot(kind='area',cmap='Spectral_r',title='BEV stocks by age')
         fix_age_legend(ax)  
         
@@ -540,19 +562,17 @@ class FleetModel:
         fix_age_legend(ax)  
         ax.axvline(2020,ls='dotted',color='k')
                 
-        # ----- Plot addition to stocks
-        fig,axes = plt.subplots(1,2)
-        stock_add_grouped = self.stock_add.unstack('seg').groupby('tec')
-        for (key,ax) in zip(stock_add_grouped.groups.keys(),axes.flatten()):
-            stock_add_grouped.get_group(key).plot(ax=ax,kind='area',cmap='jet',legend=False)
-            ax.set_xticklabels([2000,2010,2020,2030,2040,2050])
-            ax.set_xlabel('year')
-            ax.set_title(key,fontsize=10,fontweight='bold')
-            #ax.axvline(x=('BEV',2020),ls='dotted')
-            ax.set_label('segment')
-        fig.suptitle('Additions to stock by segment and technology')
-        ax.set_label('segment')
-        ax.legend()
+        """--- Plot addition to stocks by segment and technology  ---"""
+#        fig,axes = plt.subplots(1,2,figsize=(6,3))
+#        stock_add_grouped = self.stock_add.unstack('seg').groupby('tec')
+#        for (key,ax) in zip(stock_add_grouped.groups.keys(),axes.flatten()):
+#            stock_add_grouped.get_group(key).plot(ax=ax,kind='area',cmap='jet',legend=False)
+#            ax.set_xticklabels([2000,2010,2020,2030,2040,2050])
+#            ax.set_xlabel('year')
+#            ax.set_title(key,fontsize=10,fontweight='bold')
+#            #ax.axvline(x=('BEV',2020),ls='dotted')
+#        fig.suptitle('Additions to stock by segment and technology')
+#        ax.legend(labels=self.seg,title='Segment',markerscale=15)
         
         ax = self.stock_add.sum(axis=1).unstack('seg').unstack('tec').plot(kind='area',cmap=paired,title='Stock additions, by segment and technology')
         fix_age_legend(ax,'Vehicle segment and technology') 
@@ -560,6 +580,63 @@ class FleetModel:
         #ax.set_xticklabels([2000,2010,2020,2030,2040,2050])
         #ax.set_xlabel('year')
         #ax.axvline(x=2020,ls='dotted')
+        
+        """--- Plot stock addition shares by segment and technology ---"""
+        add_gpby = self.stock_add.sum(axis=1).unstack('seg').unstack('tec')
+        add_share = add_gpby.div(add_gpby.sum(axis=1),axis=0)
+        
+        ax = add_share.plot(kind='area',cmap=paired,title='Share of stock additions, by segment and technology')
+        ax.xaxis.set_minor_locator(MultipleLocator(1))
+        ax.grid(which='minor',axis='x',c='w',alpha=0.6,linestyle=':',lw=0.3)
+        ax.grid(which='major',axis='x',c='darkgrey',alpha=0.75,linestyle='--',lw=1)
+        fix_age_legend(ax,'Vehicle segment and technology') 
+
+        """--- Plot production emissions by tec and seg ---"""
+#        fig,axes = plt.subplots(1,2)
+#        for (key,ax) in zip(self.veh_prod_totc.groupby(['tec','seg']).groups.keys(),axes.flatten()):
+#            self.veh_prod_totc.groupby(['tec','seg']).get_group(key).plot(ax=ax,kind='area',cmap='jet',legend=False)
+#            ax.set_xticklabels([2000,2010,2020,2030,2040,2050])
+#            ax.set_xlabel('year')
+#            ax.set_title(key,fontsize=10,fontweight='bold')
+#            #ax.axvline(x=('BEV',2020),ls='dotted')
+#            ax.set_label('segment')
+#        ax.legend()
+#        pp.savefig(bbox_inches='tight')
+        
+        """--- Plot production emissions by tec and seg ---"""
+        prod_int = self.veh_prod_totc.unstack('tec')/self.stock_add.sum(axis=1).unstack('tec')
+        
+        fig,axes = plt.subplots(3,2,figsize=(9,9),sharey=True)
+        labels=['BEV','ICE']
+        title='Total production emissions by technology and segment'
+        plot_subplots(self.veh_prod_totc.unstack('tec').groupby(['seg']),title=title,labels=labels)
+#        ax.legend(labels=['BEV','ICE'],bbox_to_anchor=(0.2,-0.3),ncol=2,fontsize='large')    
+        
+        fig,axes = plt.subplots(3,2,figsize=(9,9),sharey=True)
+        #ax.legend(labels=['BEV','ICE'],bbox_to_anchor=(0.2,-0.3),ncol=2,fontsize='large')    
+        title = 'Production emission intensities by technology and segment'
+        plot_subplots(prod_int.groupby(['seg']),title=title,labels=labels)
+        
+
+        
+        #for (key,ax) in zip(self.veh_prod_totc.unstack('tec').groupby(['seg']).groups.keys(),axes.flatten()):
+#        for (key,ax) in zip(self.veh_prod_totc.unstack('tec').groupby(['seg']).groups.keys(),axes.flatten()):
+#            self.veh_prod_totc.unstack('tec').groupby(['seg']).get_group(key).plot(ax=ax,cmap='jet',legend=False)
+#            ax.set_xticklabels([2000,2010,2020,2030,2040,2050])
+#            ax.set_xlabel('year')
+#            ax.set_title(key,fontsize=10,fontweight='bold')
+#            ax.set_label('segment')
+#            
+#            ax.xaxis.set_minor_locator(MultipleLocator(1))
+#            ax.grid(which='minor',axis='x',c='lightgrey',alpha=0.55,linestyle=':',lw=0.3)
+#            ax.grid(which='major',axis='x',c='darkgrey',alpha=0.75,linestyle='--',lw=1)
+#
+#        
+#        ax.legend(labels=['BEV','ICE'],bbox_to_anchor=(0.2,-0.3),ncol=2,fontsize='large')    
+#        plt.subplots_adjust(hspace=0.45)
+#        pp.savefig(bbox_inches='tight')
+#        
+        
         
         #stock_df_grouped =stock_df.groupby(level=[0])
 #        for name, group in stock_df_grouped:
