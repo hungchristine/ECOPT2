@@ -45,7 +45,9 @@ class FleetModel:
         self.gms_file = 'C:\\Users\\chrishun\\Box Sync\\YSSP_temp\\EVD4EUR.gms' # GAMS model file
         self.import_fp = 'C:\\Users\\chrishun\\Box Sync\\YSSP_temp\\data\\'
         self.export_fp = ''
-        
+        self.keeper = "{:%d-%m-%y, %H_%M}".format(datetime.now())
+        self.xl_writer = pd.ExcelWriter('output'+self.keeper+'.xlsx')
+
         """ static input data.....hardcoded and/or read in from Excel? """
         self.battery_specs = pd.DataFrame() # possible battery_sizes (and acceptable segment assignments, CO2 production emissions, critical material content, mass)
         self.fuelcell_specs = pd.DataFrame() # possible fuel cell powers (and acceptable segment assignments, CO2 production emissions, critical material content, fuel efficiency(?), mass)
@@ -339,9 +341,15 @@ class FleetModel:
                 sys.exit('Model infeasible!')
             else:
                 self.totc = self.get_output_from_GAMS(gams_db,'TOTC')
+                self.totc.to_excel(self.xl_writer,sheet_name='TOTC')
                 self.veh_stck_add = self.get_output_from_GAMS(gams_db,'VEH_STCK_ADD')
+                self.veh_stck_add.to_excel(self.xl_writer,sheet_name='VEH_STCK_ADD')
                 self.veh_stck = self.get_output_from_GAMS(gams_db,'VEH_STCK')
+                self.veh_stck.to_excel(self.xl_writer,sheet_name='TOTC')
+
                 self.veh_totc = self.get_output_from_GAMS(gams_db,'VEH_TOTC')
+                self.veh_totc.to_excel(self.xl_writer,sheet_name='TOTC')
+
                 self.veh_prod_totc = self.get_output_from_GAMS(gams_db,'VEH_PROD_TOTC')
                 self.veh_oper_totc = self.get_output_from_GAMS(gams_db,'VEH_OPER_TOTC')
                 self.veh_eolt_totc = self.get_output_from_GAMS(gams_db,'VEH_EOLT_TOTC')
@@ -403,10 +411,9 @@ class FleetModel:
     def vis_GAMS(self):
         """ visualize key GAMS parameters for quality checks"""
         """To do: split into input/output visualization; add plotting of CO2 and stocks together"""
-        keeper = "{:%d-%m-%y, %H_%M}".format(datetime.now())
         ch_path = os.path.dirname(os.path.abspath(__file__))+r'\visualization output\ '
         os.chdir(ch_path)
-        pp = PdfPages('output_vis_'+keeper+'.pdf')
+        pp = PdfPages('output_vis_'+self.keeper+'.pdf')
         
         gdx_file = self.export_fp #'C:\\Users\\chrishun\\Box Sync\\YSSP_temp\\EVD4EUR_ver098.gdx'
         sets = gmspy.ls(gdx_filepath=gdx_file, entity='Set')
@@ -464,8 +471,9 @@ class FleetModel:
         
         def fix_age_legend(ax,title='Vehicle ages'):
             patches, labels = ax.get_legend_handles_labels()
-            leg = ax.legend(bbox_to_anchor=(1.05,1), ncol=2, title=title)
-            pp.savefig(bbox_extra_artists=(leg))
+            ax.legend(patches,labels,bbox_to_anchor=(1.05,1), ncol=2, title=title)
+            pp.savefig(bbox_inches='tight')
+           
 
         # Plot total stocks by age
         self.stock_df = v_dict['VEH_STCK']
@@ -486,7 +494,6 @@ class FleetModel:
             #print(key)
             if(key==('BEV','B')):
                 fix_age_legend(ax)
-                print(key)
             self.stock_df_plot_grouped.get_group(key).plot(ax=ax,kind='area',cmap='Spectral_r',legend=False)
             handles,labels = ax.get_legend_handles_labels()
             ax.set_xticklabels([2000,2010,2020,2030,2040,2050])
@@ -497,7 +504,8 @@ class FleetModel:
         #fig.legend(labels=labels, ncol=2,title="age",loc='upper left',bbox_to_anchor=(0.78,0.8))#,loc='upper left')  # Title for the legend
         fig.suptitle('Vehicle stock by technology and segment')
         plt.subplots_adjust(hspace=0.42)#right=0.82,
-        pp.savefig(pad_inches=0.5)
+        pp.savefig(bbox_inches='tight')
+        
 #        for (key, ax) in zip(self.stock_df_plot_grouped.groups.keys(), axes.flatten()):
  #           self.stock_df_plot_grouped.get_group(key).plot(ax=ax,kind='area',cmap='Spectral_r')
 
@@ -515,7 +523,6 @@ class FleetModel:
         paired = matplotlib.colors.LinearSegmentedColormap.from_list('paired',co.colors[:12],N=12)
         
         ax = self.stock_df_plot.sum(axis=1).unstack('seg').unstack('tec').plot(kind='area',cmap=paired,title='Total stocks by segment and technology')
-        
         fix_age_legend(ax,'Vehicle segment and technology') 
 
         
@@ -533,6 +540,7 @@ class FleetModel:
         fix_age_legend(ax)  
         ax.axvline(2020,ls='dotted',color='k')
                 
+        # ----- Plot addition to stocks
         fig,axes = plt.subplots(1,2)
         stock_add_grouped = self.stock_add.unstack('seg').groupby('tec')
         for (key,ax) in zip(stock_add_grouped.groups.keys(),axes.flatten()):
@@ -542,12 +550,17 @@ class FleetModel:
             ax.set_title(key,fontsize=10,fontweight='bold')
             #ax.axvline(x=('BEV',2020),ls='dotted')
             ax.set_label('segment')
+        fig.suptitle('Additions to stock by segment and technology')
+        ax.set_label('segment')
+        ax.legend()
+        
+        ax = self.stock_add.sum(axis=1).unstack('seg').unstack('tec').plot(kind='area',cmap=paired,title='Stock additions, by segment and technology')
+        fix_age_legend(ax,'Vehicle segment and technology') 
         #axes = self.stock_add.unstack('seg').groupby('tec').plot(kind='area',cmap='jet',title='Stock additions by segment and technology')
         #ax.set_xticklabels([2000,2010,2020,2030,2040,2050])
         #ax.set_xlabel('year')
         #ax.axvline(x=2020,ls='dotted')
-        ax.set_label('segment')
-        ax.legend()
+        
         #stock_df_grouped =stock_df.groupby(level=[0])
 #        for name, group in stock_df_grouped:
 #            ax=group.plot(kind='area',cmap='Spectral_r',title=name+' stock by age')
