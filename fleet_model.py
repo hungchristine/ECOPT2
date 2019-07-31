@@ -47,7 +47,7 @@ class FleetModel:
        #self.gdx_file = 'C:\\Users\\chrishun\\Box Sync\\YSSP_temp\\EVD4EUR_input.gdx'#EVD4EUR_ver098.gdx'
         self.gms_file = 'C:\\Users\\chrishun\\Box Sync\\YSSP_temp\\EVD4EUR.gms' # GAMS model file
         self.import_fp = 'C:\\Users\\chrishun\\Box Sync\\YSSP_temp\\data\\'
-        self.export_fp = ''
+        self.export_fp = 'C:\\Users\\chrishun\\Box Sync\\YSSP_temp\\Model run data\\'
         self.keeper = "{:%d-%m-%y, %H_%M}".format(datetime.now())
         self.xl_writer = pd.ExcelWriter('output'+self.keeper+'.xlsx')
 
@@ -269,7 +269,7 @@ class FleetModel:
          #spy.param2series('VEH_PAY', db) # series, otherwise makes giant sparse dataframe        
 
 
-    def _load_experiment_data_in_gams(self): # will become unnecessary as we start calculating/defining sets and/or parameters within the class
+    def _load_experiment_data_in_gams(self,filename): # will become unnecessary as we start calculating/defining sets and/or parameters within the class
         years = gmspy.list2set(self.db,self.year,'year')
         tecs = gmspy.list2set(self.db, self.tecs, 'tec')
         #cohort = gmspy.list2set(self.db, self.cohort, 'prodyear') ## prodyear is an alias of year, not a set of its own
@@ -322,8 +322,8 @@ class FleetModel:
 
         #veh_add_grd = gmspy.df2param(self.db,self.veh_add_grd, ['grdeq','tec'], 'VEH_ADD_GRD')
         
-        print('exporting database...troubleshooting_params')
-        self.db.export(os.path.join(self.current_path,'troubleshooting_params'))
+        print('exporting database...'+filename+'_input')
+        self.db.export(os.path.join(self.current_path,filename+'_input'))
 
     def calc_op_emissions(self):
         """ calculate operation emissions from calc_cint_operation and calc_eint_operation """
@@ -357,22 +357,22 @@ class FleetModel:
         # used in calc_veh_mass()
         pass
               
-    def run_GAMS(self):
+    def run_GAMS(self,filename):
 
         # Pass to GAMS all necessary sets and parameters
-        self._load_experiment_data_in_gams()
+        self._load_experiment_data_in_gams(filename)
         #self.db.export('troubleshooting_custom.gdx')
         
         #Run GMS Optimization
         try:
-            model_run = self.ws.add_job_from_file(self.gms_file)
+            model_run = self.ws.add_job_from_file(self.gms_file) # model_run is type GamsJob
         
             model_run.run(databases=self.db,create_out_db = True)
             print("Ran GAMS model: "+self.gms_file)
             gams_db = model_run.out_db
-            self.export_fp = os.path.join(self.current_path,'fleet_model_output.gdx')
+            self.export_fp = os.path.join(self.export_fp,filename+'_solution.gdx')
             gams_db.export(self.export_fp)
-            print("Completed export of " + self.export_fp)
+            print("Completed export of solution database")# + self.export_fp)
             
             self.totc = self.get_output_from_GAMS(gams_db,'TOTC')
             #self.totc.to_excel(self.xl_writer,sheet_name='TOTC')
@@ -442,12 +442,12 @@ class FleetModel:
     def import_from_MESSAGE(self):
         pass
 
-    def vis_GAMS(self):
+    def vis_GAMS(self,filename):
         """ visualize key GAMS parameters for quality checks"""
         """To do: split into input/output visualization; add plotting of CO2 and stocks together"""
         ch_path = os.path.dirname(os.path.abspath(__file__))+r'\visualization output\ '
         os.chdir(ch_path)
-        pp = PdfPages('output_vis_'+self.keeper+'.pdf')
+        pp = PdfPages('output_vis_'+filename+'.pdf')
         
         gdx_file = self.export_fp #'C:\\Users\\chrishun\\Box Sync\\YSSP_temp\\EVD4EUR_ver098.gdx'
         sets = gmspy.ls(gdx_filepath=gdx_file, entity='Set')
