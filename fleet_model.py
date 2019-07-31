@@ -220,31 +220,7 @@ class FleetModel:
         pass
     
     @staticmethod
-    def _process_df_to_series(df):
-        """self.veh_prod_cint.set_index([0,1],inplace=True)
-        a=self.veh_prod_cint.index.get_level_values(0).astype(str)
-        b=self.veh_prod_cint.index.get_level_values(1).astype(str)
-        self.veh_prod_cint.index = [a,b]
-        self.veh_prod_cint.columns=['']
-        self.veh_prod_cint.index.names = ['','']
-        self.veh_prod_cint = pd.Series(self.veh_prod_cint.iloc[:,0])"""
-        
-#        col = self.veh_oper_cint.columns[:-1].tolist()
-#        self.veh_oper_cint.set_axis(col,axis=1,inplace=True)
-#        self.veh_oper_cint.set_index(col,inplace=True)
-#        self.veh_oper_cint.set_index(self.veh_oper_cint.loc[:,col],inplace=True)
-        
-#        
-#        a = self.veh_oper_cint.index.get_level_values(0).astype(str)
-#        b = self.veh_oper_cint.index.get_level_values(1).astype(str)
-#        c = self.veh_oper_cint.index.get_level_values(2).astype(str)
-#        
-#        self.veh_oper_cint.index = [a,b,c]
-#        self.veh_oper_cint.columns=['']
-#        self.veh_oper_cint.index.names = ['','','']
-#        self.veh_oper_cint = pd.Series(self.veh_oper_cint.iloc[:,0])
-        
-        
+    def _process_df_to_series(df):        
         dims = df.shape[1]-1 # assumes stacked format
         indices = df.columns[:-1].tolist()
         df.set_index(indices,inplace=True)
@@ -358,7 +334,6 @@ class FleetModel:
         pass
               
     def run_GAMS(self,filename):
-
         # Pass to GAMS all necessary sets and parameters
         self._load_experiment_data_in_gams(filename)
         #self.db.export('troubleshooting_custom.gdx')
@@ -375,14 +350,9 @@ class FleetModel:
             print("Completed export of solution database")# + self.export_fp)
             
             self.totc = self.get_output_from_GAMS(gams_db,'TOTC')
-            #self.totc.to_excel(self.xl_writer,sheet_name='TOTC')
             self.veh_stck_add = self.get_output_from_GAMS(gams_db,'VEH_STCK_ADD')
-#            self.veh_stck_add.to_excel(self.xl_writer,sheet_name='VEH_STCK_ADD')
             self.veh_stck = self.get_output_from_GAMS(gams_db,'VEH_STCK')
-#            self.veh_stck.to_excel(self.xl_writer,sheet_name='TOTC')
-
             self.veh_totc = self.get_output_from_GAMS(gams_db,'VEH_TOTC')
-#            self.veh_totc.to_excel(self.xl_writer,sheet_name='TOTC')
 
             self.veh_prod_totc = self.get_output_from_GAMS(gams_db,'VEH_PROD_TOTC')
             self.veh_oper_totc = self.get_output_from_GAMS(gams_db,'VEH_OPER_TOTC')
@@ -449,11 +419,10 @@ class FleetModel:
         os.chdir(ch_path)
         pp = PdfPages('output_vis_'+filename+'.pdf')
         
-        gdx_file = self.export_fp #'C:\\Users\\chrishun\\Box Sync\\YSSP_temp\\EVD4EUR_ver098.gdx'
+        gdx_file = self.export_fp 
         sets = gmspy.ls(gdx_filepath=gdx_file, entity='Set')
         parameters = gmspy.ls(gdx_filepath=gdx_file,entity='Parameter')
         variables = gmspy.ls(gdx_filepath=gdx_file,entity='Variable')
-        """os.path.join(ws.working_directory,".gdx'0"""
         years = gmspy.set2list(sets[0], gdx_filepath=gdx_file)
 
         # Export parameters
@@ -469,21 +438,6 @@ class FleetModel:
             except AttributeError:
                 pass
             
-        
-#        p_df = pd.DataFrame(index=years)
-#        p_df.index.name='year'
-#        for key in p_dict:
-#            if len(p_dict[key])==len(years):
-#                p_dict[key].rename_axis('year',inplace=True)
-#                #p_df=pd.concat([p_df,p_dict[key]],axis=1,join_axes=[p_df.index])
-#                #p_df= p_df.join(p_dict[key],how='outer')
-#                p_df= pd.merge(p_df,p_dict[key].rename(key),on='year')#left_index=True,right_index=True)
-#            else:
-#                pass
-#                    #print(key)
-#        p_df.drop(['YEAR_PAR','PRODYEAR_PAR'],axis=1,inplace=True)
-        
-        
         # Export variables
         v_dict = {}
         for v in variables:
@@ -738,21 +692,6 @@ class FleetModel:
     def _read_all_final_parameters(self, a_file):
         # will become unnecessary as we start internally defining all parameters
         db = gmspy._iwantitall(None, None, a_file)
-
-        #self.veh_oper_dist = gmspy.param2series('VEH_OPER_DIST', db)
-        #self.veh_stck_tot = gmspy.param2series('VEH_STCK_TOT', db)
-        #self.veh_lift_cdf = gmspy.param2series('VEH_LIFT_CDF', db)
-        #self.veh_lift_age = gmspy.param2series('VEH_LIFT_AGE', db)
-
-        #self.veh_prod_cint = gmspy.param2df('VEH_PROD_CINT', db)
-        #self.veh_oper_cint = gmspy.param2df('VEH_OPER_CINT', db)
-        #self.veh_eolt_cint = gmspy.param2df('VEH_EOLT_CINT', db)
-
-        #self.veh_stck_int = gmspy.param2df('VEH_STCK_INT', db)
-
-        #self.enr_veh = gmspy.param2df('ENR_VEH', db)
-        #self.veh_pay = gm
-    
        
 
 class EcoinventManipulator:
