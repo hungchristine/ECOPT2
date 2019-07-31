@@ -18,6 +18,7 @@ import seaborn
 from matplotlib.backends.backend_pdf import PdfPages
 from datetime import datetime
 
+import itertools
 
 import gams
 import gmspy
@@ -41,7 +42,7 @@ class FleetModel:
         lightweighting_scenario: whether (how aggressively) LDVs are lightweighted in the experiment
         
     """
-    def __init__(self, data_from_message=None):
+    def __init__(self,veh_seg_shr,veh_seg_int, data_from_message=None):
         self.current_path = os.path.dirname(os.path.realpath(__file__))
        #self.gdx_file = 'C:\\Users\\chrishun\\Box Sync\\YSSP_temp\\EVD4EUR_input.gdx'#EVD4EUR_ver098.gdx'
         self.gms_file = 'C:\\Users\\chrishun\\Box Sync\\YSSP_temp\\EVD4EUR.gms' # GAMS model file
@@ -99,14 +100,30 @@ class FleetModel:
         self.veh_stck_tot = pd.DataFrame(pd.read_excel('GAMS_input_new.xls',sheet_name='VEH_STCK_TOT',header=None,usecols='A:B',skiprows=[0]))
         self.veh_stck_tot = self._process_df_to_series(self.veh_stck_tot)
         
+        self.veh_seg_shr = veh_seg_shr#[0.08,0.21,0.27,0.08,0.03,0.34] # From 2017
+        self.veh_seg_shr = pd.Series(self.veh_seg_shr,index=self.seg)
+        
+        ## Temporary; used to calculate relative CO2-intensity between segments
+        self.veh_seg_int = veh_seg_int#[0.75,0.8,1,1.2,1.5,1.7] # Totally random/has no real scientific basis.
+        self.veh_seg_int = pd.Series(self.veh_seg_int,index=self.seg)
+        
         ################ Life cycle intensities ################
         """These factors are usually calculated using the general logistic function"""
-        self.veh_prod_cint = pd.DataFrame(pd.read_excel('GAMS_input_new.xls',sheet_name='VEH_PROD_CINT',header=None,usecols='A:D',skiprows=[0]))  # [tecs, cohort]
-        self.veh_prod_cint = self._process_df_to_series(self.veh_prod_cint)
+        self.veh_prod_cint_csnt = pd.DataFrame(pd.read_excel('GAMS_input_new.xls',sheet_name='VEH_PROD_CINT_CSNT',header=None,usecols='A:D',skiprows=[0]))
+        self.veh_prod_cint_csnt = self._process_df_to_series(self.veh_prod_cint_csnt)
 
-        self.veh_oper_cint = pd.DataFrame(pd.read_excel('GAMS_input_new.xls',sheet_name='VEH_OPER_CINT',header=None,usecols='A:E',skiprows=[0]))  # [[tecs, enr], cohort]
-        self.veh_oper_cint = self._process_df_to_series(self.veh_oper_cint)
+        self.veh_prod_eint = pd.DataFrame(pd.read_excel('GAMS_input_new.xls',sheet_name='VEH_PROD_EINT',header=None,usecols='A:D',skiprows=[0]))
+        self.veh_prod_eint = self._process_df_to_series(self.veh_prod_eint)
+
+#        self.veh_prod_cint = pd.DataFrame(pd.read_excel('GAMS_input_new.xls',sheet_name='VEH_PROD_CINT',header=None,usecols='A:D',skiprows=[0]))  # [tecs, cohort]
+#        self.veh_prod_cint = self._process_df_to_series(self.veh_prod_cint)
         
+        self.veh_oper_eint = pd.DataFrame(pd.read_excel('GAMS_input_new.xls',sheet_name='VEH_OPER_EINT',header=None,usecols='A:D',skiprows=[0]))  # [[tecs, enr], cohort]
+        self.veh_oper_eint = self._process_df_to_series(self.veh_oper_eint)
+
+#        self.veh_oper_cint = pd.DataFrame(pd.read_excel('GAMS_input_new.xls',sheet_name='VEH_OPER_CINT',header=None,usecols='A:E',skiprows=[0]))  # [[tecs, enr], cohort]
+#        self.veh_oper_cint = self._process_df_to_series(self.veh_oper_cint)
+#        
         """Trial for calculating general logistic function in-code""" 
         """self.veh_partab = pd.DataFrame(pd.read_excel('GAMS_input_new.xls',sheet_name='VEH_PARTAB',header=None,usecols='A:D',skiprows=[0]))
         self.veh_partab = self._process_df_to_series(self.veh_partab)
@@ -163,9 +180,15 @@ class FleetModel:
         self.prodyear_par = pd.Series([int(i) for i in self.cohort],index = self.cohort)
         self.prodyear_par.index = self.prodyear_par.index.astype('str')
         
+        
         """# ACEA.be has segment division for Western Europe
         # https://www.acea.be/statistics/tag/category/segments-body-country
         # More detailed age distribution (https://www.acea.be/uploads/statistic_documents/ACEA_Report_Vehicles_in_use-Europe_2018.pdf)"""
+
+
+        self.veh_add_grd = dict()
+        for element in itertools.product(*[self.grdeq,self.tecs]):
+            self.veh_add_grd[element] = 0.1
 
         # --------------- Expected GAMS Outputs ------------------------------
 
@@ -186,7 +209,7 @@ class FleetModel:
 
         """ Optimization Initialization """
         self.ws = gams.GamsWorkspace(working_directory=self.current_path,debug=2)
-        self.db = self.ws.add_database(database_name='pyGAMSdb')
+        self.db = self.ws.add_database()#database_name='pyGAMSdb')
         self.opt = self.ws.add_options()
         self.opt.DumpParms = 2
         self.opt.ForceWork = 1
@@ -267,9 +290,15 @@ class FleetModel:
 
         veh_oper_dist = gmspy.df2param(self.db, self.veh_oper_dist, ['year'], 'VEH_OPER_DIST')
         veh_stck_tot = gmspy.df2param(self.db, self.veh_stck_tot, ['year'], 'VEH_STCK_TOT')
+        veh_seg_shr = gmspy.df2param(self.db,self.veh_seg_shr,['seg'],'VEH_SEG_SHR')
+        veh_seg_int = gmspy.df2param(self.db,self.veh_seg_int,['seg'],'VEH_SEG_INT')
         
-        veh_prod_cint = gmspy.df2param(self.db, self.veh_prod_cint, ['tec','seg', 'prodyear'], 'VEH_PROD_CINT')
-        veh_oper_cint = gmspy.df2param(self.db, self.veh_oper_cint, ['tec', 'enr','seg', 'prodyear'], 'VEH_OPER_CINT')
+#        veh_prod_cint = gmspy.df2param(self.db, self.veh_prod_cint, ['tec','seg', 'prodyear'], 'VEH_PROD_CINT')
+        veh_prod_cint_csnt = gmspy.df2param(self.db,self.veh_prod_cint_csnt,['tec','seg','prodyear'],'VEH_PROD_CINT_CSNT')
+        veh_prod_eint = gmspy.df2param(self.db,self.veh_prod_eint,['tec','seg','prodyear'],'VEH_PROD_EINT')
+        
+        veh_oper_eint = gmspy.df2param(self.db, self.veh_oper_eint, ['tec', 'seg', 'prodyear'], 'VEH_OPER_EINT')
+#        veh_oper_cint = gmspy.df2param(self.db, self.veh_oper_cint, ['tec', 'enr','seg', 'prodyear'], 'VEH_OPER_CINT')
         veh_eolt_cint = gmspy.df2param(self.db, self.veh_eolt_cint, ['tec','seg', 'prodyear'], 'VEH_EOLT_CINT')
 
         veh_lift_cdf = gmspy.df2param(self.db, self.veh_lift_cdf, ['age'], 'VEH_LIFT_CDF')
@@ -284,8 +313,14 @@ class FleetModel:
 
         veh_pay = gmspy.df2param(self.db, self.veh_pay, ['prodyear', 'age', 'year'], 'VEH_PAY')
         
-        age_par = gmspy.df2param(self.db,self.age_par, ['age'], 'AGE_PAR')
+        #age_par = gmspy.df2param(self.db,self.age_par, ['age'], 'AGE_PAR')
         year_par = gmspy.df2param(self.db,self.year_par, ['year'], 'YEAR_PAR')
+        
+        veh_add_grd = self.db.add_parameter_dc('VEH_ADD_GRD', ['grdeq','tec'])
+        for keys,value in iter(self.veh_add_grd.items()):
+            veh_add_grd.add_record(keys).value = value
+
+        #veh_add_grd = gmspy.df2param(self.db,self.veh_add_grd, ['grdeq','tec'], 'VEH_ADD_GRD')
         
         print('exporting database...troubleshooting_params')
         self.db.export(os.path.join(self.current_path,'troubleshooting_params'))
@@ -486,7 +521,8 @@ class FleetModel:
 
                 plt.subplots_adjust(hspace=0.45)
                 fig.suptitle(title)
-            ax.legend(labels=labels,bbox_to_anchor=(0.2,-0.3),ncol=2,fontsize='large')    
+            ax.legend(labels=labels,bbox_to_anchor=(0.2,-0.3),ncol=2,fontsize='large') 
+            return ax
 
         ## Make paired colormap for comparing tecs
         co = plt.get_cmap('tab20')
@@ -604,21 +640,25 @@ class FleetModel:
 #        pp.savefig(bbox_inches='tight')
         
         """--- Plot production emissions by tec and seg ---"""
-        prod_int = self.veh_prod_totc.unstack('tec')/self.stock_add.sum(axis=1).unstack('tec')
+        prod = self.veh_prod_totc.unstack('tec')/1e9
+        prod_int = (self.veh_prod_totc.unstack('tec')/self.stock_add.sum(axis=1).unstack('tec'))/1000
         
         fig,axes = plt.subplots(3,2,figsize=(9,9),sharey=True)
         labels=['BEV','ICE']
         title='Total production emissions by technology and segment'
-        plot_subplots(self.veh_prod_totc.unstack('tec').groupby(['seg']),title=title,labels=labels)
-#        ax.legend(labels=['BEV','ICE'],bbox_to_anchor=(0.2,-0.3),ncol=2,fontsize='large')    
+        #plot_subplots((self.veh_prod_totc.unstack('tec').groupby(['seg'])),title=title,labels=labels)
+        plot_subplots(prod.groupby(['seg']), title=title, labels=labels)
+#        ax.legend(labels=['BEV','ICE'],bbox_to_anchor=(0.2,-0.3),ncol=2,fontsize='large')   
+        fig.text(0.04,0.5,'Production emissions \n(Mt CO2-eq)', ha='center', rotation='vertical')
+
         
         fig,axes = plt.subplots(3,2,figsize=(9,9),sharey=True)
         #ax.legend(labels=['BEV','ICE'],bbox_to_anchor=(0.2,-0.3),ncol=2,fontsize='large')    
         title = 'Production emission intensities by technology and segment'
         plot_subplots(prod_int.groupby(['seg']),title=title,labels=labels)
         
-
-        
+        fig.text(0.04,0.5,'Production emissions intensity \n(t CO2/vehicle)', ha='center', rotation='vertical')
+                
         #for (key,ax) in zip(self.veh_prod_totc.unstack('tec').groupby(['seg']).groups.keys(),axes.flatten()):
 #        for (key,ax) in zip(self.veh_prod_totc.unstack('tec').groupby(['seg']).groups.keys(),axes.flatten()):
 #            self.veh_prod_totc.unstack('tec').groupby(['seg']).get_group(key).plot(ax=ax,cmap='jet',legend=False)

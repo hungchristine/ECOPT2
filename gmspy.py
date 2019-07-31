@@ -69,10 +69,11 @@ def df2param(db, df, domains, name, comment=''):
     ## if df is a single-column dataframe (i.e., series cast as dataframe), the below doesn't work; keys uses the index-column name pair...
     
     a_param = db.add_parameter_dc(name, domains, comment)
-    if df.ndim > 1:
-        df = df.stack()
-    df = df.to_dict()
-#    print(name)
+    if isinstance(df,pd.DataFrame):
+        if df.ndim > 1:
+            df = df.stack()
+        df = df.to_dict()
+    #    print(name)
     for keys, data in iter(df.items()):#iter(df.items()):
 #        if name == 'VEH_PROD_CINT':
 #            print('keys..'+str(keys))
