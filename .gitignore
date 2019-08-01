@@ -5,7 +5,8 @@
 *.log
 *.lxi
 
-
+# Output YAML files
+testing_*.yaml
 
 # Compilation stuff
 

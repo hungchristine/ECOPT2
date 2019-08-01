@@ -4,10 +4,12 @@ Created on Thu Apr 25 17:26:23 2019
 
 @author: chrishun
 """
+import logging
+import sys
 
 import fleet_model
 #import test_gams
-import itertools
+from itertools import product
 from datetime import datetime
 import yaml
 
@@ -21,70 +23,89 @@ import yaml
 #b=[1/6 for i in range(6)]
 #
 #fleet = fleet_model.FleetModel(a,b)
-#fleet.run_GAMS('run_x')      
-#fleet.vis_GAMS('run_x') 
+#fleet.run_GAMS('run_x')
+#fleet.vis_GAMS('run_x')
+
+
+# Log to screen
+logging.basicConfig(stream=sys.stdout, level=logging.INFO)
+log = logging.getLogger(__name__)
+
+# Make output YAML less ugly, see https://stackoverflow.com/a/30682604
+yaml.SafeDumper.ignore_aliases = lambda *args: True
+
 
 def run_experiment():
     # Load parameter values from YAML
-    with open('input.yaml','r') as stream:
+    with open('input.yaml', 'r') as stream:
         try:
             params = yaml.safe_load(stream)
         except yaml.YAMLError as exc:
             print(exc)
 
-    f = open('experiment_log.txt','a')
-    i=1
-    
+    # Dictionary for logging
+    info = {}
+
+    # Explicit list of parameters
+    param_names = ['veh_seg_int', 'veh_seg_shr']
+
     # Run experiments
-    id_and_value = [p.items() for p in params.values()]
-    
-    id_and_value = [
-            [('A', [ ....]), ('B', [ .... ])],
-            [('X', [.....]), ('Y', [.....])],
-            ]
-    
-    for (a_id, a), (b_id, b) in itertools.product(*id_and_value):
-    for a, b in itertools.product(*params.values()):
-        #### Make run ID tag
-        filename = 'run '+str(i)
-        run_id = f'run_{a_id}_{b_id}'
-        print(filename)
-        print(a)
-        print(b)
-        fm = fleet_model.FleetModel(veh_seg_shr=a, veh_seg_int=b) #need to pass in run ID tag for saving gdx/csv
-        i+=1
-        fm.run_GAMS(filename)
-        #fm.vis_GAMS(filename)
+    id_and_value = [params[p].items() for p in param_names]
+    # NB could also change the names here
+    for i, run_params in enumerate(product(*id_and_value)):
+        # Same order as in param_names. Each is a tuple of (id, values)
+        veh_seg_int, veh_seg_shr = run_params
+
+        # Make run ID
+        run_id = f'run_{veh_seg_int[0]}_{veh_seg_shr[0]}'
+        # run_id = f'run_{i}'  # alternate format
+
+        log.info(f'Starting run {run_id}')
+
+        # need to pass in run ID tag for saving gdx/csv
+        # NB here, use explicit names to avoid any confusion
+        fm = fleet_model.FleetModel(veh_seg_shr=veh_seg_shr[1],
+                                    veh_seg_int=veh_seg_int[1])
+        fm.run_GAMS(run_id)
+
+        # fm.vis_GAMS(filename)
         exceptions = fm.db.get_database_dvs()
-        if len(exceptions)>1:
+        if len(exceptions) > 1:
             print(exceptions[0].symbol.name)
-            dunno=exceptions[0].symbol_dvs
-            
-            dunno2=exceptions[0].symbol
-            print(fleet.db.number_symbols)
-        
-        
-        f.write('Experiment run: '+str(i)+'\n')
-        f.write('Time of run: '+"{:%d-%m-%y, %H_%M_%S}".format(datetime.now())+'\n')
-        #### Add stuff about var_a, var_b, __
-        f.write(str(a))
-        f.write('\n')
-        f.write(str(b))
-        f.write('\n')
-        f.write('TOTC: '+str(fm.totc))
-        f.write('\n')
-        f.write('End experiment *************** \n')
-        f.write('\n')
-    f.close()
- 
+            dunno = exceptions[0].symbol_dvs
+
+            dunno2 = exceptions[0].symbol
+            print(fm.db.number_symbols)
+
+        # Save log info
+        info[run_id] = {
+            'params': {
+                'veh_seg_int': veh_seg_int,
+                'veh_seg_shr': veh_seg_shr,
+            },
+            'output': {
+                'totc': 42,   # life, the universe, and everything…
+                # 'totc': fm.totc,
+            }
+        }
+
+        # Display the info for this run
+        log.info(repr(info[run_id]))
+
+    # Write log to file
+    now = datetime.now().isoformat(timespec='seconds')
+    with open(f'testing_{now}.yaml', 'w') as f:
+        yaml.safe_dump(info, f)
+
+
 run_experiment()
-   
-    
+
+
 #        bounds = ['high','baseline','low']
 
 #    for element in itertools.product(experiment_list,bounds):
 #        fleet = fleet_model.FleetModel()
-    
+
 #    for experiment in experiment_list:
 #        keeper
 #        for i, bound in enumerate(bounds):
