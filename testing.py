@@ -16,7 +16,7 @@ import yaml
 #fleet.add_to_GAMS()
 
 #fleet._read_all_final_parameters("C:\\Users\\chrishun\\Box Sync\\YSSP_temp\\EVD4EUR_input.gdx")
-"""
+#"""
 #a=[1/6 for i in range(6)]
 #b=[1/6 for i in range(6)]
 #
@@ -36,13 +36,22 @@ def run_experiment():
     i=1
     
     # Run experiments
-    for a,b in itertools.product(*params.values()):
+    id_and_value = [p.items() for p in params.values()]
+    
+    id_and_value = [
+            [('A', [ ....]), ('B', [ .... ])],
+            [('X', [.....]), ('Y', [.....])],
+            ]
+    
+    for (a_id, a), (b_id, b) in itertools.product(*id_and_value):
+    for a, b in itertools.product(*params.values()):
         #### Make run ID tag
         filename = 'run '+str(i)
+        run_id = f'run_{a_id}_{b_id}'
         print(filename)
         print(a)
         print(b)
-        fm = fleet_model.FleetModel(veh_seg_shr=a,veh_seg_int=b) #need to pass in run ID tag for saving gdx/csv
+        fm = fleet_model.FleetModel(veh_seg_shr=a, veh_seg_int=b) #need to pass in run ID tag for saving gdx/csv
         i+=1
         fm.run_GAMS(filename)
         #fm.vis_GAMS(filename)

@@ -42,7 +42,7 @@ class FleetModel:
         lightweighting_scenario: whether (how aggressively) LDVs are lightweighted in the experiment
         
     """
-    def __init__(self,veh_seg_shr,veh_seg_int, data_from_message=None):
+    def __init__(self, veh_seg_shr, veh_seg_int, data_from_message=None):
         self.current_path = os.path.dirname(os.path.realpath(__file__))
        #self.gdx_file = 'C:\\Users\\chrishun\\Box Sync\\YSSP_temp\\EVD4EUR_input.gdx'#EVD4EUR_ver098.gdx'
         self.gms_file = 'C:\\Users\\chrishun\\Box Sync\\YSSP_temp\\EVD4EUR.gms' # GAMS model file
@@ -100,7 +100,7 @@ class FleetModel:
         self.veh_stck_tot = pd.DataFrame(pd.read_excel('GAMS_input_new.xls',sheet_name='VEH_STCK_TOT',header=None,usecols='A:B',skiprows=[0]))
         self.veh_stck_tot = self._process_df_to_series(self.veh_stck_tot)
         
-        self.veh_seg_shr = veh_seg_shr#[0.08,0.21,0.27,0.08,0.03,0.34] # From 2017
+        self.veh_seg_shr = veh_seg_shr or [0.08,0.21,0.27,0.08,0.03,0.34]  # From 2017
         self.veh_seg_shr = pd.Series(self.veh_seg_shr,index=self.seg)
         
         ## Temporary; used to calculate relative CO2-intensity between segments
@@ -336,14 +336,17 @@ class FleetModel:
     def run_GAMS(self,filename):
         # Pass to GAMS all necessary sets and parameters
         self._load_experiment_data_in_gams(filename)
-        #self.db.export('troubleshooting_custom.gdx')
+        #self.db.export(' _custom.gdx')
         
         #Run GMS Optimization
         try:
             model_run = self.ws.add_job_from_file(self.gms_file) # model_run is type GamsJob
-        
-            model_run.run(databases=self.db,create_out_db = True)
+            
+            opt = self.ws.add_options()
+            opt.defines["gdxincname"] = self.db.name
+            model_run.run(opt,databases=self.db,create_out_db = True)
             print("Ran GAMS model: "+self.gms_file)
+
             gams_db = model_run.out_db
             self.export_fp = os.path.join(self.export_fp,filename+'_solution.gdx')
             gams_db.export(self.export_fp)
