@@ -49,7 +49,7 @@ class FleetModel:
         self.import_fp = 'C:\\Users\\chrishun\\Box Sync\\YSSP_temp\\data\\'
         self.export_fp = 'C:\\Users\\chrishun\\Box Sync\\YSSP_temp\\Model run data\\'
         self.keeper = "{:%d-%m-%y, %H_%M}".format(datetime.now())
-        self.xl_writer = pd.ExcelWriter('output'+self.keeper+'.xlsx')
+#        self.xl_writer = pd.ExcelWriter('output'+self.keeper+'.xlsx')
 
         """ static input data.....hardcoded and/or read in from Excel? """
         self.battery_specs = pd.DataFrame() # possible battery_sizes (and acceptable segment assignments, CO2 production emissions, critical material content, mass)
@@ -76,12 +76,12 @@ class FleetModel:
         self.veheq = ['PROD_EINT','PROD_CINT_CSNT','OPER_EINT','EOLT_CINT']
         self.inityear=[str(2000+i) for i in range(21)]      # reduce to one/five year(s)? Originally 2000-2020
         self.lfteq=['LFT_DISTR','AGE_DISTR']
-        self.sigvar=['A','B','r','t','u']                   # S-curve terms
+        self.sigvar=['A','B','r','t','u']                   # S-curve terms...only required for parameter calculation within GAMS
         self.critmats = ['Cu','Li','Co','Pt','','']         # critical elements to count for; to incorporate later
-        self.age_int = list(map(int,self.age))
-        
+        self.age_int = list(map(int,self.age))              # age as ints for Python operations
+        self.year_int = list(map(int,self.year))            # year as ints for Python operations
         # --------------- GAMS Parameters -------------------------------------
-
+        self.set_dict={'tec':('ICE','BEV'),'enr':('ELC','FOS')}
         
         # "Functional unit" # TODO: this is redund
         # Eurostat road_tf_veh [vkm]
@@ -109,10 +109,12 @@ class FleetModel:
         
         ################ Life cycle intensities ################
         """These factors are usually calculated using the general logistic function"""
+#        self.veh_prod_cint_csnt = self._genlogfunc([[2500,2000,0.2,2025],[6500,2500,0.2,2025]],'tec',self.tecs)
         self.veh_prod_cint_csnt = pd.DataFrame(pd.read_excel('GAMS_input_new.xls',sheet_name='VEH_PROD_CINT_CSNT',header=None,usecols='A:D',skiprows=[0]))
         self.veh_prod_cint_csnt = self._process_df_to_series(self.veh_prod_cint_csnt)
 
         self.veh_prod_eint = pd.DataFrame(pd.read_excel('GAMS_input_new.xls',sheet_name='VEH_PROD_EINT',header=None,usecols='A:D',skiprows=[0]))
+#        self.veh_prod_eint = self._genlogfunc(self.tecs,)
         self.veh_prod_eint = self._process_df_to_series(self.veh_prod_eint)
 
 #        self.veh_prod_cint = pd.DataFrame(pd.read_excel('GAMS_input_new.xls',sheet_name='VEH_PROD_CINT',header=None,usecols='A:D',skiprows=[0]))  # [tecs, cohort]
@@ -128,9 +130,17 @@ class FleetModel:
         """self.veh_partab = pd.DataFrame(pd.read_excel('GAMS_input_new.xls',sheet_name='VEH_PARTAB',header=None,usecols='A:D',skiprows=[0]))
         self.veh_partab = self._process_df_to_series(self.veh_partab)
         print(self.veh_partab)
-        self.trial_oper_eint = self.veh_partab['OPER_EINT']
-        self.oper_eint = self.trial_oper_eint['A']+(trial_oper_eint['B']-trial_oper_eint['A'])/(1+exp(-trial_oper_eint['r']*(self.year-trial_oper_eint['u'])))
+        self.trial_oper_eint = self.veh_partab['OPER_EINT']"""
+        
+        self.dd = {'BEV':{'A':2000, 'B':3000, 'r':0.2, 'u':2025},'ICE':{'A':1000,'B':2000, 'r':0.2, 'u':2025}}
+        self.try_glf = self._genlogfunc(self.dd,'tec',self.tecs)
+#        sets = [self.age,self.tecs] # list of sets in dataframe
+#        for s in sets:
+#            self._genlogfunc(A,B,R,u)
+#            temp_df = temp_df.append
+#        self.try_gen_log_func = self._genlogfunc(1,0.1,0.2,2035)
         #A, B, r, u"""
+#        self.veh_eolt_cint = self._genlogfunc()
 
         self.veh_eolt_cint = pd.DataFrame(pd.read_excel('GAMS_input_new.xls',sheet_name='VEH_EOLT_CINT',header=None,usecols='A:D',skiprows=[0]))  # [[tecs, enr], cohort]
         self.veh_eolt_cint = self._process_df_to_series(self.veh_eolt_cint)  # [tecs, cohort]
@@ -234,6 +244,27 @@ class FleetModel:
         df = pd.Series(df.iloc[:,0])
         return df
     
+    def _genlogfunc(self,glf_terms,set_names=None,sets=None):
+        """y = A + (B-A)/(1+exp(-r*(t-tau)));
+        Y  is for example the  CO2 eq. intensity of electricity generation
+        t  is time.
+        A = Initial CO2 intensity of electricity generation
+        B = End CO2 intensity of electricity generation
+        r = is the rate of change ;
+        (tau) u is time the of maximum gradient of Y"""
+        y_df = pd.DataFrame()
+        if sets:
+            for s in sets:
+                index = pd.MultiIndex.from_arrays([[s]*len(self.year),self.year],names=(set_names,'years'))
+                A = glf_terms[s]['A']
+                B = glf_terms[s]['B']
+                r = glf_terms[s]['r']
+                u = glf_terms[s]['u']
+                self.y_val = [A + (B-A)/(1+np.exp(-r*(t-u))) for t in self.year_int]
+                y = pd.DataFrame(self.y_val,index=index,dtype=str,columns=[''])
+                y_df = y_df.append(y)
+        return y_df
+
     def read_all_sets(self, gdx_file):
         # No longer used after commit c941039 as sets are now internally defined
         """db = gmspy._iwantitall(None, None, gdx_file)
@@ -243,9 +274,9 @@ class FleetModel:
         self.enr = gmspy.set2list('enr', db)"""
 
          #spy.param2series('VEH_PAY', db) # series, otherwise makes giant sparse dataframe        
+    
 
-
-    def _load_experiment_data_in_gams(self,filename): # will become unnecessary as we start calculating/defining sets and/or parameters within the class
+    def _load_experiment_data_to_gams(self,filename): 
         years = gmspy.list2set(self.db,self.year,'year')
         tecs = gmspy.list2set(self.db, self.tecs, 'tec')
         #cohort = gmspy.list2set(self.db, self.cohort, 'prodyear') ## prodyear is an alias of year, not a set of its own
@@ -333,9 +364,9 @@ class FleetModel:
         # used in calc_veh_mass()
         pass
               
-    def run_GAMS(self,filename):
+    def run_GAMS(self, filename):
         # Pass to GAMS all necessary sets and parameters
-        self._load_experiment_data_in_gams(filename)
+        self._load_experiment_data_to_gams(filename)
         #self.db.export(' _custom.gdx')
         
         #Run GMS Optimization
@@ -350,7 +381,7 @@ class FleetModel:
             gams_db = model_run.out_db
             self.export_fp = os.path.join(self.export_fp,filename+'_solution.gdx')
             gams_db.export(self.export_fp)
-            print("Completed export of solution database")# + self.export_fp)
+            print("Completed export of solution database to " + str(self.export_fp))
             
             self.totc = self.get_output_from_GAMS(gams_db,'TOTC')
             self.veh_stck_add = self.get_output_from_GAMS(gams_db,'VEH_STCK_ADD')

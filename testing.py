@@ -19,11 +19,11 @@ import yaml
 
 #fleet._read_all_final_parameters("C:\\Users\\chrishun\\Box Sync\\YSSP_temp\\EVD4EUR_input.gdx")
 #"""
-#a=[1/6 for i in range(6)]
-#b=[1/6 for i in range(6)]
-#
-#fleet = fleet_model.FleetModel(a,b)
-#fleet.run_GAMS('run_x')
+a=[1/6 for i in range(6)]
+b=[1/6 for i in range(6)]
+
+fleet = fleet_model.FleetModel(a,b)
+fleet.run_GAMS('run_x')
 #fleet.vis_GAMS('run_x')
 
 
@@ -72,9 +72,9 @@ def run_experiment():
         exceptions = fm.db.get_database_dvs()
         if len(exceptions) > 1:
             print(exceptions[0].symbol.name)
-            dunno = exceptions[0].symbol_dvs
+            domain_violations = exceptions[0].symbol_dvs
 
-            dunno2 = exceptions[0].symbol
+            symbol_exc = exceptions[0].symbol
             print(fm.db.number_symbols)
 
         # Save log info
@@ -93,13 +93,29 @@ def run_experiment():
         log.info(repr(info[run_id]))
 
     # Write log to file
-    now = datetime.now().isoformat(timespec='seconds')
+    now = datetime.now().isoformat(timespec='seconds').replace(':','_')
     with open(f'testing_{now}.yaml', 'w') as f:
         yaml.safe_dump(info, f)
 
 
-run_experiment()
+#run_experiment()
 
+"""
+GDX export from within GAMS:
+       execute 'gdxviewer.exe i=inputfile.gdx type=outputfile id=x';
+
+execute 'Gdxviewer.exe Trnsport.gdx';
+execute_unload 'Result.gdx', i,x; * where x is variable, i is set
+
+* XLS writing
+execute 'gdxviewer.exe i=Result.gdx xls=Result.xls id=x';
+
+* Excel Pivot Table writing
+execute 'gdxviewer.exe i=Result.gdx pivot=ResultPivot.xls id=x';
+
+* CSV file writing
+execute 'gdxviewer.exe i=Result.gdx csv=Result.csv id=x';
+"""
 
 #        bounds = ['high','baseline','low']
 
