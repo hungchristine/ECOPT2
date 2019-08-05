@@ -76,7 +76,7 @@ class FleetModel:
         self.veheq = ['PROD_EINT','PROD_CINT_CSNT','OPER_EINT','EOLT_CINT']
         self.inityear=[str(2000+i) for i in range(21)]      # reduce to one/five year(s)? Originally 2000-2020
         self.lfteq=['LFT_DISTR','AGE_DISTR']
-        self.sigvar=['A','B','r','t','u']                   # S-curve terms
+        self.sigvar=['A','B','r','u']                   # S-curve terms
         self.critmats = ['Cu','Li','Co','Pt','','']         # critical elements to count for; to incorporate later
         self.age_int = list(map(int,self.age))
         
@@ -103,7 +103,7 @@ class FleetModel:
         self.veh_seg_shr = veh_seg_shr or [0.08,0.21,0.27,0.08,0.03,0.34]  # From 2017
         self.veh_seg_shr = pd.Series(self.veh_seg_shr,index=self.seg)
         
-        ## Temporary; used to calculate relative CO2-intensity between segments
+        ## Temporary; used to calculate relative CO2-intensity and energy use between segments
         self.veh_seg_int = veh_seg_int#[0.75,0.8,1,1.2,1.5,1.7] # Totally random/has no real scientific basis.
         self.veh_seg_int = pd.Series(self.veh_seg_int,index=self.seg)
         
@@ -162,7 +162,9 @@ class FleetModel:
         # Also check pb2018-section2016.xls for more cohesive, EU28++ data"""
         self.veh_stck_int = pd.DataFrame(pd.read_excel('GAMS_input_new.xls',sheet_name='VEH_STCK_INT',header=None,usecols='A:D',skiprows=[0]))  # [tec, age]
         self.veh_stck_int = self._process_df_to_series(self.veh_stck_int)
-
+        
+        BEV_int_shr = 0.0018 # from Eurostat; assume remaining is ICE
+        self.veh_stck_int_tec = pd.Series([1-BEV_int_shr, BEV_int_shr],index=['ICE','BEV'])
 
         ################ filters and parameter aliases ################
         self.enr_veh = pd.DataFrame(pd.read_excel('GAMS_input_new.xls',sheet_name='ENR_VEH',header=None,usecols='A:C',skiprows=[0]))            # [enr, tec]
@@ -180,7 +182,10 @@ class FleetModel:
         self.prodyear_par = pd.Series([int(i) for i in self.cohort],index = self.cohort)
         self.prodyear_par.index = self.prodyear_par.index.astype('str')
         
-        
+        # Temporary introduction of seg-specific VEH_PARTAB from Excel; will later be read in from YAML
+        self.veh_partab = pd.DataFrame(pd.read_excel('GAMS_input_new.xls',sheet_name = 'genlogfunc',usecols='A:G',index_col=[0,1,2],skip_footer=6)).stack()
+#        self.veh_partab.index = self.veh_partab.index.astype('str')
+#        self.veh_partab = self._process_df_to_series(self.veh_partab)       
         """# ACEA.be has segment division for Western Europe
         # https://www.acea.be/statistics/tag/category/segments-body-country
         # More detailed age distribution (https://www.acea.be/uploads/statistic_documents/ACEA_Report_Vehicles_in_use-Europe_2018.pdf)"""
@@ -189,6 +194,10 @@ class FleetModel:
         self.veh_add_grd = dict()
         for element in itertools.product(*[self.grdeq,self.tecs]):
             self.veh_add_grd[element] = 0.1
+            
+        self.gro_cnstrnt = [0.4 for i in range(len(self.year))]
+        self.gro_cnstrnt = pd.Series(self.gro_cnstrnt,index=self.year)
+        self.gro_cnstrnt.index = self.gro_cnstrnt.index.astype('str')
 
         # --------------- Expected GAMS Outputs ------------------------------
 
@@ -221,7 +230,7 @@ class FleetModel:
     
     @staticmethod
     def _process_df_to_series(df):        
-        dims = df.shape[1]-1 # assumes stacked format
+        dims = df.shape[1]-1 # assumes unstacked format
         indices = df.columns[:-1].tolist()
         df.set_index(indices,inplace=True)
 
@@ -284,6 +293,7 @@ class FleetModel:
     
         ######  OBS: Originally calculated using VEH_STCK_INT_TEC, VEH_LIFT_AGE, VEH_STCK_TOT
         veh_stck_int = gmspy.df2param(self.db, self.veh_stck_int, ['tec','seg', 'age'], 'VEH_STCK_INT')
+        veh_stck_int_tec = gmspy.df2param(self.db,self.veh_stck_int_tec,['tec'],'VEH_STCK_INT_TEC')
 
         enr_veh = gmspy.df2param(self.db, self.enr_veh, ['enr', 'tec'], 'ENR_VEH')
 
@@ -291,12 +301,14 @@ class FleetModel:
         
         #age_par = gmspy.df2param(self.db,self.age_par, ['age'], 'AGE_PAR')
         year_par = gmspy.df2param(self.db,self.year_par, ['year'], 'YEAR_PAR')
-        
+        veh_partab = gmspy.df2param(self.db,self.veh_partab,['veheq','tec','seg','sigvar'],'VEH_PARTAB')
         veh_add_grd = self.db.add_parameter_dc('VEH_ADD_GRD', ['grdeq','tec'])
         for keys,value in iter(self.veh_add_grd.items()):
             veh_add_grd.add_record(keys).value = value
 
         #veh_add_grd = gmspy.df2param(self.db,self.veh_add_grd, ['grdeq','tec'], 'VEH_ADD_GRD')
+        
+        gro_cnstrnt = gmspy.df2param(self.db, self.gro_cnstrnt,['year'],'GRO_CNSTRNT')
         
         print('exporting database...'+filename+'_input')
         self.db.export(os.path.join(self.current_path,filename+'_input'))
