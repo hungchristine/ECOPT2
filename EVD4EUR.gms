@@ -247,6 +247,7 @@ $LOAD VEH_PROD_EINT
 $LOAD VEH_OPER_EINT
 $LOAD VEH_STCK_INT
 $LOAD VEH_STCK_INT_TEC
+*$LOAD VEH_STCK_INT_SEG
 $LOAD VEH_PAY
 $LOAD VEH_EOLT_CINT
 $LOAD ENR_VEH
@@ -260,6 +261,7 @@ $GDXIN
 ;
 
 
+* temporary definition; to introduce for all inityears
 PARAMETER VEH_STCK_INT_SEG(seg)
 /
         A = 0.08
@@ -389,12 +391,11 @@ EQ_STCK_COHORT
 *-----------------------------------------------------------------------------------
 *
 * Model Definition  p.t 3 : Model Equations
-*
+
 *-----------------------------------------------------------------------------------
 
+
 ***VEHICLE STOCK MODEL  ------------------------------------------------------------
-
-
 
 ***  Initiate stock in first year ----------------------------
 
@@ -448,11 +449,15 @@ EQ_STCK_CHK(year)..                                                    VEH_STCK_
 *** Constraints -----------------------------------------------------------------------
 
 *** Technology adoption constraint
-EQ_STCK_GRD(tec,optyear,age)$(ord(optyear)>1 and ord(age)=1)..         sum((seg), VEH_STCK_ADD(tec,seg,optyear,age)) =l= (1 + (VEH_ADD_GRD('IND',tec)))*sum((seg),VEH_STCK_ADD(tec,seg,optyear-1,age)) + 5e6;
+EQ_STCK_GRD(tec,optyear,age)$(ord(optyear)>1 and ord(age)=1)..          sum((seg), VEH_STCK_ADD(tec,seg,optyear,age)) =l= (1 + (VEH_ADD_GRD('IND',tec)))*sum((seg),VEH_STCK_ADD(tec,seg,optyear-1,age)) + 5e6;
 
 *** Segment share constraints
-EQ_SEG_GRD1(seg,optyear,age)$(ord(optyear)>1 and ord(age)=1)..             sum(tec,VEH_STCK_ADD(tec,seg,optyear,age)) =g= ((1-GRO_CNSTRNT(optyear))*sum(tec,VEH_STCK_ADD(tec,seg,optyear-1,age)));
-EQ_SEG_GRD2(seg,optyear,age)$(ord(optyear)>1 and ord(age)=1)..             sum(tec,VEH_STCK_ADD(tec,seg,optyear,age)) =l= ((1+GRO_CNSTRNT(optyear))*sum(tec,VEH_STCK_ADD(tec,seg,optyear-1,age)));
+*EQ_SEG_GRD1(seg,optyear,age)$(ord(optyear)>1 and ord(age)=1)..          sum(tec,VEH_STCK_ADD(tec,seg,optyear,age)) =e= VEH_SEG_SHR(seg)*sum((tec),VEH_STCK_ADD(tec,seg,optyear,age));
+*EQ_SEG_GRD1(seg,optyear,age)$(ord(optyear)>1 and ord(age)=1)..          sum(tec,VEH_STCK(tec,seg,optyear,age)) =e= sum((tec),VEH_STCK(tec,seg,optyear-1,age-1))+VEH_SEG_SHR(seg)*VEH_STCK_DELTA(optyear);
+*EQ_SEG_GRD1(seg,optyear,age)$(ord(optyear)>1 and ord(age)=1)..          sum(tec,VEH_STCK_ADD(tec,seg,optyear,age)) =g= ((1-GRO_CNSTRNT(optyear))*sum(tec,VEH_STCK_ADD(tec,seg,optyear-1,age)));
+EQ_SEG_GRD1(seg,optyear,age)$(ord(optyear)>1 and ord(age)=1)..          sum(tec,VEH_STCK_ADD(tec,seg,optyear,age)) =g= sum(tec,VEH_STCK_ADD(tec,seg,optyear-1,age));
+EQ_SEG_GRD2(seg,optyear,age)$(ord(optyear)>1 and ord(age)=1)..          sum(tec,VEH_STCK_ADD(tec,seg,optyear,age)) =l= ((1.14)*sum(tec,VEH_STCK_ADD(tec,seg,optyear-1,age)));
+
 
 *** EMISSION and ENERGY MODELS incl OBJ. FUNCTION ------------------------------------
 * Objective function
