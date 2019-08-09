@@ -146,15 +146,15 @@ ENR_VEH(enr,tec)                 feasible cominations of vehicle technology and 
 
 **PRODUCTION
 VEH_PROD_EINT(tec,seg,prodyear)        Electricity intensity of vehicle prod [kwh el required per vehicle produced]
-VEH_PROD_CINT_CSNT(tec,seg,prodyear)   Constant term for CO2 int. of vehicle production [kg CO2-eq per vehicle produced]
-VEH_PROD_CINT(tec,seg,prodyear)        CO2 intensity of vehicle production [kg CO2-eq per vehicle produced]
+VEH_PROD_CINT_CSNT(tec,seg,prodyear)   Constant term for CO2 int. of vehicle production [t CO2-eq per vehicle produced]
+VEH_PROD_CINT(tec,seg,prodyear)        CO2 intensity of vehicle production [t CO2-eq per vehicle produced]
 
 **OPERATION
 VEH_OPER_EINT(tec,seg,prodyear)        Energy intensity of vehicle operation [kwh per km]
-VEH_OPER_CINT(tec,enr,seg,prodyear)    CO2 intensity of vehicle operation    [kg CO2 per km]
+VEH_OPER_CINT(tec,enr,seg,prodyear)    CO2 intensity of vehicle operation    [t CO2 per km]
 
 **EOL
-VEH_EOLT_CINT(tec,seg,year)            CO2 intensity of ICE vehicle EOL - [kg CO2-eq per vehicle in EOL treatment]
+VEH_EOLT_CINT(tec,seg,year)            CO2 intensity of ICE vehicle EOL - [t CO2-eq per vehicle in EOL treatment]
 
 
 
@@ -166,7 +166,7 @@ VEH_EOLT_CINT(tec,seg,year)            CO2 intensity of ICE vehicle EOL - [kg CO
 VEH_STCK_TOT(year)               Number of vehicles - #
 VEH_OPER_DIST(year)              Annual driving distance per vehicles - km
 VEH_OCUP(year)
-VEH_SEG_INT(seg)                 temporary factors for segment-specific intensities
+*VEH_SEG_INT(seg)                 temporary factors for segment-specific intensities
 ** LIFETIME
 
 VEH_LIFT_PDF(age)                Age PDF
@@ -283,12 +283,12 @@ VEH_PROD_EINT(tec,seg,prodyear) = genlogfnc(VEH_PARTAB('PROD_EINT',tec,seg,'A'),
 VEH_PROD_CINT_CSNT(tec,seg,prodyear) = genlogfnc(VEH_PARTAB('PROD_CINT_CSNT',tec,seg,'A'),VEH_PARTAB('PROD_CINT_CSNT',tec,seg,'B'),VEH_PARTAB('PROD_CINT_CSNT',tec,seg,'r'),YEAR_PAR(prodyear),VEH_PARTAB('PROD_CINT_CSNT',tec,seg,'u'));
 
 *VEH_PROD_CINT(tec,seg,prodyear) = VEH_PROD_CINT_CSNT(tec,seg,prodyear) + VEH_PROD_EINT(tec,seg,prodyear)*ENR_CINT('elc',prodyear);
-VEH_PROD_CINT(tec,seg,prodyear) = VEH_PROD_CINT_CSNT(tec,seg,prodyear) + VEH_PROD_EINT(tec,seg,prodyear)*ENR_CINT('elc',prodyear);
+VEH_PROD_CINT(tec,seg,prodyear) = VEH_PROD_CINT_CSNT(tec,seg,prodyear) + VEH_PROD_EINT(tec,seg,prodyear)*ENR_CINT('elc',prodyear)/1000;
 *
 *VEH_OPER_EINT(tec,seg,prodyear) = VEH_SEG_INT(seg)*genlogfnc(VEH_PARTAB(tec,'OPER_EINT','A'),VEH_PARTAB(tec,'OPER_EINT','B'),VEH_PARTAB(tec,'OPER_EINT','r'),YEAR_PAR(prodyear),VEH_PARTAB(tec,'OPER_EINT','u'));
 VEH_OPER_EINT(tec,seg,prodyear) = genlogfnc(VEH_PARTAB('OPER_EINT',tec,seg,'A'),VEH_PARTAB('OPER_EINT',tec,seg,'B'),VEH_PARTAB('OPER_EINT',tec,seg,'r'),YEAR_PAR(prodyear),VEH_PARTAB('OPER_EINT',tec,seg,'u'));
 
-VEH_OPER_CINT(tec,enr,seg,prodyear)$(ENR_VEH(enr,tec)) = VEH_OPER_EINT(tec,seg,prodyear)*ENR_CINT(enr,prodyear);
+VEH_OPER_CINT(tec,enr,seg,prodyear)$(ENR_VEH(enr,tec)) = VEH_OPER_EINT(tec,seg,prodyear)*ENR_CINT(enr,prodyear)/1000; 
 
 *VEH_EOLT_CINT(tec,seg,prodyear) = VEH_SEG_INT(seg)*genlogfnc(VEH_PARTAB(tec,'EOLT_CINT','A'),VEH_PARTAB(tec,'EOLT_CINT','B'),VEH_PARTAB(tec,'EOLT_CINT','r'),YEAR_PAR(prodyear),VEH_PARTAB(tec,'EOLT_CINT','u'));
 
@@ -321,11 +321,11 @@ VEH_STCK_ADD(tec,seg,year,age)           Stock additions (new car sales)
 *VEH_SEG_ADD_SHR(seg,year,age)            Market share (new additions) by segment
 VEH_TOT_ADD(year,age)                    Total vehicles added
 *VEH_SEG_ADD(seg,year,age)                Number of vehicles added by segment
-VEH_TOTC(tec,seg,year)                   Total CO2 emissions of vehicles per year, by technology
+VEH_TOTC(tec,seg,year)                   Total CO2 emissions of vehicles per year, by technology, in t CO2-eq
 
-VEH_PROD_TOTC(tec,seg,year)              Total CO2 emissions from production of vehicles per year
-VEH_OPER_TOTC(tec,seg,year)              Total CO2 emissions from operations of vehicles per year
-VEH_EOLT_TOTC(tec,seg,year)              Total CO2 emissions from vehicle end of life treatment per year
+VEH_PROD_TOTC(tec,seg,year)              Total CO2 emissions from production of vehicles per year, in t CO2-eq
+VEH_OPER_TOTC(tec,seg,year)              Total CO2 emissions from operations of vehicles per year, in t CO2-eq
+VEH_EOLT_TOTC(tec,seg,year)              Total CO2 emissions from vehicle end of life treatment per year, in t CO2-eq
 
 VEH_STCK_CHRT(tec,seg,year,age,year)
 *VEH_TRIAL(tec,seg,year,age)
@@ -368,7 +368,7 @@ EQ_STCK_GRD
 EQ_TOT_ADD
 *EQ_SEG_ADD
 EQ_SEG_GRD1
-EQ_SEG_GRD2
+*EQ_SEG_GRD2
 *EQ_SEG_CHK
 **EMISSION and ENERGY MODELS incl OBJ. FUNCTION --------------------------------------
 
@@ -449,14 +449,16 @@ EQ_STCK_CHK(year)..                                                    VEH_STCK_
 *** Constraints -----------------------------------------------------------------------
 
 *** Technology adoption constraint
-EQ_STCK_GRD(tec,optyear,age)$(ord(optyear)>1 and ord(age)=1)..          sum((seg), VEH_STCK_ADD(tec,seg,optyear,age)) =l= (1 + (VEH_ADD_GRD('IND',tec)))*sum((seg),VEH_STCK_ADD(tec,seg,optyear-1,age)) + 5e6;
+*EQ_STCK_GRD(tec,optyear,age)$(ord(optyear)>1 and ord(age)=1)..          sum((seg), VEH_STCK_ADD(tec,seg,optyear,age)) =l= (1 + (VEH_ADD_GRD('IND',tec)))*sum((seg),VEH_STCK_ADD(tec,seg,optyear-1,age)) + 5e5;
+EQ_STCK_GRD(tec,seg,optyear,age)$(ord(optyear)>1 and ord(age)=1)..       VEH_STCK_ADD(tec,seg,optyear,age) =l= (1 + (VEH_ADD_GRD('IND',tec)))*VEH_STCK_ADD(tec,seg,optyear-1,age) + 5e5;
 
 *** Segment share constraints
 *EQ_SEG_GRD1(seg,optyear,age)$(ord(optyear)>1 and ord(age)=1)..          sum(tec,VEH_STCK_ADD(tec,seg,optyear,age)) =e= VEH_SEG_SHR(seg)*sum((tec),VEH_STCK_ADD(tec,seg,optyear,age));
+EQ_SEG_GRD1(seg,optyear,age)$(ord(optyear)>1 and ord(age)=1)..         sum(tec,VEH_STCK(tec,seg,optyear,age)) =e= VEH_STCK_INT_SEG(seg);
 *EQ_SEG_GRD1(seg,optyear,age)$(ord(optyear)>1 and ord(age)=1)..          sum(tec,VEH_STCK(tec,seg,optyear,age)) =e= sum((tec),VEH_STCK(tec,seg,optyear-1,age-1))+VEH_SEG_SHR(seg)*VEH_STCK_DELTA(optyear);
 *EQ_SEG_GRD1(seg,optyear,age)$(ord(optyear)>1 and ord(age)=1)..          sum(tec,VEH_STCK_ADD(tec,seg,optyear,age)) =g= ((1-GRO_CNSTRNT(optyear))*sum(tec,VEH_STCK_ADD(tec,seg,optyear-1,age)));
-EQ_SEG_GRD1(seg,optyear,age)$(ord(optyear)>1 and ord(age)=1)..          sum(tec,VEH_STCK_ADD(tec,seg,optyear,age)) =g= sum(tec,VEH_STCK_ADD(tec,seg,optyear-1,age));
-EQ_SEG_GRD2(seg,optyear,age)$(ord(optyear)>1 and ord(age)=1)..          sum(tec,VEH_STCK_ADD(tec,seg,optyear,age)) =l= ((1.14)*sum(tec,VEH_STCK_ADD(tec,seg,optyear-1,age)));
+*EQ_SEG_GRD1(seg,optyear,age)$(ord(optyear)>1 and ord(age)=1)..          sum(tec,VEH_STCK_ADD(tec,seg,optyear,age)) =g= sum(tec,VEH_STCK_ADD(tec,seg,optyear-1,age));
+*EQ_SEG_GRD2(seg,optyear,age)$(ord(optyear)>1 and ord(age)=1)..          sum(tec,VEH_STCK_ADD(tec,seg,optyear,age)) =l= ((1.14)*sum(tec,VEH_STCK_ADD(tec,seg,optyear-1,age)));
 
 
 *** EMISSION and ENERGY MODELS incl OBJ. FUNCTION ------------------------------------
@@ -467,7 +469,7 @@ EQ_TOTC..                                TOTC =e= SUM((tec,seg,year), VEH_TOTC(t
 EQ_VEH_TOTC(tec,seg,year)..                  VEH_TOTC(tec,seg,year) =e= VEH_PROD_TOTC(tec,seg,year) + VEH_OPER_TOTC(tec,seg,year) + VEH_EOLT_TOTC(tec,seg,year);
 *int_tec
 EQ_VEH_PROD_TOTC(tec,seg,year)..             VEH_PROD_TOTC(tec,seg,year) =e= sum( (agej)$(ord(agej)=1), VEH_STCK_ADD(tec,seg,year,agej)*VEH_PROD_CINT(tec,seg,year));
-EQ_VEH_OPER_TOTC(tec,seg,year)..             VEH_OPER_TOTC(tec,seg,year) =e= sum( (agej,enr,prodyear), VEH_STCK(tec,seg,year,agej)*VEH_OPER_CINT(tec,enr,seg,prodyear)*ENR_VEH(enr,tec)*VEH_PAY(prodyear,agej,year)*VEH_OPER_DIST(year));
+EQ_VEH_OPER_TOTC(tec,seg,year)..             VEH_OPER_TOTC(tec,seg,year) =e= sum( (agej,enr,prodyear), VEH_STCK(tec,seg,year,agej)*VEH_OPER_CINT(tec,enr,seg,prodyear)*ENR_VEH(enr,tec)*VEH_PAY(prodyear,agej,year)*VEH_OPER_DIST(year))/1000;
 EQ_VEH_EOLT_TOTC(tec,seg,year)..             VEH_EOLT_TOTC(tec,seg,year) =e= sum( (agej), VEH_STCK_REM(tec,seg,year,agej))*VEH_EOLT_CINT(tec,seg,year);
 
 
