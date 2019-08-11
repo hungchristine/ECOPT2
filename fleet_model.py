@@ -42,8 +42,9 @@ class FleetModel:
         lightweighting_scenario: whether (how aggressively) LDVs are lightweighted in the experiment
         
     """
-    def __init__(self, veh_seg_shr, add_gradient, B_term_factors, r_term_factors=0.2, u_term_factors=2025,data_from_message=None):
-        self.B_terms=B_term_factors
+    def __init__(self, veh_seg_shr, tec_add_gradient, B_term_prod, B_term_oper_EOL, r_term_factors=0.2, u_term_factors=2025,data_from_message=None):
+        self.B_prod = B_term_prod
+        self.B_oper = B_term_oper_EOL
         
         self.current_path = os.path.dirname(os.path.realpath(__file__))
 #        ch_path = os.path.dirname(os.path.abspath(__file__))+r'\visualization output\ '
@@ -184,7 +185,7 @@ class FleetModel:
         
         # Temporary introduction of seg-specific VEH_PARTAB from Excel; will later be read in from YAML
 #        self.veh_partab = pd.DataFrame(pd.read_excel(self.import_fp,sheet_name = 'genlogfunc',usecols='A:G',index_col=[0,1,2],skipfooter=6)).stack()
-        self.veh_partab = self.build_veh_partab(B_term_factors,r_term_factors,u_term_factors).stack()
+        self.veh_partab = self.build_veh_partab(B_term_prod,B_term_oper_EOL,r_term_factors,u_term_factors)#.stack()
         """" if modify_b_ice or modify_b_bev:
                 self.veh_partab.loc[:,'ICE',:,'B']=self.veh_partab.loc[:,'ICE',:,'A'].values*modify_b_ice
                 self..veh_partab.loc[:,'BEV',:,'B'] = self.veh_partab.loc[:,'BEV',:,'A'].values*modify_b_bev"""
@@ -198,10 +199,10 @@ class FleetModel:
         # https://www.acea.be/statistics/tag/category/segments-body-country
         # More detailed age distribution (https://www.acea.be/uploads/statistic_documents/ACEA_Report_Vehicles_in_use-Europe_2018.pdf)"""
 
-        self.add_gradient = add_gradient#0.2
+        self.tec_add_gradient = tec_add_gradient#0.2
         self.veh_add_grd = dict()
         for element in itertools.product(*[self.grdeq,self.tecs]):
-            self.veh_add_grd[element] = self.add_gradient
+            self.veh_add_grd[element] = self.tec_add_gradient
         
         self.growth_constraint = 0#growth_constraint
         self.gro_cnstrnt = [self.growth_constraint for i in range(len(self.year))]
@@ -262,34 +263,57 @@ class FleetModel:
 
          #spy.param2series('VEH_PAY', db) # series, otherwise makes giant sparse dataframe        
 
-    def build_veh_partab(self,B_term_factors,r_term_factors,u_term_factors):
+    def build_veh_partab(self,B_term_prod,B_term_oper_EOL,r_term_factors,u_term_factors):
         fp = r"C:\Users\chrishun\Box Sync\YSSP_temp\GAMS_input_new.xls"
         lookup_table = pd.read_excel(fp, sheet_name='Sheet6',header=[0,1],index_col=0)
         """ TO DO: separate A-terms for battery and rest-of-vehicle and apply different b-factors"""
-        self.A_terms = pd.read_excel(fp,sheet_name='genlogfunc',header=[0],index_col=[0,1,2],usecols='A:D',nrows=48)
+        self.A_terms_raw = pd.read_excel(fp,sheet_name='genlogfunc',header=[0],index_col=[0,1,2],usecols='A:F',nrows=48)
+        self.A_terms_raw.columns.names=['comp']
+        self.A = self.A_terms_raw.sum(axis=1)
+        self.A.columns = ['A']
+        self.A_terms_raw = self.A_terms_raw.stack().to_frame('a')
         
-        reform = {(outerKey, innerKey): values for outerKey, innerDict in B_term_factors.items() for innerKey, values in innerDict.items()}
+        reform = {(firstKey, secondKey, thirdKey): values for firstKey, secondDict in B_term_prod.items() for secondKey, thirdDict in secondDict.items() for thirdKey, values in thirdDict.items()}
         mi = pd.MultiIndex.from_tuples(reform.keys())
-        temp_df = pd.DataFrame()
+        self.temp_prod_df = pd.DataFrame()
+        self.temp_oper_df = pd.DataFrame()
+        self.temp_df = pd.DataFrame()
         
-        self.b = pd.DataFrame(reform.values(), index = mi)
-        self.b.index.names = ['veheq','tec']
+        self.b_prod = pd.DataFrame(reform.values(), index = mi)
+        self.b_prod.index.names = ['veheq','tec','comp']
         
-        # Apply B-multiplication factors
-        temp_df = self.A_terms.join(self.b,on=['veheq','tec'],how='left')
-        temp_df['B'] = temp_df['A']*temp_df[0]
+        # Apply B-multiplication factors to production A-factors
+        self.temp_a = self.A_terms_raw.join(self.b_prod,on=['veheq','tec','comp'],how='left')
+        self.temp_prod_df['B'] = self.temp_a['a']*self.temp_a[0]
+        self.temp_prod_df.dropna(how='any',axis=0,inplace=True)
         
+        # Apply B-multiplication factors for operation and EOL A-factors
+        reform = {(firstKey, secondKey): values for firstKey, secondDict in B_term_oper_EOL.items() for secondKey, values in secondDict.items()}
+        mi = pd.MultiIndex.from_tuples(reform.keys())
+        self.b_oper = pd.DataFrame(reform.values(),index=mi,columns=['b'])
+#        
+        self.temp_oper_df = self.A_terms_raw.join(self.b_oper,on=['veheq','tec'],how='left')
+        self.temp_oper_df['B'] = self.temp_oper_df['a']*self.temp_oper_df['b']
+        self.temp_oper_df.dropna(how='any',axis=0,inplace=True)
+        self.temp_oper_df.drop(columns=['a','b'],inplace=True)
+                
+        self.temp_df['A'] = self.A
+        self.B = pd.concat([self.temp_prod_df,self.temp_oper_df],axis=0).dropna(how='any',axis=1)
+        self.B = self.B.unstack(['comp']).sum(axis=1)
+        self.temp_df['B']=self.B
+
         # Add same r values across all technologies
-        temp_df['r'] = r_term_factors
+        self.temp_df['r'] = r_term_factors
+
         
         # Add technology-specific u values
         temp_u = pd.DataFrame.from_dict(u_term_factors,orient='index', columns=['u'])
-        temp_df = temp_df.join(temp_u,on=['tec'],how='left')
+        self.temp_df = self.temp_df.join(temp_u,on=['tec'],how='left')
         
-        temp_df.drop(labels=0,axis=1,inplace=True)
-        temp_df.index.names=[None,None,None]
+#        self.temp_df.drop(labels=0,axis=1,inplace=True)
+#        self.temp_df.index.names=[None,None,None]
         
-        return temp_df
+        return self.temp_df
 
         
     def _load_experiment_data_in_gams(self,filename): # will become unnecessary as we start calculating/defining sets and/or parameters within the class
@@ -618,6 +642,8 @@ class FleetModel:
         
         
         """--- Plot addition to stocks by segment and technology  ---"""
+        ax = self.stock_add.sum(axis=1).unstack('seg').sum(axis=1).unstack('tec').plot(kind='area',cmap=paired,title='Stock additions by technology')
+        fix_age_legend(ax,'Vehicle technology') 
 #        fig,axes = plt.subplots(1,2,figsize=(6,3))
 #        stock_add_grouped = self.stock_add.unstack('seg').groupby('tec')
 #        for (key,ax) in zip(stock_add_grouped.groups.keys(),axes.flatten()):
