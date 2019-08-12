@@ -213,7 +213,7 @@ $GDXIN 'EVD4EUR_input'
 $LOAD DEM_PARTAB
 $LOAD ENR_PARTAB
 *$LOAD LFT_PARTAB
-$LOAD ENR_CINT
+*$LOAD ENR_CINT
 *$LOAD ENR_VEH
 *
 *$LOAD VEH_OPER_EINT
@@ -368,11 +368,9 @@ EQ_STCK_GRD
 *EQ_SEG_SHR
 EQ_TOT_ADD
 *EQ_SEG_ADD
-EQ_SEG_GRD1
-*EQ_SEG_GRD2
+EQ_SEG_GRD
 *EQ_SEG_CHK
 
-*EQ_WTF
 **EMISSION and ENERGY MODELS incl OBJ. FUNCTION --------------------------------------
 
 * Objective function
@@ -386,7 +384,7 @@ EQ_VEH_OPER_TOTC
 *eolt emissions
 EQ_VEH_EOLT_TOTC
 
-EQ_STCK_COHORT
+*EQ_STCK_COHORT
 *EQ_SEG_ADD_INIT
 *EQ_TRIAL
 ;
@@ -403,8 +401,7 @@ EQ_STCK_COHORT
 ***  Initiate stock in first year ----------------------------
 
 *removals
-EQ_STCK_REM_T1(tec,seg,inityear,age)..                 VEH_STCK_REM(tec,seg,inityear,age) =e=  VEH_STCK_TOT(inityear)*VEH_STCK_INT_TEC(tec)*VEH_LIFT_PDF(age)*VEH_LIFT_MOR(age)*VEH_SEG_SHR(seg);
-*VEH_STCK_INT_SEG(seg);
+EQ_STCK_REM_T1(tec,seg,inityear,age)..                 VEH_STCK_REM(tec,seg,inityear,age) =e=  VEH_STCK_TOT(inityear)*VEH_STCK_INT_TEC(tec)*VEH_LIFT_PDF(age)*VEH_LIFT_MOR(age)*VEH_STCK_INT_SEG(seg);
 
 *stock additions
 EQ_STCK_ADD_T1(seg,inityear,age)$(ord(age)=1)..          sum( (tec), VEH_STCK_ADD(tec,seg,inityear,age) ) =e=  sum( (tec,agej), VEH_STCK_REM(tec,seg,inityear,agej));
@@ -415,7 +412,6 @@ EQ_STCK_ADD_T1(seg,inityear,age)$(ord(age)=1)..          sum( (tec), VEH_STCK_AD
 
 *stock
 EQ_STCK_BAL_T1(tec,seg,inityear,age)..                VEH_STCK(tec,seg,inityear,age) =e=  VEH_STCK_TOT(inityear)*(VEH_STCK_INT_TEC(tec)*VEH_LIFT_PDF(age)*VEH_SEG_SHR(seg));
-*VEH_STCK_INT_SEG(seg));
 
 ***  Main Model -----------------------------------------------
 EQ_STCK_DELTA(optyear)$(ord(optyear)>1)..                              VEH_STCK_DELTA(optyear)  =e=  VEH_STCK_TOT(optyear)-VEH_STCK_TOT(optyear-1);
@@ -448,46 +444,32 @@ EQ_TOT_ADD(year,age)$(ord(age)=1)..                                    VEH_TOT_A
 
 *summing the number of vehicles in for check.
 EQ_STCK_CHK(year)..                                                    VEH_STCK_TOT_CHECK(year) =e= sum((tec,seg,age), VEH_STCK(tec,seg,year,age));
-*EQ_WTF(seg,year)..                                                     VEH_WTF(seg,year) =e= VEH_STCK_INT_SEG(seg)*sum((tec,age), VEH_STCK_ADD(tec,seg,year,age));
 
 *** Constraints -----------------------------------------------------------------------
 
-*** Technology adoption constraint
-*EQ_STCK_GRD(tec,optyear,age)$(ord(optyear)>1 and ord(age)=1)..          sum((seg), VEH_STCK_ADD(tec,seg,optyear,age)) =l= (1 + (VEH_ADD_GRD('IND',tec)))*sum((seg),VEH_STCK_ADD(tec,seg,optyear-1,age)) + 5e5;
-EQ_STCK_GRD(tec,seg,optyear,age)$(ord(optyear)>1 and ord(age)=1)..       VEH_STCK_ADD(tec,seg,optyear,age) =l= ((1 + (VEH_ADD_GRD('IND',tec)))*VEH_STCK_ADD(tec,seg,optyear-1,age)) + 5e5;
+* stock additions by technology
+EQ_STCK_GRD(tec,seg,optyear,age)$(ord(optyear)>1 and ord(age)=1)..          VEH_STCK_ADD(tec,seg,optyear,age) =l= ((1 + VEH_ADD_GRD('IND',tec))*VEH_STCK_ADD(tec,seg,optyear-1,age))+1e5;
+** number of vehicles added in year y must be less than 
+*EQ_STCK_GRD(tec,seg,optyear,age)$(ord(optyear)>1 and ord(age)=1)..       VEH_STCK_ADD(tec,seg,optyear,age) =l= 5e6;
+*EQ_STCK_GRD('BEV',seg,optyear,age)$(ord(optyear)>1 and ord(age)=1)..       VEH_STCK_ADD('BEV',seg,optyear,age) =l= (1 + (VEH_ADD_GRD('IND','BEV')))*VEH_STCK_ADD('BEV',seg,optyear-1,age) + 5e5;
+*EQ_STCK_GRD('BEV',optyear,age)$(ord(optyear)>1 and ord(age)=1)..       sum(seg,VEH_STCK_ADD('BEV',seg,optyear,age)) =l= 2*sum(seg,VEH_STCK_ADD('BEV',seg,optyear-1,age)) + 5e5;
 
+* Technology market share constraint
+*EQ_STCK_GRD(tec,seg,optyear,age)$(ord(optyear)>1 and ord(age)=1)..          VEH_STCK_ADD(tec,seg,optyear,age) =l= (1 + (VEH_ADD_GRD('IND',tec)))*VEH_STCK_ADD(tec,seg,optyear-1,age) + 5e5;
 
-*SHARE_CONSTRAINT_MODE_UP(shares,node,tec,mode,year,time)$(
-*    map_tec_act(node,tec,year,mode,time) AND
-*    share_mode_up(shares,node,tec,mode,year,time)
-*)..
-** activity of mode to be constrained
-*    SUM(vintage$( map_tec_lifetime(node,tec,vintage,year) ), ACT(node,tec,vintage,year,mode,time))
-*    =L= share_mode_up(shares,node,tec,mode,year,time) * SUM((vintage,mode2)$( map_tec_lifetime(node,tec,vintage,year) AND map_tec_mode(node,tec,year,mode2) ),    ACT(node,tec,vintage,year,mode2,time)
-*    ) ;
+* Segment share constraint (keep segment shares constant over analysis period)
+*** This causes infeasibility in the solution (but otherwise (used to) work).
+*EQ_SEG_GRD(seg,optyear,age)$(ord(optyear)>1 and ord(age)=1)..          sum(tec,VEH_STCK_ADD(tec,seg,optyear,age)) =e= VEH_STCK_INT_SEG(seg)*sum((tec,segj),VEH_STCK_ADD(tec,segj,optyear,age));
+EQ_SEG_GRD(seg,optyear,age)$(ord(optyear)>1 and ord(age)=1)..          sum(tec,VEH_STCK(tec,seg,optyear,age)) =e= VEH_STCK_INT_SEG(seg)*sum((tec,segj),VEH_STCK(tec,segj,optyear,age));
 
-** activity aggregated over all modes
-
-*** Segment share constraints
-*EQ_SEG_GRD1(seg,optyear,age)$(ord(optyear)>1 and ord(age)=1)..          sum(tec,VEH_STCK_ADD(tec,seg,optyear,age)) =e= VEH_SEG_SHR(seg)*sum((tec),VEH_STCK_ADD(tec,seg,optyear,age));
-
-*EQ_SEG_GRD1(seg,optyear)$(ord(optyear)>1)..           sum((tec,age),VEH_STCK(tec,seg,year,age)) =e= sum((tec,seg,age), VEH_STCK(tec,seg,year,age))*VEH_STCK_INT_SEG(seg);
-
-*EQ_SEG_GRD1(seg,optyear,age)$(ord(optyear)>1 and ord(age)=1)..          sum(tec,VEH_STCK(tec,seg,optyear,age)) =e= sum((tec),VEH_STCK(tec,seg,optyear-1,age-1))+VEH_SEG_SHR(seg)*VEH_STCK_DELTA(optyear);
-*EQ_SEG_GRD1(seg,optyear,age)$(ord(optyear)>1 and ord(age)=1)..          sum(tec,VEH_STCK_ADD(tec,seg,optyear,age)) =g= ((1-GRO_CNSTRNT(optyear))*sum(tec,VEH_STCK_ADD(tec,seg,optyear-1,age)));
-
-*
-EQ_SEG_GRD1(seg,optyear,age)$(ord(optyear)>1 and ord(age)=1)..          sum(tec,VEH_STCK_ADD(tec,seg,optyear,age)) =e= VEH_STCK_INT_SEG(seg)*sum((tec,segj),VEH_STCK_ADD(tec,segj,optyear,age));
-
-*EQ_SEG_GRD1(seg,optyear,age)$(ord(optyear)>1 and ord(age)=1)..          sum(tec,VEH_STCK_ADD(tec,seg,optyear,age)) =g= sum(tec,VEH_STCK_ADD(tec,seg,optyear-1,age));
-*EQ_SEG_GRD2(seg,optyear,age)$(ord(optyear)>1 and ord(age)=1)..          sum(tec,VEH_STCK_ADD(tec,'A',optyear,age)) =l= (1.05*sum(tec,VEH_STCK_ADD(tec,'A',optyear-1,age)));
+*EQ_SEG_GRD(seg,optyear,age)$(ord(optyear)>1 and ord(age)=1)..          sum(tec,VEH_STCK_ADD(tec,seg,optyear,age)) =l= 1.2*sum((tec,segj),VEH_STCK_ADD(tec,segj,optyear-1,age));
 
 
 *** EMISSION and ENERGY MODELS incl OBJ. FUNCTION ------------------------------------
 * Objective function
 EQ_TOTC..                                TOTC =e= SUM((tec,seg,year), VEH_TOTC(tec,seg,year));
 
-* Calculation of Emissions from all vehicle classes per year
+* Calculation of emissions from all vehicle classes per year
 EQ_VEH_TOTC(tec,seg,year)..                  VEH_TOTC(tec,seg,year) =e= VEH_PROD_TOTC(tec,seg,year) + VEH_OPER_TOTC(tec,seg,year) + VEH_EOLT_TOTC(tec,seg,year);
 *int_tec
 EQ_VEH_PROD_TOTC(tec,seg,year)..             VEH_PROD_TOTC(tec,seg,year) =e= sum( (agej)$(ord(agej)=1), VEH_STCK_ADD(tec,seg,year,agej)*VEH_PROD_CINT(tec,seg,year));
@@ -497,7 +479,7 @@ EQ_VEH_EOLT_TOTC(tec,seg,year)..             VEH_EOLT_TOTC(tec,seg,year) =e= sum
 
 *** Convert VEH_STCK to include cohort ---------------------------------------------
 **** Doesn't work. 
-EQ_STCK_COHORT(tec,seg,prodyear,agej,year)..    VEH_STCK_CHRT(tec,seg,prodyear,agej,year) =e= VEH_STCK(tec,seg,year,agej)*VEH_PAY(prodyear,agej,year);
+*EQ_STCK_COHORT(tec,seg,prodyear,agej,year)..    VEH_STCK_CHRT(tec,seg,prodyear,agej,year) =e= VEH_STCK(tec,seg,year,agej)*VEH_PAY(prodyear,agej,year);
 
 
 *-----------------------------------------------------------------------------------
