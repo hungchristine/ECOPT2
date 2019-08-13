@@ -42,7 +42,7 @@ class FleetModel:
         lightweighting_scenario: whether (how aggressively) LDVs are lightweighted in the experiment
         
     """
-    def __init__(self, veh_seg_shr, tec_add_gradient, B_term_prod, B_term_oper_EOL, r_term_factors=0.2, u_term_factors=2025,data_from_message=None):
+    def __init__(self, veh_seg_shr, tec_add_gradient,seg_batt_caps, B_term_prod, B_term_oper_EOL, r_term_factors=0.2, u_term_factors=2025,data_from_message=None):
         self.B_prod = B_term_prod
         self.B_oper = B_term_oper_EOL
         
@@ -185,7 +185,7 @@ class FleetModel:
         
         # Temporary introduction of seg-specific VEH_PARTAB from Excel; will later be read in from YAML
 #        self.veh_partab = pd.DataFrame(pd.read_excel(self.import_fp,sheet_name = 'genlogfunc',usecols='A:G',index_col=[0,1,2],skipfooter=6)).stack()
-        self.veh_partab = self.build_veh_partab(B_term_prod,B_term_oper_EOL,r_term_factors,u_term_factors)#.stack()
+        self.veh_partab = self.build_veh_partab(seg_batt_caps,B_term_prod,B_term_oper_EOL,r_term_factors,u_term_factors)#.stack()
         """" if modify_b_ice or modify_b_bev:
                 self.veh_partab.loc[:,'ICE',:,'B']=self.veh_partab.loc[:,'ICE',:,'A'].values*modify_b_ice
                 self..veh_partab.loc[:,'BEV',:,'B'] = self.veh_partab.loc[:,'BEV',:,'A'].values*modify_b_bev"""
@@ -262,17 +262,32 @@ class FleetModel:
         self.enr = gmspy.set2list('enr', db)"""
 
          #spy.param2series('VEH_PAY', db) # series, otherwise makes giant sparse dataframe        
+    def build_BEV(self, seg_batt_caps):
+        self.lookup_table = pd.read_excel(self.import_fp, sheet_name='Sheet6',header=[0,1],index_col=0)
+        self.prod_df = pd.DataFrame()
+        for key,value in seg_batt_caps.items():
+            self.prod_df[key] = self.lookup_table[key,value]
+        mi = pd.MultiIndex.from_product([self.prod_df.index.to_list(),['BEV'],['batt']])
+        self.prod_df.index = mi
+        self.prod_df = self.prod_df.stack()
+        self.prod_df.index.names = ['veheq','tec','comp','seg']
+        self.prod_df.index = self.prod_df.index.swaplevel(i=-2,j=-1)
+        return self.prod_df
+    
 
-    def build_veh_partab(self,B_term_prod,B_term_oper_EOL,r_term_factors,u_term_factors):
-        fp = r"C:\Users\chrishun\Box Sync\YSSP_temp\GAMS_input_new.xls"
-        lookup_table = pd.read_excel(fp, sheet_name='Sheet6',header=[0,1],index_col=0)
+    def build_veh_partab(self,seg_batt_caps,B_term_prod,B_term_oper_EOL,r_term_factors,u_term_factors):
         """ TO DO: separate A-terms for battery and rest-of-vehicle and apply different b-factors"""
-        self.A_terms_raw = pd.read_excel(fp,sheet_name='genlogfunc',header=[0],index_col=[0,1,2],usecols='A:F',nrows=48)
+        self.A_terms_raw = pd.read_excel(self.import_fp,sheet_name='genlogfunc',header=[0],index_col=[0,1,2],usecols='A:F',nrows=48)
         self.A_terms_raw.columns.names=['comp']
-        self.A = self.A_terms_raw.sum(axis=1)
-        self.A.columns = ['A']
         self.A_terms_raw = self.A_terms_raw.stack().to_frame('a')
         
+        # Retrieve production emission factors for chosen battery capacities and place in raw A factors (with component resolution)
+        self.batt_list = self.build_BEV(seg_batt_caps)
+        for index, value in self.prod_df.iteritems():
+            self.A_terms_raw.loc[index,'a'] = value
+        
+        
+        # Get input for B-multiplication factors (relative to A) from YAML file
         reform = {(firstKey, secondKey, thirdKey): values for firstKey, secondDict in B_term_prod.items() for secondKey, thirdDict in secondDict.items() for thirdKey, values in thirdDict.items()}
         mi = pd.MultiIndex.from_tuples(reform.keys())
         self.temp_prod_df = pd.DataFrame()
@@ -282,7 +297,7 @@ class FleetModel:
         self.b_prod = pd.DataFrame(reform.values(), index = mi)
         self.b_prod.index.names = ['veheq','tec','comp']
         
-        # Apply B-multiplication factors to production A-factors
+        # Apply B-multiplication factors to production A-factors (with component resolution)
         self.temp_a = self.A_terms_raw.join(self.b_prod,on=['veheq','tec','comp'],how='left')
         self.temp_prod_df['B'] = self.temp_a['a']*self.temp_a[0]
         self.temp_prod_df.dropna(how='any',axis=0,inplace=True)
@@ -296,16 +311,23 @@ class FleetModel:
         self.temp_oper_df['B'] = self.temp_oper_df['a']*self.temp_oper_df['b']
         self.temp_oper_df.dropna(how='any',axis=0,inplace=True)
         self.temp_oper_df.drop(columns=['a','b'],inplace=True)
-                
+        
+        # Aggregate component A values for VEH_PARTAB parameter
+        self.A = self.A_terms_raw.sum(axis=1)
+        self.A = self.A.unstack(['comp']).sum(axis=1)
+        self.A.columns = ['A']
+        
+        # Begin building final VEH_PARTAB parameter table
         self.temp_df['A'] = self.A
         self.B = pd.concat([self.temp_prod_df,self.temp_oper_df],axis=0).dropna(how='any',axis=1)
         self.B = self.B.unstack(['comp']).sum(axis=1)
         self.temp_df['B']=self.B
 
-        # Add same r values across all technologies
-        self.temp_df['r'] = r_term_factors
+        # Add same r values across all technologies...can add BEV vs ICE resolution here
+        temp_r = pd.DataFrame.from_dict(r_term_factors,orient='index',columns=['r'])
+        self.temp_df = self.temp_df.join(temp_r, on=['tec'],how='left')
+#        self.temp_df['r'] = r_term_factors
 
-        
         # Add technology-specific u values
         temp_u = pd.DataFrame.from_dict(u_term_factors,orient='index', columns=['u'])
         self.temp_df = self.temp_df.join(temp_u,on=['tec'],how='left')

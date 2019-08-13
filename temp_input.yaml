@@ -7,52 +7,61 @@ veh_seg_shr:
   - 0.08
   - 0.03
   - 0.34 
-#growth_constraint:
-#  def: 0.2
-#  loose: 0.4
-#  stricta: 0.14
-
-add_gradient:
- def: 0.1
+  
+tec_add_gradient:
+ def: 0.2
 #agg: 0.35
 #slow: 0.05
  
-#seg_batt_caps:
-# def:
-#  A: 26.6
-#  B: 42.2
-#  C: 42.2
-#  D: 59.9
-#  E: 75
-#  F: 89.8
-
-B_term_factors:
+seg_batt_caps:
  def:
-  VEH_PROD_EINT:
-   ICE: 0.8
+  A: 26.6
+  B: 42.2
+  C: 42.2
+  D: 59.9
+  E: 75
+  F: 89.8
+ #trial:
+ # A: 42.2
+ # B: 42.2
+ # C: 59.9
+ # D: 59.9
+ # E: 75
+ # F: 89.8
+
+B_term_prod:
+ def:
+  PROD_EINT:
+   ICE: 
+    full_veh: 0.9
+   BEV: 
+    batt: 0.4
+    ROV: 0.8
+  PROD_CINT_CSNT: 
+   ICE: 
+    full_veh: 0.9
+   BEV:
+    batt: 0.3
+    ROV: 0.75
+
+B_term_oper_EOL: 
+ def: 
+  OPER_EINT:
+   ICE: 0.9
    BEV: 0.5
-  VEH_PROD_CINT_CSNT: 
-   ICE: 0.85
-   BEV: 0.0.5
-  VEH_OPER_EINT:
-   ICE: 0.8
-   BEV: 0.5
-  VEH_EOLT_CINT:
+  EOLT_CINT:
    ICE: 0.9
    BEV: 0.9
    
 r_term_factors:
-   def: 0.3
-   
+   def: 
+    BEV: 0.3
+    ICE: 0.2
+
 u_term_factors:
  def:
   ICE: 2025
   BEV: 2020
- 
-#b_term_factor:
-# default:
-#  ICE: 0.85
-#  BEV: 0.5
 
 
 # add_gradient (for technology additions)

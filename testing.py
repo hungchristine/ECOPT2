@@ -58,18 +58,18 @@ def run_experiment():
     info = {}
 
     # Explicit list of parameters
-    param_names = ['veh_seg_shr','add_gradient','B_term_factors','r_term_factors','u_term_factors']#,'seg_batt_caps']
+    param_names = ['veh_seg_shr','tec_add_gradient','seg_batt_caps','B_term_prod','B_term_oper_EOL','r_term_factors','u_term_factors']#,'seg_batt_caps']
 
     # Run experiments
     id_and_value = [params[p].items() for p in param_names]
     # NB could also change the names here
     for i, run_params in enumerate(product(*id_and_value)):
         # Same order as in param_names. Each is a tuple of (id, values)
-#        veh_seg_shr, add_gradient, seg_batt_caps = run_params
-        veh_seg_shr, add_gradient, B_term_factors, r_term_factors,u_term_factors = run_params
-        
+#        veh_seg_shr, tec_add_gradient, seg_batt_caps = run_params
+        veh_seg_shr, tec_add_gradient, seg_batt_caps, B_term_prod, B_term_oper_EOL, r_term_factors, u_term_factors = run_params
+
         # Make run ID
-        run_id = f'run_{veh_seg_shr[0]}_{add_gradient[0]}'#'_{seg_batt_caps[0]}'
+        run_id = f'run_{veh_seg_shr[0]}_{tec_add_gradient[0]}_{seg_batt_caps[0]}'#'_{seg_batt_caps[0]}'
 
         # run_id = f'run_{i}'  # alternate format
 
@@ -87,8 +87,10 @@ def run_experiment():
         # need to pass in run ID tag for saving gdx/csv
         # NB here, use explicit names to avoid any confusion
         fm = fleet_model.FleetModel(veh_seg_shr=veh_seg_shr[1],
-                                    add_gradient = add_gradient[1],
-                                    B_term_factors = B_term_factors[1],
+                                    tec_add_gradient = tec_add_gradient[1],
+                                    seg_batt_caps = seg_batt_caps[1],
+                                    B_term_prod = B_term_prod[1],
+                                    B_term_oper_EOL = B_term_oper_EOL[1],
                                     r_term_factors = r_term_factors[1],
                                     u_term_factors = u_term_factors[1])#,
 #                                    growth_constraint = growth_constraint[1])
@@ -109,8 +111,10 @@ def run_experiment():
         info[run_id] = {
             'params': {
                 'veh_seg_shr ': veh_seg_shr,
-                'add_gradient ': add_gradient,
-                'B_term_factors ': B_term_factors,
+                'tec_add_gradient ': tec_add_gradient,
+                'seg_batt_caps ': seg_batt_caps,
+                'B_term_prod ': B_term_prod,
+                'B_term_oper_EOL ': B_term_oper_EOL,
                 'r_term_factors ': r_term_factors,
                 'u_term_factors ': u_term_factors
             },
