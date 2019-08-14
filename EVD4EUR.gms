@@ -165,8 +165,8 @@ INIT_TEC(tec)
 INIT_AGE(age)
 SEG_TEC(seg,tec)
 SEG_TEC_AGE(seg,tec,age)
-**DEMAND --------------------
 
+**DEMAND --------------------
 
 VEH_STCK_TOT(year)               Number of vehicles - #
 VEH_OPER_DIST(year)              Annual driving distance per vehicles - km
@@ -183,8 +183,8 @@ VEH_LIFT_MOR(age)                Age distribution = 1 - CDF
 
 VEH_PAY(prodyear,age,year)       Correspondance between a vehicle production year and its age (up to 20) in a given year
 VEH_STCK_INT_TEC(tec)            Initial share of vehicles in stock tech
-VEH_STCK_INT(tec,seg,age)        Initial size of stock of vehicles by age cohort and segment
 VEH_STCK_INT_SEG(seg)            Initial stock distribution by segment
+VEH_STCK_INT(tec,seg,age)        Initial size of stock of vehicles by age cohort and segment
 
 ** GRADIENT OF CHANGE -------
 VEH_ADD_GRD(grdeq,tec)           Parameter for gradient of change constraint (fleet additions) - individual (IND) for each tech or related to all tech (ALL)
@@ -282,6 +282,7 @@ INIT_TEC(tec) = VEH_STCK_INT_TEC(tec)*VEH_STCK_TOT('2000');
 INIT_AGE(age) = VEH_LIFT_PDF(age)*VEH_STCK_TOT('2000');
 SEG_TEC(seg,tec) = (VEH_STCK_INT_TEC(tec))*(VEH_STCK_INT_SEG(seg));
 SEG_TEC_AGE(seg,tec,age) = (VEH_STCK_INT_TEC(tec)*VEH_STCK_INT_SEG(seg))*VEH_LIFT_PDF(age);
+
 VEH_STCK_INT(tec,seg,age) =(VEH_STCK_INT_TEC(tec)*VEH_LIFT_PDF(age)*VEH_STCK_INT_SEG(seg))*VEH_STCK_TOT('2000');
 
 
@@ -334,9 +335,10 @@ EQUATIONS
 EQ_STCK_REM_T1
 *stock additions
 EQ_STCK_ADD_T1
+EQ_STCK_ADD_T11
 *stock
 EQ_STCK_BAL_T1
-
+EQ_STCK_DELTA_T1
 ***  Main Model
 EQ_STCK_DELTA
 *removals
@@ -388,10 +390,18 @@ EQ_STCK_REM_T1(tec,seg,inityear,age)..                 VEH_STCK_REM(tec,seg,init
 
 *stock additions
 *-- Makes assumption that retired segments are replaced by the same segment
-EQ_STCK_ADD_T1(seg,inityear,age)$(ord(age)=1)..         sum(tec, VEH_STCK_ADD(tec,seg,inityear,age)) =e=  sum((tec,agej), VEH_STCK_REM(tec,seg,inityear,agej));
+*EQ_STCK_ADD_T1(seg,inityear,age)$(ord(age)=1)..         sum(tec, VEH_STCK_ADD(tec,seg,inityear,age)) =e=  sum((tec,agej), VEH_STCK_REM(tec,seg,inityear,agej));
+EQ_STCK_ADD_T1(seg,inityear,age)$(ord(age)=1)..         sum(tec, VEH_STCK_ADD(tec,seg,inityear,age)) =e=  sum((tec,agej), VEH_STCK_REM(tec,seg,inityear,agej))+ (VEH_STCK_DELTA(inityear)*VEH_STCK_INT_SEG(seg));
+
+EQ_STCK_ADD_T11('2000')..              VEH_STCK_DELTA('2000') =e= 3637119.13333321;
+
+*EQ_STCK_ADD_T11(seg,'2000',age)$(ord(age)=1)..              sum(tec,VEH_STCK_ADD(tec,seg,'2000',age)) =e= sum((tec,agej),VEH_STCK_REM(tec,seg,'2000',agej))+3637119.13333321;
 
 *stock
 EQ_STCK_BAL_T1(tec,seg,inityear,age)..                VEH_STCK(tec,seg,inityear,age) =e=  VEH_STCK_TOT(inityear) * (VEH_STCK_INT_TEC(tec) * VEH_LIFT_PDF(age) * VEH_STCK_INT_SEG(seg));
+
+EQ_STCK_DELTA_T1(inityear)$(ord(inityear)>1)..                              VEH_STCK_DELTA(inityear)  =e=  VEH_STCK_TOT(inityear) - VEH_STCK_TOT(inityear-1);
+
 
 ***  Main Model -----------------------------------------------
 EQ_STCK_DELTA(optyear)$(ord(optyear)>1)..                              VEH_STCK_DELTA(optyear)  =e=  VEH_STCK_TOT(optyear) - VEH_STCK_TOT(optyear-1);
@@ -441,7 +451,7 @@ EQ_STCK_GRD(tec,seg,optyear,age)$(ord(optyear)>1 and ord(age)=1)..     VEH_STCK_
 *EQ_SEG_GRD(seg,optyear,age)$(ord(optyear)>1 and ord(age)=1)..          sum(tec,VEH_STCK_ADD(tec,seg,optyear,age)) =e= VEH_SEG_SHR(seg) * sum((tec,segj), VEH_STCK_ADD(tec,segj,optyear,age));
 
 
-EQ_SEG_GRD(seg,optyear,age)$(ord(optyear)>1 and ord(age)=1)..          sum(tec,VEH_STCK_ADD(tec,seg,optyear,age)) =g= VEH_STCK_INT_SEG(seg) * sum((tec,segj), VEH_STCK_ADD(tec,segj,optyear,age));
+EQ_SEG_GRD(seg,optyear,age)$(ord(optyear)>1 and ord(age)=1)..          sum(tec,VEH_STCK_ADD(tec,seg,optyear,age)) =l= VEH_STCK_INT_SEG(seg) * sum((tec,segj), VEH_STCK_ADD(tec,segj,optyear,age));
 
 *EQ_SEG_GRD(seg,optyear)$(ord(optyear)>1)..                          sum((tec,age), VEH_STCK(tec,seg,optyear,age)) =e= VEH_STCK_INT_SEG(seg)*sum((tec,segj,age), VEH_STCK(tec,segj,optyear,age));
 
