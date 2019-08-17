@@ -12,6 +12,7 @@ import numpy as np
 from scipy.stats import norm
 import matplotlib
 import matplotlib.pyplot as plt
+from matplotlib.colors import LinearSegmentedColormap
 from matplotlib.ticker import (MultipleLocator, FormatStrFormatter, AutoMinorLocator)
 
 import seaborn
@@ -121,7 +122,7 @@ class FleetModel:
         
         self.veh_oper_eint = pd.DataFrame(pd.read_excel(self.import_fp,sheet_name='VEH_OPER_EINT',header=None,usecols='A:D',skiprows=[0]))  # [[tecs, enr], cohort]
         self.veh_oper_eint = self._process_df_to_series(self.veh_oper_eint)
-
+#pd.read_excel(fleet.import_fp,sheet_name='fuel economy', usecols='A:G',skiprows=23,index_col=[0],nrows=14)
 #        self.veh_oper_cint = pd.DataFrame(pd.read_excel('GAMS_input_new.xls',sheet_name='VEH_OPER_CINT',header=None,usecols='A:E',skiprows=[0]))  # [[tecs, enr], cohort]
 #        self.veh_oper_cint = self._process_df_to_series(self.veh_oper_cint)
 #        
@@ -208,6 +209,8 @@ class FleetModel:
         self.gro_cnstrnt = [self.growth_constraint for i in range(len(self.year))]
         self.gro_cnstrnt = pd.Series(self.gro_cnstrnt,index=self.year)
         self.gro_cnstrnt.index = self.gro_cnstrnt.index.astype('str')
+        
+        self.enr_partab = pd.read_excel(self.import_fp,sheet_name='ENR_PARTAB',usecols='A:F',index_col=[0,1]).stack()
 
         # --------------- Expected GAMS Outputs ------------------------------
 
@@ -393,6 +396,8 @@ class FleetModel:
         
         gro_cnstrnt = gmspy.df2param(self.db, self.gro_cnstrnt,['year'],'GRO_CNSTRNT')
         
+        enr_partab = gmspy.df2param(self.db,self.enr_partab,['enr','enreq','sigvar'],'ENR_PARTAB')
+        
         print('exporting database...'+filename+'_input')
         self.db.suppress_auto_domain_checking = 1
         self.db.export(os.path.join(self.current_path,filename+'_input'))
@@ -457,7 +462,10 @@ class FleetModel:
             self.veh_prod_totc = self.get_output_from_GAMS(gams_db,'VEH_PROD_TOTC')
             self.veh_oper_totc = self.get_output_from_GAMS(gams_db,'VEH_OPER_TOTC')
             self.veh_eolt_totc = self.get_output_from_GAMS(gams_db,'VEH_EOLT_TOTC')
-        
+            
+            temp = self.veh_stck.usntack(['year','tec']).sum()
+            self.stock_tot['percent_BEV'] = (temp)/temp.sum()
+            self.time_10 = stock_tot['percent_BEV'].between(0.9,0.11)
         except:
             exceptions = self.db.get_database_dvs()
             try:
@@ -561,7 +569,13 @@ class FleetModel:
         
         def fix_age_legend(ax,title='Vehicle ages'):
             patches, labels = ax.get_legend_handles_labels()
-            ax.legend(patches,labels,bbox_to_anchor=(1.05,1), ncol=2, title=title)
+            if len(labels)==12:
+#                order = [10,11,8,9,6,7,4,5,2,3,0,1]
+                order = [11,9,7,5,3,1,10,8,6,4,2,0]
+#                ax.legend([patches[idx] for idx in order],[labels[idx] for idx in order],bbox_to_anchor=(1.05,1),ncol=2,title=title)
+                ax.legend([patches[idx] for idx in order],[labels[idx] for idx in order],loc='upper left',ncol=2,title=title)
+            else:
+                ax.legend(patches,labels,bbox_to_anchor=(1.05,1), ncol=2, title=title)
             pp.savefig(bbox_inches='tight')
             
         def plot_subplots(grouped_df,title,labels):
@@ -581,8 +595,9 @@ class FleetModel:
             return ax
 
         ## Make paired colormap for comparing tecs
-        co = plt.get_cmap('tab20')
-        paired = matplotlib.colors.LinearSegmentedColormap.from_list('paired',co.colors[:12],N=12)
+        paired = LinearSegmentedColormap.from_list('paired',colors=['indigo','thistle','mediumblue','lightsteelblue','darkgreen','yellowgreen','olive','lightgoldenrodyellow','darkorange','navajowhite','darkred','salmon'],N=12)
+#        co = plt.get_cmap('tab20')
+#        paired = matplotlib.colors.LinearSegmentedColormap.from_list('paired',co.colors[:12],N=12)
 
         # Prepare dataframes
         self.stock_df = v_dict['VEH_STCK']
@@ -607,22 +622,27 @@ class FleetModel:
         self.veh_oper_eint.index.rename(['tec','seg','year'],inplace=True)
 
         """--- Plot total stocks by age, technology, and segment---"""   
-        fig, axes = plt.subplots(4,3, figsize=(12,12), sharey=True)
+        fig, axes = plt.subplots(4,3, figsize=(12,12), sharey=True,sharex=True)
+        plt.ylim(0,np.ceil(self.stock_df_plot.sum(axis=1).max()/5e7)*5e7)
+        
         for (key, ax) in zip(self.stock_df_plot_grouped.groups.keys(), axes.flatten()):
             #print(key)
 #            if(key==('BEV','B')):
 #                fix_age_legend(ax)
             self.stock_df_plot_grouped.get_group(key).plot(ax=ax,kind='area',cmap='Spectral_r',legend=False)
             #handles,labels = ax.get_legend_handles_labels()
-            ax.set_xticklabels([2000,2010,2020,2030,2040,2050])
+            ax.set_xticklabels([2000,2010,2020,2030,2040,2050],fontsize=9, rotation=45)
             ax.set_xlabel('year')
-            ax.set_title(key,fontsize=10,fontweight='bold')
+            ax.text(0.5,0.9,key,horizontalalignment='center',transform=ax.transAxes,fontweight='bold')
+#            plt.xticks(rotation=45)
+#            ax.set_title(key,fontsize=10,fontweight='bold')
+            
         patches, labels = ax.get_legend_handles_labels()
-        ax.legend(patches,labels,bbox_to_anchor=(1.62,5.32), ncol=2, title='Age')
+        ax.legend(patches,labels,bbox_to_anchor=(1.62,4.35), ncol=2, title='Age')
         """" Does not work, need a non-'aliased' reference to datapoint """
         #ax.axvline(x=2020,ls='dotted',color='k')
         fig.suptitle('Vehicle stock by technology and segment')
-        plt.subplots_adjust(hspace=0.42)#right=0.82,
+        plt.subplots_adjust(hspace=0.12,wspace=0.1)
         pp.savefig(bbox_inches='tight')
 
 #        for (key, ax) in zip(self.stock_df_plot_grouped.groups.keys(), axes.flatten()):
