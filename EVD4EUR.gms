@@ -136,25 +136,25 @@ ENR_PARTAB(enr,enreq,sigvar)     variables for each energy (fos or elc) equation
 *LFT_PARTAB(dstvar)               variables for fleet lifetime equations
 
 ***ENERGY (ELECTRICITY GENERATION and FUEL) ------------------------------------------
-ENR_CINT(enr,year)               CO2 intensity of the energy  [kg CO2-eq pr kwh]
+ENR_CINT(enr,year)               CO2 intensity of the energy                            [kg CO2-eq pr kwh]
 
 ***ENERGY and VEHICLE TECHONLOGY COMBINATIONS ----------------------------------------
-ENR_VEH(enr,tec)                 feasible cominations of vehicle technology and energy (fuel).
+ENR_VEH(enr,tec)                 feasible combinations of vehicle technology and energy (fuel).
 
 
 ***All VEHICLES ----------------------------------------------------------------------
 
 **PRODUCTION
-VEH_PROD_EINT(tec,seg,prodyear)        Electricity intensity of vehicle prod [kwh el required per vehicle produced]
+VEH_PROD_EINT(tec,seg,prodyear)        Electricity intensity of vehicle prod            [kwh el required per vehicle produced]
 VEH_PROD_CINT_CSNT(tec,seg,prodyear)   Constant term for CO2 int. of vehicle production [t CO2-eq per vehicle produced]
-VEH_PROD_CINT(tec,seg,prodyear)        CO2 intensity of vehicle production [t CO2-eq per vehicle produced]
+VEH_PROD_CINT(tec,seg,prodyear)        CO2 intensity of vehicle production              [t CO2-eq per vehicle produced]
 
 **OPERATION
-VEH_OPER_EINT(tec,seg,prodyear)        Energy intensity of vehicle operation [kwh per km]
-VEH_OPER_CINT(tec,enr,seg,prodyear)    CO2 intensity of vehicle operation    [t CO2 per km]
+VEH_OPER_EINT(tec,seg,prodyear)        Energy intensity of vehicle operation            [kwh per km]
+VEH_OPER_CINT(tec,enr,seg,prodyear)    CO2 intensity of vehicle operation               [t CO2 per km]
 
 **EOL
-VEH_EOLT_CINT(tec,seg,year)            CO2 intensity of ICE vehicle EOL - [t CO2-eq per vehicle in EOL treatment]
+VEH_EOLT_CINT(tec,seg,year)            CO2 intensity of ICE vehicle EOL                 [t CO2-eq per vehicle in EOL treatment]
 
 
 
@@ -169,7 +169,7 @@ SEG_TEC_AGE(seg,tec,age)
 **DEMAND --------------------
 
 VEH_STCK_TOT(year)               Number of vehicles - #
-VEH_OPER_DIST(year)              Annual driving distance per vehicles - km
+VEH_OPER_DIST(year)              Annual driving distance per vehicles                   [km]
 VEH_OCUP(year)
 
 ** LIFETIME
@@ -181,7 +181,7 @@ VEH_LIFT_MOR(age)                Age distribution = 1 - CDF
 
 ** COMPOSITION --------------
 
-VEH_PAY(prodyear,age,year)       Correspondance between a vehicle production year and its age (up to 20) in a given year
+VEH_PAY(prodyear,age,year)       Correspondence between a vehicle production year and its age (up to 20) in a given year
 VEH_STCK_INT_TEC(tec)            Initial share of vehicles in stock tech
 VEH_STCK_INT_SEG(seg)            Initial stock distribution by segment
 VEH_STCK_INT(tec,seg,age)        Initial size of stock of vehicles by age cohort and segment
@@ -189,7 +189,7 @@ VEH_STCK_INT(tec,seg,age)        Initial size of stock of vehicles by age cohort
 ** GRADIENT OF CHANGE -------
 VEH_ADD_GRD(grdeq,tec)           Parameter for gradient of change constraint (fleet additions) - individual (IND) for each tech or related to all tech (ALL)
 VEH_SEG_SHR(seg)                 Parameter for segment share minimums in fleet
-GRO_CNSTRNT(year)                 Segment growth rate constraint
+GRO_CNSTRNT(year)                Segment growth rate constraint relative to stock additions
 ;
 
 
@@ -228,13 +228,13 @@ $LOAD VEH_LIFT_AGE
 $LOAD YEAR_PAR
 $LOAD VEH_PARTAB
 $LOAD ENR_PARTAB
-$LOAD VEH_PROD_CINT_CSNT
-$LOAD VEH_PROD_EINT
-$LOAD VEH_OPER_EINT
+*$LOAD VEH_PROD_CINT_CSNT
+*$LOAD VEH_PROD_EINT
+*$LOAD VEH_OPER_EINT
 $LOAD VEH_STCK_INT
 $LOAD VEH_STCK_INT_TEC
 $LOAD VEH_PAY
-$LOAD VEH_EOLT_CINT
+*$LOAD VEH_EOLT_CINT
 $LOAD ENR_VEH
 $LOAD VEH_LIFT_PDF
 $LOAD VEH_LIFT_MOR
@@ -271,7 +271,7 @@ VEH_PROD_CINT(tec,seg,prodyear) = VEH_PROD_CINT_CSNT(tec,seg,prodyear) + VEH_PRO
 *----- Operation phase emissions
 VEH_OPER_EINT(tec,seg,prodyear) = genlogfnc(VEH_PARTAB('OPER_EINT',tec,seg,'A'),VEH_PARTAB('OPER_EINT',tec,seg,'B'),VEH_PARTAB('OPER_EINT',tec,seg,'r'),YEAR_PAR(prodyear),VEH_PARTAB('OPER_EINT',tec,seg,'u'));
 
-VEH_OPER_CINT(tec,enr,seg,prodyear)$(ENR_VEH(enr,tec)) = VEH_OPER_EINT(tec,seg,prodyear)*ENR_CINT(enr,prodyear)/1000; 
+VEH_OPER_CINT(tec,enr,seg,prodyear)$(ENR_VEH(enr,tec)) = VEH_OPER_EINT(tec,seg,prodyear)*(ENR_CINT(enr,prodyear)/1000); 
 
 *----- End-of-life phase emissions
 VEH_EOLT_CINT(tec,seg,prodyear) = genlogfnc(VEH_PARTAB('EOLT_CINT',tec,seg,'A'),VEH_PARTAB('EOLT_CINT',tec,seg,'B'),VEH_PARTAB('EOLT_CINT',tec,seg,'r'),YEAR_PAR(prodyear),VEH_PARTAB('EOLT_CINT',tec,seg,'u'));
@@ -310,16 +310,18 @@ VEH_STCK_REM(tec,seg,year,age)          Number of vehicles of a given age retire
 VEH_STCK_TOT_CHECK(year)                Check on number of vehicles
 VEH_STCK_ADD(tec,seg,year,age)          Stock additions (new car sales)
 VEH_TOT_ADD(year)                       Total vehicles added
-VEH_TOTC(tec,seg,year)                  Total CO2 emissions of vehicles per year, by technology, in t CO2-eq
+VEH_TOTC(tec,seg,year)                  Total CO2 emissions of vehicles per year, by technology             [t CO2-eq]
 VEH_STCK_ADD(tec,seg,year,age)          Stock additions (new car sales)
 VEH_STCK_ADD_OPTYEAR1(tec,seg,year,age)
 
-VEH_PROD_TOTC(tec,seg,year)             Total CO2 emissions from production of vehicles per year, in t CO2-eq
-VEH_OPER_TOTC(tec,seg,year)             Total CO2 emissions from operations of vehicles per year, in t CO2-eq
-VEH_EOLT_TOTC(tec,seg,year)             Total CO2 emissions from vehicle end of life treatment per year, in t CO2-eq
+VEH_PROD_TOTC(tec,seg,year)             Total CO2 emissions from production of vehicles per year            [t CO2-eq]
+VEH_OPER_TOTC(tec,seg,year)             Total CO2 emissions from operations of vehicles per year            [t CO2-eq]
+VEH_EOLT_TOTC(tec,seg,year)             Total CO2 emissions from vehicle end of life treatment per year     [t CO2-eq]
 check_add_tot(year)
 VEH_TOT_REM(year)
+ANN_TOTC(year)                          Total CO2 emissions from LDVs, by year                              [t CO2-eq]
 *VEH_STCK_CHRT(tec,seg,year,age,year)
+*OPER(tec,seg,year,prodyear)
 ;
 
 
@@ -377,7 +379,9 @@ EQ_VEH_OPER_TOTC
 *eolt emissions
 EQ_VEH_EOLT_TOTC
 EQ_TOTC
+EQ_ANN_TOTC
 *EQ_CHECK_ADD
+*EQ_OPER
 ;
 
 *-----------------------------------------------------------------------------------
@@ -447,7 +451,7 @@ EQ_STCK_CHK(year)..                                                    VEH_STCK_
 *** Constraints -----------------------------------------------------------------------
 
 * stock additions by technology
-EQ_STCK_ADD0(tec,seg,'2019','0')..                                 VEH_STCK_ADD_OPTYEAR1('BEV','A','2019','0') =e= 0;
+EQ_STCK_ADD0(tec,seg,'2019','0')..                                 VEH_STCK_ADD_OPTYEAR1('BEV',seg,'2019','0') =e= 0;
 EQ_STCK_GRD0(tec,seg,'2020','0')..                                 VEH_STCK_ADD(tec,seg,'2020','0') =l= ((1 + VEH_ADD_GRD('IND',tec)) * VEH_STCK_ADD_OPTYEAR1(tec,seg,'2019','0')) + 5e4;
 
 EQ_STCK_GRD(tec,seg,optyear,age)$(ord(optyear)>1 and ord(age)=1)..     VEH_STCK_ADD(tec,seg,optyear,age) =l= ((1 + VEH_ADD_GRD('IND',tec)) * VEH_STCK_ADD(tec,seg,optyear-1,age)) + 5e4;
@@ -473,14 +477,17 @@ EQ_SEG_GRD(seg,optyear,age)$(ord(optyear)>1 and ord(age)=1)..          sum(tec,V
 *** EMISSION and ENERGY MODELS incl OBJ. FUNCTION ------------------------------------
 * Objective function
 EQ_TOTC_OPT..                                TOTC_OPT =e= SUM((tec,seg,optyear), VEH_TOTC(tec,seg,optyear));
-* Calculation of emissions from all vehicle classes per year
+* Calculation of emissions from all vehicle classes per year 
 EQ_VEH_TOTC(tec,seg,year)..                  VEH_TOTC(tec,seg,year) =e= VEH_PROD_TOTC(tec,seg,year) + VEH_OPER_TOTC(tec,seg,year) + VEH_EOLT_TOTC(tec,seg,year);
+EQ_ANN_TOTC(year)..                          ANN_TOTC(year) =e= sum((tec,seg),VEH_TOTC(tec,seg,year));
 *int_tec
 EQ_VEH_PROD_TOTC(tec,seg,year)..             VEH_PROD_TOTC(tec,seg,year) =e= sum( (agej)$(ord(agej)=1), VEH_STCK_ADD(tec,seg,year,agej)*VEH_PROD_CINT(tec,seg,year));
-EQ_VEH_OPER_TOTC(tec,seg,year)..             VEH_OPER_TOTC(tec,seg,year) =e= sum( (agej,enr,prodyear), VEH_STCK(tec,seg,year,agej) * VEH_OPER_CINT(tec,enr,seg,prodyear) * ENR_VEH(enr,tec)*VEH_PAY(prodyear,agej,year) * VEH_OPER_DIST(year)) / 1000;
+EQ_VEH_OPER_TOTC(tec,seg,year)..             VEH_OPER_TOTC(tec,seg,year) =e= sum( (agej,enr,prodyear), VEH_STCK(tec,seg,year,agej) * VEH_OPER_CINT(tec,enr,seg,prodyear) * ENR_VEH(enr,tec)*VEH_PAY(prodyear,agej,year) * VEH_OPER_DIST(year));
+* Init phase operation emissions are 0 because we don't account for non-new cars in 2000! (i.e., prodyear is >=2000)
+*EQ_OPER(tec,seg,year,prodyear)..                      OPER(tec,seg,year,prodyear) =e= sum((agej,enr),VEH_STCK(tec,seg,year,agej) * VEH_OPER_CINT(tec,enr,seg,prodyear) * ENR_VEH(enr,tec)*VEH_PAY(prodyear,agej,year) * VEH_OPER_DIST(year));
 EQ_VEH_EOLT_TOTC(tec,seg,year)..             VEH_EOLT_TOTC(tec,seg,year) =e= sum( (agej), VEH_STCK_REM(tec,seg,year,agej))*VEH_EOLT_CINT(tec,seg,year);
 
-EQ_TOTC..                                   TOTC =e= SUM((tec,seg,year), VEH_TOTC(tec,seg,year));
+EQ_TOTC..                                    TOTC =e= SUM((tec,seg,year), VEH_TOTC(tec,seg,year));
 *** Convert VEH_STCK to include cohort for clearer figures ------------------------------------------
 *** Doesn't work. 
 *EQ_STCK_COHORT(tec,seg,prodyear,agej,year)..    VEH_STCK_CHRT(tec,seg,prodyear,agej,year) =e= VEH_STCK(tec,seg,year,agej)*VEH_PAY(prodyear,agej,year);

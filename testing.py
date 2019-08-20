@@ -96,7 +96,7 @@ def run_experiment():
 #                                    growth_constraint = growth_constraint[1])
         
         fm.run_GAMS(run_id)
-
+#
         exceptions = fm.db.get_database_dvs()
         if len(exceptions) > 1:
             print(exceptions[0].symbol.name)
@@ -121,6 +121,7 @@ def run_experiment():
             'output': {
 #                'totc': 42,   # life, the universe, and everything…
                  'totc': fm.totc,
+                 'totc in optimization period':fm.totc_opt # collect these from all runs into a dataframe...ditto with shares of BEV/ICE
             }
         }
 

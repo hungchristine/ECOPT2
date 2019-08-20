@@ -455,6 +455,7 @@ class FleetModel:
             print("Completed export of solution database")# + self.export_fp)
             
             self.totc = self.get_output_from_GAMS(gams_db,'TOTC')
+            self.totc_opt = self.get_output_from_GAMS(gams_db,'TOTC_OPT')
             self.veh_stck_add = self.get_output_from_GAMS(gams_db,'VEH_STCK_ADD')
             self.veh_stck = self.get_output_from_GAMS(gams_db,'VEH_STCK')
             self.veh_totc = self.get_output_from_GAMS(gams_db,'VEH_TOTC')
@@ -540,6 +541,8 @@ class FleetModel:
         parameters = gmspy.ls(gdx_filepath=gdx_file,entity='Parameter')
         variables = gmspy.ls(gdx_filepath=gdx_file,entity='Variable')
         years = gmspy.set2list(sets[0], gdx_filepath=gdx_file)
+        
+        plt.xkcd()
 
         # Export parameters
         p_dict = {}
@@ -630,6 +633,14 @@ class FleetModel:
         self.veh_oper_eint = p_dict['VEH_OPER_EINT']
         self.veh_oper_eint = self.veh_oper_eint.stack()
         self.veh_oper_eint.index.rename(['tec','seg','year'],inplace=True)
+        
+        self.veh_oper_cint = p_dict['VEH_OPER_CINT']
+        self.veh_oper_cint = self.veh_oper_cint.stack()
+        self.veh_oper_cint.index.rename(['tec','enr','seg','year'],inplace=True)
+        
+        self.enr_cint = p_dict['ENR_CINT']
+        self.enr_cint = self.enr_cint.stack()
+        self.enr_cint.index.rename(['enr','year'],inplace=True)
 
         """--- Plot total stocks by age, technology, and segment---"""   
         fig, axes = plt.subplots(4,3, figsize=(12,12), sharey=True,sharex=True)
@@ -765,10 +776,10 @@ class FleetModel:
         
         """--- Plot operation emissions by tec ---"""
         ax = self.emissions.loc[:,'Operation'].plot(kind='area',cmap=LinearSegmentedColormap.from_list('temp',colors=['silver','grey']))
-        plt.hlines(342,xmin=0.6,xmax=1,linestyles='-.',color='darkslategrey',label='EU 2050 target, \nUNFCCC transport emissions',transform=ax.get_yaxis_transform())
-#        plt.hlines(890,xmin=0,xmax=0.6, linestyle='dotted',color='darkslategrey',label='2030 target',transform=ax.get_yaxis_transform())
+        plt.hlines(185,xmin=0.6,xmax=1,linestyle='-.',color='darkslategrey',label='EU 2050 target, \nUNFCCC transport emissions',transform=ax.get_yaxis_transform())
+        plt.hlines(442,xmin=0.16,xmax=0.6, linestyle='dotted',color='darkslategrey',label='2030 target, \nUNFCCC transport emissions',transform=ax.get_yaxis_transform())
         plt.ylabel('Fleet operation emissions \n Mt $CO_2$-eq')
-        ax.legend()
+        ax.legend(loc=1)
         pp.savefig(bbox_inches='tight')
 
         """--- Plot production emissions by tec and seg ---"""
@@ -784,7 +795,7 @@ class FleetModel:
 #        pp.savefig(bbox_inches='tight')
         
         """--- Plot production emissions by tec and seg ---"""
-        """ prod = self.veh_prod_totc.unstack('tec')/1e9
+        prod = self.veh_prod_totc.unstack('tec')/1e9
         prod_int = (self.veh_prod_totc.unstack('tec')/self.stock_add.sum(axis=1).unstack('tec'))
         
         fig,axes = plt.subplots(3,2,figsize=(9,9),sharey=True)
@@ -808,14 +819,24 @@ class FleetModel:
         plot_subplots(self.veh_prod_cint.unstack('tec').groupby(['seg']),title=title,labels=labels)
         fig.text(0.04,0.5,'Production emissions intensity \n(t CO2/vehicle)', ha='center', rotation='vertical')
         pp.savefig(bbox_inches='tight')       
-#        
+        
         fig, axes = plt.subplots(3,2,figsize=(9,9),sharey=True)
         title = 'VEH_OPER_EINT - check ICE sigmoid function' 
         plot_subplots(self.veh_oper_eint.unstack('tec').groupby(['seg']),title=title,labels=labels)
         fig.text(0.04,0.5,'Operation energy intensity \n(kWh/km)', ha='center', rotation='vertical')
-        pp.savefig(bbox_inches='tight')  """
+        pp.savefig(bbox_inches='tight')
         
+        fig, axes = plt.subplots(3,2,figsize=(9,9),sharey=True)
+        title = 'VEH_OPER_CINT'
+        plot_subplots((self.veh_oper_cint.unstack(['tec','enr'])*1e6).groupby(['seg']),title=title,labels=labels)
+        fig.text(0.04,0.5,'Operation emissions intensity \n(g CO2/vkm)', ha='center', rotation='vertical')
+        pp.savefig(bbox_inches='tight')  
         
+        fig = (self.enr_cint*1000).unstack('enr').plot(title='ENR_CINT')
+        plt.ylabel('Emissions intensity, fuels \n g CO2-eq/kWh')
+        pp.savefig(bbox_inches='tight')
+
+       
         #for (key,ax) in zip(self.veh_prod_totc.unstack('tec').groupby(['seg']).groups.keys(),axes.flatten()):
 #        for (key,ax) in zip(self.veh_prod_totc.unstack('tec').groupby(['seg']).groups.keys(),axes.flatten()):
 #            self.veh_prod_totc.unstack('tec').groupby(['seg']).get_group(key).plot(ax=ax,cmap='jet',legend=False)
