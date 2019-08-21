@@ -69,7 +69,8 @@ def run_experiment():
         veh_seg_shr, tec_add_gradient, seg_batt_caps, B_term_prod, B_term_oper_EOL, r_term_factors, u_term_factors = run_params
 
         # Make run ID
-        run_id = f'run_{veh_seg_shr[0]}_{tec_add_gradient[0]}_{seg_batt_caps[0]}'#'_{seg_batt_caps[0]}'
+        now = datetime.now().isoformat(timespec='minutes').replace(':','_')
+        run_id = f'run_{tec_add_gradient[0]}_{seg_batt_caps[0]}_'+now #'_{seg_batt_caps[0]}'
 
         # run_id = f'run_{i}'  # alternate format
 
@@ -96,7 +97,7 @@ def run_experiment():
 #                                    growth_constraint = growth_constraint[1])
         
         fm.run_GAMS(run_id)
-
+#
         exceptions = fm.db.get_database_dvs()
         if len(exceptions) > 1:
             print(exceptions[0].symbol.name)
@@ -121,6 +122,7 @@ def run_experiment():
             'output': {
 #                'totc': 42,   # life, the universe, and everything…
                  'totc': fm.totc,
+                 'totc in optimization period':fm.totc_opt # collect these from all runs into a dataframe...ditto with shares of BEV/ICE
             }
         }
 
