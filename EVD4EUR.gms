@@ -38,9 +38,9 @@ function cdfnormal     /stolib.cdfnormal     /;
 
 SETS
 year            total span of years, including production before intialization period
-modelyear(year) model years
-optyear(year)   years for optimization
-inityear(year)  years for initialization
+modelyear(year) model years (2000-2050)
+optyear(year)   years for optimization (2020-2050)
+inityear(year)  years for initialization (2000-2020)
 age             age
 tec             techlogy
 enr             energy
@@ -153,7 +153,7 @@ VEH_PROD_CINT(tec,seg,prodyear)        CO2 intensity of vehicle production      
 
 **OPERATION
 VEH_OPER_EINT(tec,seg,prodyear)        Energy intensity of vehicle operation            [kwh per km]
-VEH_OPER_CINT(tec,enr,seg,prodyear,modelyear)    CO2 intensity of vehicle operation               [t CO2 per km]
+VEH_OPER_CINT(tec,enr,seg,prodyear,age,modelyear)    CO2 intensity of vehicle operation               [t CO2 per km]
 
 **EOL
 VEH_EOLT_CINT(tec,seg,year)            CO2 intensity of ICE vehicle EOL                 [t CO2-eq per vehicle in EOL treatment]
@@ -172,7 +172,7 @@ SEG_TEC_AGE(seg,tec,age)
 
 VEH_STCK_TOT(year)               Number of vehicles - #
 VEH_OPER_DIST(year)              Annual driving distance per vehicles                   [km]
-VEH_OCUP(year)
+VEH_OCUP(year)					 Load factor for vehicles								[passengers per vehicle]
 
 ** LIFETIME
 
@@ -258,10 +258,21 @@ PARAMETER VEH_STCK_INT_SEG(seg)
         F = 0.34
 /;
 
+*PARAMETER BEV_CAPAC(seg)
+*/
+*	A = 
+*	B = 
+*	C = 
+*	
+*/;
+
+* TOTAL_NEW_CAP(year) = (sum(seg),VEH_STCK_ADD(year,seg)*BEV_CAPC(seg))
+*EQ_ADD_CAP(year).. TOTAL_NEW_CAP(year) =l= CURRENT TOTAL CAPACITY EARMARKED FOR EUROPE
+
 
 *VEH_STCK_INT_SEG(seg) = VEH_SEG_SHR(seg);
 
-ENR_CINT(enr,year) =  genlogfnc(ENR_PARTAB(enr,'CINT','A'),ENR_PARTAB(enr,'CINT','B'),ENR_PARTAB(enr,'CINT','r'),YEAR_PAR(year),ENR_PARTAB(enr,'CINT','u'));
+ENR_CINT(enr,modelyear) =  genlogfnc(ENR_PARTAB(enr,'CINT','A'),ENR_PARTAB(enr,'CINT','B'),ENR_PARTAB(enr,'CINT','r'),YEAR_PAR(modelyear),ENR_PARTAB(enr,'CINT','u'));
 
 *----- Production-related emissions
 VEH_PROD_EINT(tec,seg,prodyear) = genlogfnc(VEH_PARTAB('PROD_EINT',tec,seg,'A'),VEH_PARTAB('PROD_EINT',tec,seg,'B'),VEH_PARTAB('PROD_EINT',tec,seg,'r'),YEAR_PAR(prodyear),VEH_PARTAB('PROD_EINT',tec,seg,'u'));
@@ -273,7 +284,9 @@ VEH_PROD_CINT(tec,seg,prodyear) = VEH_PROD_CINT_CSNT(tec,seg,prodyear) + VEH_PRO
 *----- Operation phase emissions
 VEH_OPER_EINT(tec,seg,prodyear) = genlogfnc(VEH_PARTAB('OPER_EINT',tec,seg,'A'),VEH_PARTAB('OPER_EINT',tec,seg,'B'),VEH_PARTAB('OPER_EINT',tec,seg,'r'),YEAR_PAR(prodyear),VEH_PARTAB('OPER_EINT',tec,seg,'u'));
 
-VEH_OPER_CINT(tec,enr,seg,prodyear,modelyear)$(ENR_VEH(enr,tec)) = VEH_OPER_EINT(tec,seg,prodyear)*(ENR_CINT(enr,modelyear)/1000); 
+***NEED TO FIX: THIS VEH_OPER_CINT HAS IMPOSSIBLE VEHICLE COMBINATIONS, E.G., CARS PRODUCED IN 2040 IN 2000 
+VEH_OPER_CINT(tec,enr,seg,prodyear,age,modelyear)$(ENR_VEH(enr,tec)) = VEH_OPER_EINT(tec,seg,prodyear)*(ENR_CINT(enr,modelyear)/1000)*VEH_PAY(prodyear,age,modelyear); 
+*VEH_OPER_CINT(tec,enr,seg,prodyear,modelyear)$(ENR_VEH(enr,tec) and prodyear <=modelyear) = VEH_OPER_EINT(tec,seg,prodyear)*(ENR_CINT(enr,modelyear)/1000); 
 
 *----- End-of-life phase emissions
 VEH_EOLT_CINT(tec,seg,prodyear) = genlogfnc(VEH_PARTAB('EOLT_CINT',tec,seg,'A'),VEH_PARTAB('EOLT_CINT',tec,seg,'B'),VEH_PARTAB('EOLT_CINT',tec,seg,'r'),YEAR_PAR(prodyear),VEH_PARTAB('EOLT_CINT',tec,seg,'u'));
@@ -285,7 +298,7 @@ INIT_AGE(age) = VEH_LIFT_PDF(age)*VEH_STCK_TOT('2000');
 SEG_TEC(seg,tec) = (VEH_STCK_INT_TEC(tec))*(VEH_STCK_INT_SEG(seg));
 SEG_TEC_AGE(seg,tec,age) = (VEH_STCK_INT_TEC(tec)*VEH_STCK_INT_SEG(seg))*VEH_LIFT_PDF(age);
 
-VEH_STCK_INT(tec,seg,age) =(VEH_STCK_INT_TEC(tec)*VEH_LIFT_PDF(age)*VEH_STCK_INT_SEG(seg))*VEH_STCK_TOT('2000');
+*VEH_STCK_INT(tec,seg,age) = (VEH_STCK_INT_TEC(tec)*VEH_LIFT_PDF(age)*VEH_STCK_INT_SEG(seg))*VEH_STCK_TOT('2000');
 
 
 *-----------------------------------------------------------------------------------
@@ -322,8 +335,7 @@ VEH_EOLT_TOTC(tec,seg,year)             Total CO2 emissions from vehicle end of 
 check_add_tot(year)
 VEH_TOT_REM(year)
 ANN_TOTC(year)                          Total CO2 emissions from LDVs, by year                              [t CO2-eq]
-VEH_STCK_CONV(tec,seg,modelyear,agej,prodyear)
-*VEH_STCK_CHRT(tec,seg,year,age,year)
+VEH_STCK_CHRT(tec,seg,prodyear,age,modelyear)
 *OPER(tec,seg,year,prodyear)
 ;
 
@@ -385,7 +397,7 @@ EQ_TOTC
 EQ_ANN_TOTC
 *EQ_CHECK_ADD
 *EQ_OPER
-EQ_STCK_CONV
+EQ_STCK_COHORT
 ;
 
 *-----------------------------------------------------------------------------------
@@ -489,9 +501,8 @@ EQ_ANN_TOTC(modelyear)..                          ANN_TOTC(modelyear) =e= sum((t
 *** to do: change production emissions to scale across lifetime 
 EQ_VEH_PROD_TOTC(tec,seg,modelyear)..             VEH_PROD_TOTC(tec,seg,modelyear) =e= sum( (agej)$(ord(agej)=1), VEH_STCK_ADD(tec,seg,modelyear,agej)*VEH_PROD_CINT(tec,seg,modelyear));
 *EQ_VEH_OPER_TOTC(tec,seg,modelyear)..             VEH_OPER_TOTC(tec,seg,modelyear) =e= sum( (agej,enr,prodyear), VEH_STCK(tec,seg,modelyear,agej) * VEH_OPER_CINT(tec,enr,seg,prodyear,modelyear) * ENR_VEH(enr,tec)*VEH_PAY(prodyear,agej,modelyear) * VEH_OPER_DIST(modelyear));
-EQ_VEH_OPER_TOTC(tec,seg,modelyear)..             VEH_OPER_TOTC(tec,seg,modelyear) =e= sum( (agej,enr,prodyear), VEH_STCK(tec,seg,modelyear,agej) *VEH_PAY(prodyear,agej,modelyear)* VEH_OPER_CINT(tec,enr,seg,prodyear,modelyear) *  VEH_OPER_DIST(modelyear));
-*
-EQ_STCK_CONV(tec,seg,modelyear,agej,prodyear)..     VEH_STCK_CONV(tec,seg,modelyear,agej,prodyear) =e= (VEH_STCK(tec,seg,modelyear,agej)*VEH_PAY(prodyear,agej,modelyear)) ;
+EQ_VEH_OPER_TOTC(tec,seg,modelyear)..             VEH_OPER_TOTC(tec,seg,modelyear) =e= sum( (agej,enr,prodyear), VEH_STCK(tec,seg,modelyear,agej) *VEH_PAY(prodyear,agej,modelyear)* VEH_OPER_CINT(tec,enr,seg,prodyear,agej,modelyear) *  VEH_OPER_DIST(modelyear));
+
 * Init phase operation emissions are 0 because we don't account for non-new cars in 2000! (i.e., prodyear is >=2000)
 *EQ_OPER(tec,seg,year,prodyear)..                      OPER(tec,seg,year,prodyear) =e= sum((agej,enr),VEH_STCK(tec,seg,year,agej) * VEH_OPER_CINT(tec,enr,seg,prodyear) * ENR_VEH(enr,tec)*VEH_PAY(prodyear,agej,year) * VEH_OPER_DIST(year));
 EQ_VEH_EOLT_TOTC(tec,seg,modelyear)..             VEH_EOLT_TOTC(tec,seg,modelyear) =e= sum( (agej), VEH_STCK_REM(tec,seg,modelyear,agej))*VEH_EOLT_CINT(tec,seg,modelyear);
@@ -500,8 +511,7 @@ EQ_TOTC..                                    TOTC =e= SUM((tec,seg,modelyear), V
 
 
 *** Convert VEH_STCK to include cohort for clearer figures ------------------------------------------
-*** Doesn't work. 
-*EQ_STCK_COHORT(tec,seg,prodyear,agej,year)..    VEH_STCK_CHRT(tec,seg,prodyear,agej,year) =e= VEH_STCK(tec,seg,year,agej)*VEH_PAY(prodyear,agej,year);
+EQ_STCK_COHORT(tec,seg,prodyear,agej,modelyear)$VEH_PAY(prodyear,agej,modelyear)..    VEH_STCK_CHRT(tec,seg,prodyear,agej,modelyear) =e= (VEH_STCK(tec,seg,modelyear,agej)*VEH_PAY(prodyear,agej,modelyear)) ;
 
 
 *-----------------------------------------------------------------------------------
