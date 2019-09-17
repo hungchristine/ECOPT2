@@ -43,7 +43,7 @@ class FleetModel:
         lightweighting_scenario: whether (how aggressively) LDVs are lightweighted in the experiment
         
     """
-    def __init__(self, veh_stck_int_seg, tec_add_gradient,seg_batt_caps, B_term_prod, B_term_oper_EOL, r_term_factors=0.2, u_term_factors=2025, occupancy_rate=1.643, data_from_message=None):
+    def __init__(self, veh_stck_int_seg, tec_add_gradient,seg_batt_caps, B_term_prod, B_term_oper_EOL, r_term_factors=0.2, u_term_factors=2025, pkm_scenario='iTEM2_Base', occupancy_rate=1.643, data_from_message=None):
         self.B_prod = B_term_prod
         self.B_oper = B_term_oper_EOL
         
@@ -90,8 +90,8 @@ class FleetModel:
 
         """needs to be made in terms of tec as well??"""
         """Currently uses generalized logistic growth curve"""
-        """TODO: make veh_stck_tot a variable with occupancy rate"""
-        #self.veh_stck_tot = pd.Series([100500000]*len(self.cohort),index=[str(i) for i in range(2000,2051)])  
+        
+        """ Currently uses smoothed total vehicle stock instead of stock from MESSAGE-Transport, which swings widely """
         self.veh_stck_tot = pd.DataFrame(pd.read_excel(self.import_fp,sheet_name='VEH_STCK_TOT',header=None,usecols='A,C',skiprows=[0])) # usecols='A:B' for MESSAGE data
         self.veh_stck_tot = self._process_df_to_series(self.veh_stck_tot)
         
@@ -101,7 +101,9 @@ class FleetModel:
         # Eurostat road_pa_mov [pkm]
         # http://www.odyssee-mure.eu/publications/efficiency-by-sector/transport/distance-travelled-by-car.html
         self.occupancy_rate = occupancy_rate or 1.643 #convert to time-dependent parameter #None # vkm -> pkm conversion
-        self.passenger_demand = pd.DataFrame(pd.read_excel(self.import_fp,sheet_name='VEH_STCK_TOT',header=None,usecols='A,G',skiprows=[0]))
+        all_pkm_scenarios = pd.DataFrame(pd.read_excel(self.import_fp, sheet_name = 'pkm')).T
+        self.passenger_demand = all_pkm_scenarios[pkm_scenario] # retrieve pkm demand from selected scenario
+#        self.passenger_demand = pd.DataFrame(pd.read_excel(self.import_fp,sheet_name='VEH_STCK_TOT',header=None,usecols='A,G',skiprows=[0])) #hardcoded retrieval of pkm demand
         self.passenger_demand = self._process_df_to_series(self.passenger_demand)
         self.passenger_demand = self.passenger_demand*1e9
         self.fleet_vkm = self.passenger_demand/self.occupancy_rate
@@ -205,7 +207,7 @@ class FleetModel:
         # https://www.acea.be/statistics/tag/category/segments-body-country
         # More detailed age distribution (https://www.acea.be/uploads/statistic_documents/ACEA_Report_Vehicles_in_use-Europe_2018.pdf)"""
 
-        self.tec_add_gradient = tec_add_gradient#0.2
+        self.tec_add_gradient = tec_add_gradient or 0.2
         self.veh_add_grd = dict()
         for element in itertools.product(*[self.grdeq,self.tecs]):
             self.veh_add_grd[element] = self.tec_add_gradient
@@ -568,7 +570,12 @@ class FleetModel:
             
             add_gpby = self.stock_add.sum(axis=1).unstack('seg').unstack('tec')
             self.add_share = add_gpby.div(add_gpby.sum(axis=1),axis=0)
-            self.shares_2030 = self.add_share.loc['2030'].to_string()
+            """ Export technology shares in 2030 to evaluate speed of uptake"""
+            self.shares_2030 = self.add_share.loc['2030']#.to_string()
+            
+            """ Export first year of 100% BEV market share """
+            tec_shares = self.add_share.stack().stack().sum(level=['year','tec'])
+            self.full_BEV_year = int((tec_shares.loc[:,'BEV']==1).idxmax()) - 1
         
             temp = self.veh_stck.unstack(['year','tec']).sum()
 #            self.stock_tot['percent_BEV'] = (temp)/temp.sum()
