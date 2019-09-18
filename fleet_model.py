@@ -92,7 +92,8 @@ class FleetModel:
         """Currently uses generalized logistic growth curve"""
         
         """ Currently uses smoothed total vehicle stock instead of stock from MESSAGE-Transport, which swings widely """
-        self.veh_stck_tot = pd.DataFrame(pd.read_excel(self.import_fp,sheet_name='VEH_STCK_TOT',header=None,usecols='A,C',skiprows=[0])) # usecols='A:B' for MESSAGE data
+        self.veh_stck_tot = pd.DataFrame(pd.read_excel(self.import_fp,sheet_name='VEH_STCK_TOT',header=None,usecols='A,C',skiprows=[0])) # usecols='A:B' for MESSAGE data, usecols='A,C' for old data
+#        self.veh_stck_tot = self._process_series(self.veh_stck_tot)
         self.veh_stck_tot = self._process_df_to_series(self.veh_stck_tot)
         
         # "Functional unit" # TODO: this is redund
@@ -101,11 +102,14 @@ class FleetModel:
         # Eurostat road_pa_mov [pkm]
         # http://www.odyssee-mure.eu/publications/efficiency-by-sector/transport/distance-travelled-by-car.html
         self.occupancy_rate = occupancy_rate or 1.643 #convert to time-dependent parameter #None # vkm -> pkm conversion
-        all_pkm_scenarios = pd.DataFrame(pd.read_excel(self.import_fp, sheet_name = 'pkm')).T
-        self.passenger_demand = all_pkm_scenarios[pkm_scenario] # retrieve pkm demand from selected scenario
+        self.all_pkm_scenarios = pd.DataFrame(pd.read_excel(self.import_fp, sheet_name = 'pkm',header = [0],index_col = [0])).T
+        self.passenger_demand = self.all_pkm_scenarios[pkm_scenario] # retrieve pkm demand from selected scenario
+        self.passenger_demand.reset_index()
 #        self.passenger_demand = pd.DataFrame(pd.read_excel(self.import_fp,sheet_name='VEH_STCK_TOT',header=None,usecols='A,G',skiprows=[0])) #hardcoded retrieval of pkm demand
-        self.passenger_demand = self._process_df_to_series(self.passenger_demand)
+#        self.passenger_demand = self._process_df_to_series(self.passenger_demand)
         self.passenger_demand = self.passenger_demand*1e9
+        self.passenger_demand.name = ''
+        self.passenger_demand.index = self.veh_stck_tot.index
         self.fleet_vkm = self.passenger_demand/self.occupancy_rate
         self.veh_oper_dist = self.fleet_vkm/self.veh_stck_tot
         
@@ -248,7 +252,7 @@ class FleetModel:
         pass
     
     @staticmethod
-    def _process_df_to_series(df):        
+    def _process_df_to_series(df):   
         dims = df.shape[1]-1 # assumes unstacked format
         indices = df.columns[:-1].tolist()
         df.set_index(indices,inplace=True)
@@ -261,6 +265,28 @@ class FleetModel:
         df.index.names = ['']*dims
         df = pd.Series(df.iloc[:,0])
         return df
+    
+    @staticmethod
+    def _process_series(ds):
+        ds.index = ds.index.astype(str)
+        ds.name=''
+        ds.columns=['']
+        ds.index.rename('',inplace=True)
+        return ds
+
+#        dims = df.shape[1]-1 # assumes unstacked format
+#        indices = df.columns[:-1].tolist()
+#        df.set_index(indices,inplace=True)
+#
+#        temp=[]
+#        for i in range(dims):
+#            temp.append(df.index.get_level_values(i).astype(str))
+#        df.index = temp
+#        df.columns=['']
+#        df.index.names = ['']*dims
+#        df = pd.Series(df.iloc[:,0])
+#        return df
+    
     
     def read_all_sets(self, gdx_file):
         # No longer used after commit c941039 as sets are now internally defined
