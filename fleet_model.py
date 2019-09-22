@@ -43,7 +43,7 @@ class FleetModel:
         lightweighting_scenario: whether (how aggressively) LDVs are lightweighted in the experiment
         
     """
-    def __init__(self, veh_stck_int_seg, tec_add_gradient,seg_batt_caps, B_term_prod, B_term_oper_EOL, r_term_factors=0.2, u_term_factors=2025, pkm_scenario='iTEM2_Base', occupancy_rate=1.643, data_from_message=None):
+    def __init__(self, veh_stck_int_seg, tec_add_gradient, seg_batt_caps, B_term_prod, B_term_oper_EOL, r_term_factors=0.2, u_term_factors=2025, pkm_scenario='iTEM2_Base', occupancy_rate=1.643, data_from_message=None):
         self.B_prod = B_term_prod
         self.B_oper = B_term_oper_EOL
         
@@ -119,6 +119,8 @@ class FleetModel:
             
         self.veh_stck_int_seg = veh_stck_int_seg or [0.08,0.21,0.27,0.08,0.03,0.34]  # Shares from 2017, ICCT report
         self.veh_stck_int_seg= pd.Series(self.veh_stck_int_seg,index=self.seg)
+        
+        self.seg_batt_caps = pd.Series(seg_batt_caps,index = self.seg) # For battery manufacturing capacity constraint
 
         ################ Life cycle intensities ################
 #        """These factors are usually calculated using the general logistic function"""
@@ -290,6 +292,7 @@ class FleetModel:
     
     def read_all_sets(self, gdx_file):
         # No longer used after commit c941039 as sets are now internally defined
+        
         """db = gmspy._iwantitall(None, None, gdx_file)
         self.tecs = gmspy.set2list('tec', db)
         self.cohort = gmspy.set2list('year', db)
@@ -401,6 +404,7 @@ class FleetModel:
         veh_oper_dist = gmspy.df2param(self.db, self.veh_oper_dist, ['year'], 'VEH_OPER_DIST')
         veh_stck_tot = gmspy.df2param(self.db, self.veh_stck_tot, ['year'], 'VEH_STCK_TOT')
         veh_stck_int_seg = gmspy.df2param(self.db,self.veh_stck_int_seg,['seg'],'VEH_STCK_INT_SEG')
+        bev_capac = gmspy.df2param(self.db,self.seg_batt_caps,['seg'],'BEV_CAPAC')
 #        veh_seg_int = gmspy.df2param(self.db,self.veh_seg_int,['seg'],'VEH_SEG_INT')
         
 #        veh_prod_cint = gmspy.df2param(self.db, self.veh_prod_cint, ['tec','seg', 'prodyear'], 'VEH_PROD_CINT')
@@ -598,11 +602,13 @@ class FleetModel:
             self.add_share = add_gpby.div(add_gpby.sum(axis=1),axis=0)
             """ Export technology shares in 2030 to evaluate speed of uptake"""
             self.shares_2030 = self.add_share.loc['2030']#.to_string()
+            self.shares_2050 = self.add_share.loc['2050']
             
             """ Export first year of 100% BEV market share """
             tec_shares = self.add_share.stack().stack().sum(level=['year','tec'])
             self.full_BEV_year = int((tec_shares.loc[:,'BEV']==1).idxmax()) - 1
-        
+            if self.full_BEV_year=='1999':
+                self.full_BEV_year = np.nan
             temp = self.veh_stck.unstack(['year','tec']).sum()
 #            self.stock_tot['percent_BEV'] = (temp)/temp.sum()
 #            self.time_10 = stock_tot['percent_BEV'].between(0.9,0.11)
@@ -669,9 +675,6 @@ class FleetModel:
         plt.rcParams.update({'figure.max_open_warning': 0}) # suppress max 20 figures warning
 
 
-       
-
-        
         
         def fix_age_legend(ax,title='Vehicle ages'):
             patches, labels = ax.get_legend_handles_labels()
