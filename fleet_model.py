@@ -242,11 +242,11 @@ class FleetModel:
         self.lightweighting_scenario = None # lightweighting scenario - yes/no (or gradient, e.g., none/mild/aggressive?)
 
         """ Optimization Initialization """
-        self.ws = gams.GamsWorkspace(working_directory=self.current_path,debug=2)
+        """self.ws = gams.GamsWorkspace(working_directory=self.current_path,debug=2)
         self.db = self.ws.add_database()#database_name='pyGAMSdb')
         self.opt = self.ws.add_options()
 #        self.opt.DumpParms = 2
-        self.opt.ForceWork = 1
+        self.opt.ForceWork = 1"""
 #        self.opt.SysOut = 1
         
     def main(self):
@@ -382,7 +382,7 @@ class FleetModel:
         
         return self.temp_df
 
-        
+        """
     def _load_experiment_data_in_gams(self,filename): # will become unnecessary as we start calculating/defining sets and/or parameters within the class
         years = gmspy.list2set(self.db,self.cohort,'year')
         modelyear = gmspy.list2set(self.db,self.modelyear,'modelyear')
@@ -445,6 +445,7 @@ class FleetModel:
         print('exporting database...'+filename+'_input')
         self.db.suppress_auto_domain_checking = 1
         self.db.export(os.path.join(self.current_path,filename+'_input'))
+        """
 
     def calc_op_emissions(self):
         """ calculate operation emissions from calc_cint_operation and calc_eint_operation """
@@ -478,7 +479,7 @@ class FleetModel:
         # Assembles vehicle from powertrain, glider and BoP and checks that vehicles makes sense (i.e., no Tesla motors in a Polo or vice versa)
         # used in calc_veh_mass()
         pass
-              
+    """          
     def run_GAMS(self,filename):
         # Pass to GAMS all necessary sets and parameters
         self._load_experiment_data_in_gams(filename)
@@ -504,7 +505,7 @@ class FleetModel:
             gams_db.export(self.export_fp)
             print("Completed export of solution database")# + self.export_fp)
             
-            """ Fetch model outputs"""
+            "" Fetch model outputs""
             self.totc = self.get_output_from_GAMS(gams_db,'TOTC')
             self.totc_opt = self.get_output_from_GAMS(gams_db,'TOTC_OPT')
             self.veh_stck_delta = self.get_output_from_GAMS(gams_db,'VEH_STCK_DELTA')
@@ -524,7 +525,7 @@ class FleetModel:
             self.emissions = self.emissions.unstack(['tec','year']).sum().unstack([None,'tec'])
             
             
-            """ Fetch variable and stock compositions"""
+            "" Fetch variable and stock compositions""
             sets = gmspy.ls(gdx_filepath=self.export_fp, entity='Set')
             parameters = gmspy.ls(gdx_filepath=self.export_fp,entity='Parameter')
             variables = gmspy.ls(gdx_filepath=self.export_fp,entity='Variable')
@@ -600,11 +601,11 @@ class FleetModel:
             
             add_gpby = self.stock_add.sum(axis=1).unstack('seg').unstack('tec')
             self.add_share = add_gpby.div(add_gpby.sum(axis=1),axis=0)
-            """ Export technology shares in 2030 to evaluate speed of uptake"""
+            " Export technology shares in 2030 to evaluate speed of uptake"
             self.shares_2030 = self.add_share.loc['2030']#.to_string()
             self.shares_2050 = self.add_share.loc['2050']
             
-            """ Export first year of 100% BEV market share """
+            " Export first year of 100% BEV market share "
             tec_shares = self.add_share.stack().stack().sum(level=['year','tec'])
             self.full_BEV_year = int((tec_shares.loc[:,'BEV']==1).idxmax()) - 1
             if self.full_BEV_year=='1999':
@@ -619,7 +620,7 @@ class FleetModel:
             except:
                 print(exceptions)
            # self.db.export(os.path.join(self.current_path,'troubleshooting_tryexcept'))
-        
+        """
     def add_to_GAMS(self):
         # Adding sets
         def build_set(set_list=None,name=None,desc=None):
@@ -636,7 +637,7 @@ class FleetModel:
         # Export for troubleshooting
         #self.db.export('add_sets.gdx')
         
-    def get_output_from_GAMS(self,gams_db,output_var):
+    """def get_output_from_GAMS(self,gams_db,output_var):
          temp_GMS_output = []
          temp_index_list = []
          
@@ -653,7 +654,7 @@ class FleetModel:
          temp_index = pd.MultiIndex.from_tuples(temp_index_list,names=temp_domain_list)
          temp_output_df = pd.DataFrame(temp_GMS_output,index = temp_index)
 
-         return temp_output_df
+         return temp_output_df"""
         
     def calc_crit_materials(self):
         # performs critical material mass accounting
