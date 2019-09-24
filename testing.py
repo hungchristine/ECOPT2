@@ -51,9 +51,19 @@ log = logging.getLogger(__name__)
 # Make output YAML less ugly, see https://stackoverflow.com/a/30682604
 yaml.SafeDumper.ignore_aliases = lambda *args: True
 
+# Make timestamp and directory for scenario run results for output files
+now = datetime.now().isoformat(timespec='minutes').replace(':','_')
+fp = r'C:\Users\chrishun\Box Sync\YSSP_temp\visualization output\Run_'+now
+
+try:
+    os.mkdir(fp)
+    os.chdir(fp)
+except:
+    print("cannot make folder!")
+        
 def run_experiment():
     # Load parameter values from YAML
-    with open('temp_input.yaml', 'r') as stream:
+    with open(r'C:\Users\chrishun\Box Sync\YSSP_temp\temp_input.yaml', 'r') as stream:
         try:
             params = yaml.safe_load(stream)
             print('finished')
@@ -70,6 +80,13 @@ def run_experiment():
     id_and_value = [params[p].items() for p in param_names]
     # NB could also change the names here
     
+    # Calculate total number of runs
+    count = 1
+    for x in params:
+        temp = len(params[x])
+        #temp += len(id_and_value[x])
+        count = temp * count
+        
     shares_2030 = None
     shares_2050 = None
     add_share = None
@@ -83,14 +100,14 @@ def run_experiment():
 
     
     for i, run_params in enumerate(product(*id_and_value)):
-        print('Run '+str(i)+' of ')
+        print('Starting run '+str(i+1)+' of '+str(count)+'\n\n')
 #        veh_seg_shr, tec_add_gradient, seg_batt_caps = run_params
         veh_stck_int_seg, tec_add_gradient, seg_batt_caps, B_term_prod, B_term_oper_EOL, r_term_factors, u_term_factors, pkm_scenario = run_params
 
         # Make run ID
         now = datetime.now().isoformat(timespec='minutes').replace(':','_')
         run_id = f'run_{tec_add_gradient[0]}_{seg_batt_caps[0]}_{B_term_prod[0]}_{B_term_oper_EOL[0]}_{r_term_factors[0]}_{u_term_factors[0]}_{pkm_scenario[1]}' #'_{seg_batt_caps[0]}'
-        run_tag = run_id+now
+        run_tag = run_id + now
         run_id_list.append(run_id)
 
         # run_id = f'run_{i}'  # alternate format
@@ -129,7 +146,12 @@ def run_experiment():
             dunno2 = exceptions[0].symbol
             print(fm.db.number_symbols)
 
-#        fm.vis_GAMS(run_id)
+        # Pickle the scenario fleet object
+        os.chdir(fp)
+        with open('run_'+run_tag+'.pkl','wb') as f:
+            pickle.dump(fm,f)
+            
+        fm.vis_GAMS(fp,run_id)
         
         # Save log info
         info[run_tag] = {
@@ -183,28 +205,25 @@ def run_experiment():
 
         # Display the info for this run
         log.info(repr(info[run_tag]))
+        print('\n\n\n ********** End of run ' + str(i+1)+ ' ************** \n\n\n')
 
     # Write log to file
-    now = datetime.now().isoformat(timespec='seconds').replace(':','_')
     with open(f'output_{now}.yaml', 'w') as f:
         yaml.safe_dump(info, f)
     
-    fleet_dict[run_id] = fm
-    
-    return fm, run_id_list, shares_2030,  shares_2050, add_share, stock_comp, full_BEV_yr_list, totc_list, fleet_dict
+    return fm, run_id_list, shares_2030,  shares_2050, add_share, stock_comp, full_BEV_yr_list, totc_list#, fleet_dict
 
 
 """ Run the full experiment """
-fleet,run_id_list, shares_2030, shares_2050, add_share, stock_comp, full_BEV_yr_list, totc_list, fleet_dict = run_experiment()
+fleet,run_id_list, shares_2030, shares_2050, add_share, stock_comp, full_BEV_yr_list, totc_list = run_experiment()
 
 
 full_BEV_yr = pd.DataFrame(full_BEV_yr_list,index = run_id_list)
 scenario_totcs = pd.DataFrame(totc_list, index=run_id_list)
 
 # Export potentially helpful output for analyzing across scenarios
-now = datetime.now().isoformat(timespec='minutes').replace(':','_')
 with open('run_'+now+'.pkl', 'wb') as f:
-    pickle.dump([fleet_dict, shares_2030, shares_2050, add_share, stock_comp, full_BEV_yr, scenario_totcs], f)
+    pickle.dump([shares_2030, shares_2050, add_share, stock_comp, full_BEV_yr, scenario_totcs], f)
 """with open('run_2019-09-22T14_50.pkl','rb') as f:
     d=pickle.load(f)
 d[0][run_id_list[0]].add_share"""

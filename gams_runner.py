@@ -25,12 +25,17 @@ class GAMSRunner:
         self.current_path = os.path.dirname(os.path.realpath(__file__))
         self.export_fp = 'C:\\Users\\chrishun\\Box Sync\\YSSP_temp\\Model run data\\'
         self.ws = gams.GamsWorkspace(working_directory=self.current_path,debug=2)
-        self.db = self.ws.add_database()#database_name='pyGAMSdb')
+#        self.db = self.ws.add_database()#database_name='pyGAMSdb')
         self.opt = self.ws.add_options()
+        self.opt.LogLine = 2
 #        self.opt.DumpParms = 2
         self.opt.ForceWork = 1
+        gams.execution.SymbolUpdateType =1
         
     def _load_experiment_data_in_gams(self, fleet, filename): # will become unnecessary as we start calculating/defining sets and/or parameters within the class
+        # Clear database for new run
+#        self.db.clear() # need to add functionality to gmspy --> check if Symbol exists in database, write over
+        self.db = self.ws.add_database()#database_name='pyGAMSdb')
         years = gmspy.list2set(self.db,fleet.cohort,'year')
         modelyear = gmspy.list2set(self.db,fleet.modelyear,'modelyear')
         tecs = gmspy.list2set(self.db, fleet.tecs, 'tec')
@@ -75,7 +80,7 @@ class GAMSRunner:
             veh_add_grd.add_record(keys).value = value
 
 #        veh_add_grd = gmspy.df2param(self.db,self.veh_add_grd, ['grdeq','tec'], 'VEH_ADD_GRD')
-        
+    
         gro_cnstrnt = gmspy.df2param(self.db, fleet.gro_cnstrnt,['year'],'GRO_CNSTRNT')
         
         enr_partab = gmspy.df2param(self.db, fleet.enr_partab,['enr','enreq','sigvar'],'ENR_PARTAB')
@@ -103,7 +108,7 @@ class GAMSRunner:
 
          return temp_output_df
      
-    def run_GAMS(self,fleet,filename):
+    def run_GAMS(self, fleet, filename):
         # Pass to GAMS all necessary sets and parameters
         self._load_experiment_data_in_gams(fleet, filename)
         #self.db.export(' _custom.gdx')
@@ -124,8 +129,8 @@ class GAMSRunner:
             print("Ran GAMS model: "+fleet.gms_file)
 
             gams_db = model_run.out_db
-            self.export_fp = os.path.join(self.export_fp,filename+'_solution.gdx')
-            gams_db.export(self.export_fp)
+            self.export_model = os.path.join(self.export_fp,filename+'_solution.gdx')
+            gams_db.export(self.export_model)
             print("Completed export of solution database")# + self.export_fp)
             
             """ Fetch model outputs"""
@@ -149,19 +154,19 @@ class GAMSRunner:
             
             
             """ Fetch variable and stock compositions"""
-            sets = gmspy.ls(gdx_filepath=self.export_fp, entity='Set')
-            parameters = gmspy.ls(gdx_filepath=self.export_fp,entity='Parameter')
-            variables = gmspy.ls(gdx_filepath=self.export_fp,entity='Variable')
-            years = gmspy.set2list(sets[0], gdx_filepath=self.export_fp)
+            sets = gmspy.ls(gdx_filepath=self.export_model, entity='Set')
+            parameters = gmspy.ls(gdx_filepath=self.export_model,entity='Parameter')
+            variables = gmspy.ls(gdx_filepath=self.export_model,entity='Variable')
+            years = gmspy.set2list(sets[0], gdx_filepath=self.export_model)
                 
             # Export parameters
             p_dict = {}
             for p in parameters:
                 try:
-                    p_dict[p] = gmspy.param2df(p,gdx_filepath=self.export_fp)
+                    p_dict[p] = gmspy.param2df(p,gdx_filepath=self.export_model)
                 except ValueError:
                     try:
-                        p_dict[p] = gmspy.param2series(p,gdx_filepath=self.export_fp)
+                        p_dict[p] = gmspy.param2series(p,gdx_filepath=self.export_model)
                     except:
                         print(f'Warning!: p_dict ValueError in {p}!')
                         pass
@@ -173,10 +178,10 @@ class GAMSRunner:
             v_dict = {}
             for v in variables:
                 try:
-                    v_dict[v] = gmspy.var2df(v,gdx_filepath=self.export_fp)
+                    v_dict[v] = gmspy.var2df(v,gdx_filepath=self.export_model)
                 except ValueError:
                     try:
-                        v_dict[v] = gmspy.var2series(v,gdx_filepath=self.export_fp)
+                        v_dict[v] = gmspy.var2series(v,gdx_filepath=self.export_model)
                     except:
                         print(f'Warning!: v_dict ValueError in {v}!')
                         pass
@@ -185,38 +190,38 @@ class GAMSRunner:
                     pass
             
             
-            # Prepare dataframes
-            self.stock_df = v_dict['VEH_STCK']
-            self.stock_df = reorder_age_headers(self.stock_df)
-            self.stock_add = v_dict['VEH_STCK_ADD']
-            self.stock_add = reorder_age_headers(self.stock_add)
-            self.stock_add = self.stock_add.dropna(axis=1,how='any')
-            self.stock_df_plot = self.stock_df.stack().unstack('age')  
-            self.stock_df_plot = reorder_age_headers(self.stock_df_plot)
+            # Prepare model output dataframes for visualization
+            fleet.stock_df = v_dict['VEH_STCK']
+            fleet.stock_df = reorder_age_headers(fleet.stock_df)
+            fleet.stock_add = v_dict['VEH_STCK_ADD']
+            fleet.stock_add = reorder_age_headers(fleet.stock_add)
+            fleet.stock_add = fleet.stock_add.dropna(axis=1,how='any')
+            fleet.stock_df_plot = fleet.stock_df.stack().unstack('age')  
+            fleet.stock_df_plot = reorder_age_headers(fleet.stock_df_plot)
     
-            self.stock_df_plot_grouped = self.stock_df_plot.groupby(['tec','seg'])
+            fleet.stock_df_plot_grouped = fleet.stock_df_plot.groupby(['tec','seg'])
             
-            self.stock_cohort = v_dict['VEH_STCK_CHRT']
-            self.stock_cohort = self.stock_cohort.droplevel(level='age',axis=0)
-            self.stock_cohort = self.stock_cohort.stack().unstack('prodyear').sum(axis=0,level=['tec','modelyear'])
+            fleet.stock_cohort = v_dict['VEH_STCK_CHRT']
+            fleet.stock_cohort = fleet.stock_cohort.droplevel(level='age',axis=0)
+            fleet.stock_cohort = fleet.stock_cohort.stack().unstack('prodyear').sum(axis=0,level=['tec','modelyear'])
             
-            self.veh_prod_cint = p_dict['VEH_PROD_CINT']
-            self.veh_prod_cint = self.veh_prod_cint.stack()
-            self.veh_prod_cint.index.rename(['tec','seg','year'],inplace=True)
+            fleet.veh_prod_cint = p_dict['VEH_PROD_CINT']
+            fleet.veh_prod_cint = fleet.veh_prod_cint.stack()
+            fleet.veh_prod_cint.index.rename(['tec','seg','year'],inplace=True)
             
-            self.veh_oper_eint = p_dict['VEH_OPER_EINT']
-            self.veh_oper_eint = self.veh_oper_eint.stack()
-            self.veh_oper_eint.index.rename(['tec','seg','year'],inplace=True)
+            fleet.veh_oper_eint = p_dict['VEH_OPER_EINT']
+            fleet.veh_oper_eint = fleet.veh_oper_eint.stack()
+            fleet.veh_oper_eint.index.rename(['tec','seg','year'],inplace=True)
             
-            self.veh_oper_cint = p_dict['VEH_OPER_CINT']
-            self.veh_oper_cint = self.veh_oper_cint.stack()
-            self.veh_oper_cint.index.rename(['tec','enr','seg','cohort','age','year'],inplace=True)
-            self.veh_oper_cint.index = self.veh_oper_cint.index.droplevel(['year','age','enr'])
+            fleet.veh_oper_cint = p_dict['VEH_OPER_CINT']
+            fleet.veh_oper_cint = fleet.veh_oper_cint.stack()
+            fleet.veh_oper_cint.index.rename(['tec','enr','seg','cohort','age','year'],inplace=True)
+            fleet.veh_oper_cint.index = fleet.veh_oper_cint.index.droplevel(['year','age','enr'])
             
-            self.enr_cint = p_dict['ENR_CINT'].stack()
-            self.enr_cint.index.rename(['enr','year'],inplace=True)
+            fleet.enr_cint = p_dict['ENR_CINT'].stack()
+            fleet.enr_cint.index.rename(['enr','year'],inplace=True)
             
-            add_gpby = self.stock_add.sum(axis=1).unstack('seg').unstack('tec')
+            add_gpby = fleet.stock_add.sum(axis=1).unstack('seg').unstack('tec')
             fleet.add_share = add_gpby.div(add_gpby.sum(axis=1),axis=0)
             """ Export technology shares in 2030 to evaluate speed of uptake"""
             fleet.shares_2030 = fleet.add_share.loc['2030']#.to_string()
@@ -225,9 +230,9 @@ class GAMSRunner:
             """ Export first year of 100% BEV market share """
             tec_shares = fleet.add_share.stack().stack().sum(level=['year','tec'])
             fleet.full_BEV_year = int((tec_shares.loc[:,'BEV']==1).idxmax()) - 1
-            if fleet.full_BEV_year=='1999':
-                fleet.full_BEV_year = np.nan()
-            temp = self.veh_stck.unstack(['year','tec']).sum()
+            if fleet.full_BEV_year == 1999:
+                fleet.full_BEV_year = np.nan
+            temp = fleet.veh_stck.unstack(['year','tec']).sum()
         except:
             exceptions = self.db.get_database_dvs()
             try:

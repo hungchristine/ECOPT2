@@ -68,22 +68,22 @@ class FleetModel:
         
         """ GAMS-relevant attributes"""
         #  --------------- GAMS sets / domains -------------------------------
-        self.tecs = ['ICE','BEV']                           # drivetrain technologies; can include e.g., alternative battery chemistries
+        self.tecs = ['ICE','BEV']                               # drivetrain technologies; can include e.g., alternative battery chemistries
         self.modelyear = [str((2000)+i) for i in range(51)]
-        self.inityear=[str(2000+i) for i in range(21)]      # reduce to one/five year(s)? Originally 2000-2020
-        self.cohort = [str((2000-28)+i) for i in range(51+28)]      # vehicle cohorts (production year)
+        self.inityear=[str(2000+i) for i in range(21)]          # reduce to one/five year(s)? Originally 2000-2020
+        self.cohort = [str((2000-28)+i) for i in range(51+28)]  # vehicle cohorts (production year)
         self.optyear = [str(2020+i) for i in range(31)]
-        self.age = [str(i) for i in range(28)]              # vehicle age, up to 27 years old
-        self.enr = ['ELC','FOS']                            # fuel types; later include H2, 
+        self.age = [str(i) for i in range(28)]                  # vehicle age, up to 27 years old
+        self.enr = ['ELC','FOS']                                # fuel types; later include H2, 
         self.seg = ['A','B','C','D','E','F']                    # From ACEA: Small, lower medium, upper medium, executive
-        self.demeq= ['STCK_TOT','OPER_DIST','OCUP']         # definition of 
+        self.demeq= ['STCK_TOT','OPER_DIST','OCUP']             # definition of 
         self.dstvar=['mean','stdv']
         self.enreq=['CINT']
         self.grdeq=['IND','ALL']
         self.veheq = ['PROD_EINT','PROD_CINT_CSNT','OPER_EINT','EOLT_CINT']
-        self.lfteq=['LFT_DISTR','AGE_DISTR']
-        self.sigvar=['A','B','r','u']                   # S-curve terms
-        self.critmats = ['Cu','Li','Co','Pt','','']         # critical elements to count for; to incorporate later
+        self.lfteq = ['LFT_DISTR','AGE_DISTR']
+        self.sigvar = ['A','B','r','u']                         # S-curve terms
+        self.critmats = ['Cu','Li','Co','Pt','','']             # critical elements to count for; to incorporate later
         self.age_int = list(map(int,self.age))
         
         # --------------- GAMS Parameters -------------------------------------
@@ -667,15 +667,13 @@ class FleetModel:
     def import_from_MESSAGE(self):
         pass
 
-    def vis_GAMS(self,filename):
+    def vis_GAMS(self,fp,filename):
         """ visualize key GAMS parameters for quality checks"""
         """To do: split into input/output visualization; add plotting of CO2 and stocks together"""
-        ch_path = os.path.dirname(os.path.abspath(__file__))+r'\visualization output\ '
-        os.chdir(ch_path)
+#        ch_path = os.path.dirname(fp)
+        os.chdir(fp)
         pp = PdfPages('output_vis_'+filename+'.pdf')
         plt.rcParams.update({'figure.max_open_warning': 0}) # suppress max 20 figures warning
-
-
         
         def fix_age_legend(ax,title='Vehicle ages'):
             patches, labels = ax.get_legend_handles_labels()
