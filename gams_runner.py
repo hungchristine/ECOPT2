@@ -36,6 +36,7 @@ class GAMSRunner:
         # Clear database for new run
 #        self.db.clear() # need to add functionality to gmspy --> check if Symbol exists in database, write over
         self.db = self.ws.add_database()#database_name='pyGAMSdb')
+        self.update_fleet(fleet)
         years = gmspy.list2set(self.db,fleet.cohort,'year')
         modelyear = gmspy.list2set(self.db,fleet.modelyear,'modelyear')
         tecs = gmspy.list2set(self.db, fleet.tecs, 'tec')
@@ -76,9 +77,13 @@ class GAMSRunner:
         veh_partab = gmspy.df2param(self.db, fleet.veh_partab,['veheq','tec','seg','sigvar'],'VEH_PARTAB')
 
         veh_add_grd = self.db.add_parameter_dc('VEH_ADD_GRD', ['grdeq','tec'])
+        # Prep work making add gradient df from given rate constraint
+        
+        # adding growth constraint for each tec    
         for keys,value in iter(fleet.veh_add_grd.items()):
             veh_add_grd.add_record(keys).value = value
-
+        print('_load_experiment_data')
+        print(veh_add_grd)
 #        veh_add_grd = gmspy.df2param(self.db,self.veh_add_grd, ['grdeq','tec'], 'VEH_ADD_GRD')
     
         gro_cnstrnt = gmspy.df2param(self.db, fleet.gro_cnstrnt,['year'],'GRO_CNSTRNT')
@@ -108,6 +113,18 @@ class GAMSRunner:
 
          return temp_output_df
      
+    def update_fleet(self,fleet):
+        """ tec_add_gradient --> veh_add_grd """
+        fleet.veh_add_grd = dict()
+        for element in itertools.product(*[fleet.grdeq,fleet.tecs]):
+            fleet.veh_add_grd[element] = fleet.tec_add_gradient
+            
+        """ occupancy_rate --> veh_oper_dist """    
+        fleet.fleet_vkm = fleet.passenger_demand/fleet.occupancy_rate
+        fleet.veh_oper_dist = fleet.fleet_vkm/fleet.veh_stck_tot
+        
+#        fleet.veh_partab = fleet.build_veh_partab(seg_batt_caps,B_term_prod,B_term_oper_EOL,r_term_factors,u_term_factors)#.stack()
+            
     def run_GAMS(self, fleet, filename):
         # Pass to GAMS all necessary sets and parameters
         self._load_experiment_data_in_gams(fleet, filename)
@@ -136,6 +153,8 @@ class GAMSRunner:
             """ Fetch model outputs"""
             fleet.totc = self.get_output_from_GAMS(gams_db,'TOTC')
             fleet.totc_opt = self.get_output_from_GAMS(gams_db,'TOTC_OPT')
+            print("TEST")
+            print(fleet.totc_opt)
             fleet.veh_stck_delta = self.get_output_from_GAMS(gams_db,'VEH_STCK_DELTA')
             fleet.veh_stck_add = self.get_output_from_GAMS(gams_db,'VEH_STCK_ADD')
             fleet.veh_stck_rem = self.get_output_from_GAMS(gams_db, 'VEH_STCK_REM')
@@ -157,6 +176,7 @@ class GAMSRunner:
             sets = gmspy.ls(gdx_filepath=self.export_model, entity='Set')
             parameters = gmspy.ls(gdx_filepath=self.export_model,entity='Parameter')
             variables = gmspy.ls(gdx_filepath=self.export_model,entity='Variable')
+            equations = gmspy.ls(gdx_filepath=self.export_model, entity='Equation')
             years = gmspy.set2list(sets[0], gdx_filepath=self.export_model)
                 
             # Export parameters
@@ -189,6 +209,13 @@ class GAMSRunner:
                     print(f'Warning! v-dict TypeError in {v}!')
                     pass
             
+            e_dict={}
+            for e in equations:
+                try:
+                    e_dict[e] = gmspy.eq2series(e, gdx_filepath=self.export_model)
+                except:
+                    print(f'Warning!: Error in {e}')
+                    pass
             
             # Prepare model output dataframes for visualization
             fleet.stock_df = v_dict['VEH_STCK']
@@ -226,6 +253,7 @@ class GAMSRunner:
             """ Export technology shares in 2030 to evaluate speed of uptake"""
             fleet.shares_2030 = fleet.add_share.loc['2030']#.to_string()
             fleet.shares_2050 = fleet.add_share.loc['2050']
+            fleet.eq = e_dict['EQ_STCK_GRD']
             
             """ Export first year of 100% BEV market share """
             tec_shares = fleet.add_share.stack().stack().sum(level=['year','tec'])

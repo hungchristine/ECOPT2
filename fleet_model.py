@@ -43,7 +43,7 @@ class FleetModel:
         lightweighting_scenario: whether (how aggressively) LDVs are lightweighted in the experiment
         
     """
-    def __init__(self, veh_stck_int_seg, tec_add_gradient, seg_batt_caps, B_term_prod, B_term_oper_EOL, r_term_factors=0.2, u_term_factors=2025, pkm_scenario='iTEM2_Base', occupancy_rate=1.643, data_from_message=None):
+    def __init__(self, veh_stck_int_seg, tec_add_gradient, seg_batt_caps, B_term_prod, B_term_oper_EOL, r_term_factors=0.2, u_term_factors=2025, pkm_scenario='iTEM2-Base', occupancy_rate=1.643, data_from_message=None):
         self.B_prod = B_term_prod
         self.B_oper = B_term_oper_EOL
         
@@ -69,10 +69,10 @@ class FleetModel:
         """ GAMS-relevant attributes"""
         #  --------------- GAMS sets / domains -------------------------------
         self.tecs = ['ICE','BEV']                               # drivetrain technologies; can include e.g., alternative battery chemistries
-        self.modelyear = [str((2000)+i) for i in range(51)]
+        self.modelyear = [str((2000)+i) for i in range(81)]
         self.inityear=[str(2000+i) for i in range(21)]          # reduce to one/five year(s)? Originally 2000-2020
-        self.cohort = [str((2000-28)+i) for i in range(51+28)]  # vehicle cohorts (production year)
-        self.optyear = [str(2020+i) for i in range(31)]
+        self.cohort = [str((2000-28)+i) for i in range(81+28)]  # vehicle cohorts (production year)
+        self.optyear = [str(2020+i) for i in range(61)]
         self.age = [str(i) for i in range(28)]                  # vehicle age, up to 27 years old
         self.enr = ['ELC','FOS']                                # fuel types; later include H2, 
         self.seg = ['A','B','C','D','E','F']                    # From ACEA: Small, lower medium, upper medium, executive
@@ -155,15 +155,15 @@ class FleetModel:
         VEH_LIFT_AGE(age) = (1 - VEH_LIFT_CDF(age))/sum(agej, VEH_LIFT_CDF(agej)) ;
         VEH_LIFT_MOR(age)$(ord(age)< 20) = 1 - VEH_LIFT_AGE(age+1)/VEH_LIFT_AGE(age);
         VEH_LIFT_MOR(age)$(ord(age)= 20) = 1"""
-        avg_age = 11.1 # From ACEA 2019-2020 report
-        std_dev_age = 2.21
-        self.veh_lift_cdf = pd.Series(norm.cdf(self.age_int,avg_age,std_dev_age),index=self.age)#pd.Series(pd.read_pickle(self.import_fp+'input.pkl'))#pd.DataFrame()  # [age] TODO Is it this one we feed to gams?
+        self.avg_age = 11.1 # From ACEA 2019-2020 report
+        self.std_dev_age = 2.21
+        self.veh_lift_cdf = pd.Series(norm.cdf(self.age_int,self.avg_age,self.std_dev_age),index=self.age)#pd.Series(pd.read_pickle(self.import_fp+'input.pkl'))#pd.DataFrame()  # [age] TODO Is it this one we feed to gams?
         self.veh_lift_cdf.index = self.veh_lift_cdf.index.astype('str')
         
         self.veh_lift_age = pd.Series(1-self.veh_lift_cdf)     # [age] # probability of car of age x to die in current year
         
         #lifetime = [1-self.veh_lift_age[i+1]/self.veh_lift_age[i] for i in range(len(self.age)-1)]
-        self.veh_lift_pdf = pd.Series(calc_steadystate_vehicle_age_distributions(self.age_int,avg_age,std_dev_age), index = self.age)   # idealized age PDF given avg fleet age and std dev
+        self.veh_lift_pdf = pd.Series(calc_steadystate_vehicle_age_distributions(self.age_int,self.avg_age,self.std_dev_age), index = self.age)   # idealized age PDF given avg fleet age and std dev
         self.veh_lift_pdf.index = self.veh_lift_pdf.index.astype('str')
         
         self.veh_lift_mor = pd.Series(calc_probability_of_vehicle_retirement(self.age_int,self.veh_lift_pdf), index = self.age)
@@ -214,13 +214,10 @@ class FleetModel:
         # More detailed age distribution (https://www.acea.be/uploads/statistic_documents/ACEA_Report_Vehicles_in_use-Europe_2018.pdf)"""
 
         self.tec_add_gradient = tec_add_gradient or 0.2
-        self.veh_add_grd = dict()
-        for element in itertools.product(*[self.grdeq,self.tecs]):
-            self.veh_add_grd[element] = self.tec_add_gradient
         
         self.growth_constraint = 0#growth_constraint
         self.gro_cnstrnt = [self.growth_constraint for i in range(len(self.modelyear))]
-        self.gro_cnstrnt = pd.Series(self.gro_cnstrnt,index=self.modelyear)
+        self.gro_cnstrnt = pd.Series(self.gro_cnstrnt, index=self.modelyear)
         self.gro_cnstrnt.index = self.gro_cnstrnt.index.astype('str')
         
         self.enr_partab = pd.read_excel(self.import_fp,sheet_name='ENR_PARTAB',usecols='A:F',index_col=[0,1]).stack()
@@ -667,7 +664,7 @@ class FleetModel:
     def import_from_MESSAGE(self):
         pass
 
-    def vis_GAMS(self,fp,filename):
+    def vis_GAMS(self,fp,filename,max_year=50, cropx=True):
         """ visualize key GAMS parameters for quality checks"""
         """To do: split into input/output visualization; add plotting of CO2 and stocks together"""
 #        ch_path = os.path.dirname(fp)
@@ -677,6 +674,7 @@ class FleetModel:
         
         def fix_age_legend(ax,title='Vehicle ages'):
             patches, labels = ax.get_legend_handles_labels()
+                
             if len(labels)==12:
                 order = [11,9,7,5,3,1,10,8,6,4,2,0]
                 labels = [x+', '+y for x,y in itertools.product(['BEV','ICEV'],['mini','small','medium','large','executive','luxury and SUV'])]
@@ -686,6 +684,11 @@ class FleetModel:
                 ax.legend([patches[idx] for idx in order],[labels[idx] for idx in order],bbox_to_anchor=(1.05,1.02),ncol=2, title=title)
             else:
                 ax.legend(patches,labels,bbox_to_anchor=(1.05,1.02), ncol=2, title=title)
+                
+            if cropx and ax.get_xlim()[1]==80:
+                print('here!')
+                print(ax.get_xlim())
+                ax.set_xlim(right=max_year)
             pp.savefig(bbox_inches='tight')
             
         def plot_subplots(grouped_df,title,labels):
@@ -706,7 +709,11 @@ class FleetModel:
                 fig.suptitle(title)
             ax.legend(labels=labels,bbox_to_anchor=(0.2,-0.3),ncol=2,fontsize='large') 
             return ax
-
+#        
+#        def crop_x(ax,max_year,cropx):
+#            if cropx:
+#                ax.xlim(right=max_year)
+                
         ## Make paired colormap for comparing tecs
         paired = LinearSegmentedColormap.from_list('paired',colors=['indigo','thistle','mediumblue','lightsteelblue','darkgreen','yellowgreen','olive','lightgoldenrodyellow','darkorange','navajowhite','darkred','salmon'],N=12)
         paired_tec = LinearSegmentedColormap.from_list('paired_by_tec',colors=['indigo','mediumblue','darkgreen','olive','darkorange','darkred','thistle','lightsteelblue','yellowgreen','lightgoldenrodyellow','navajowhite','salmon'],N=12)
@@ -717,6 +724,8 @@ class FleetModel:
         """--- Plot total stocks by age, technology, and segment---"""   
         fig, axes = plt.subplots(4,3, figsize=(12,12), sharey=True,sharex=True)
         plt.ylim(0,np.ceil(self.stock_df_plot.sum(axis=1).max()/5e7)*5e7)
+        if cropx:
+            plt.xlim(right=max_year)
         
         for (key, ax) in zip(self.stock_df_plot_grouped.groups.keys(), axes.flatten()):
             #print(key)
@@ -785,7 +794,9 @@ class FleetModel:
 
         ax1.set_ylabel('Lifecycle climate emissions \n Mt $CO_2$-eq',fontsize=13)
         ax2.set_ylabel('Vehicles, millions',fontsize=13,labelpad=25)
-        
+        if cropx:
+            ax1.set_xlim(right=max_year)
+            ax2.set_xlim(right=max_year)
 #        patches, labels = ax1.get_legend_handles_labels()
 #        order = [5,3,1,4,2,0]
 #        ax1.legend([patches[idx] for idx in order],[labels[idx] for idx in order],loc=1, fontsize=12)
@@ -806,6 +817,8 @@ class FleetModel:
         plt.hlines(442,xmin=0.16,xmax=0.6, linestyle='dotted',color='darkslategrey',label='EU 2030 target, \n 20% reduction from 2008 emissions',transform=ax.get_yaxis_transform())
         plt.hlines(185,xmin=0.6,xmax=1,linestyle='-.',color='darkslategrey',label='EU 2050 target, \n 60% reduction from 1990 emissions',transform=ax.get_yaxis_transform())
         plt.ylabel('Fleet operation emissions \n Mt $CO_2$-eq')
+        if cropx:
+            plt.xlim(right=max_year)
         handles, labels = ax.get_legend_handles_labels()
         ax.legend(handles,['ICEV','BEV','EU 2030 target, \n20% reduction from 2008 emissions','EU 2050 target, \n60% reduction from 1990 emissions'],bbox_to_anchor = (1.05,1.02))#loc=1
         pp.savefig(bbox_inches='tight')
@@ -833,7 +846,9 @@ class FleetModel:
         #ax = self.stock_df_plot.sum(level=2).plot.barh()
         """--- Plot total stocks by age and technology ---"""
 #        ax = self.stock_df_plot.loc['BEV'].sum(level=1).plot(kind='area',cmap='Spectral_r',title='BEV stocks by age')
-        ax = (self.stock_cohort.iloc[:,48:].loc['BEV'].loc['2020':]/1e6).plot(kind='bar',stacked=True,width=1,cmap='Spectral',title='BEV stock by cohort')
+#        ax = (self.stock_cohort.iloc[:,48:].loc['BEV'].loc['2020':'2050']/1e6).plot(kind='bar',stacked=True,width=1,cmap='Spectral',title='BEV stock by cohort')
+        ax = (self.stock_cohort/1e6).loc['BEV'].loc['2020':'2050'].plot(kind='bar',stacked=True,width=1,cmap='Spectral',title='BEV stock by cohort')
+
         ax.xaxis.set_major_locator(MultipleLocator(5))
         ax.set_xticklabels([2015,2020,2025,2030,2035,2040,2045,2050])
         plt.ylabel('BEV stock, in millions of vehicles')
@@ -841,7 +856,7 @@ class FleetModel:
         fix_age_legend(ax,title='Vehicle cohort')
         
 #        ax = (self.stock_cohort.iloc[:,48:].loc['ICE'].loc['2020':]/1e6).plot(kind='bar',stacked=True,width=1,cmap='Spectral',title='ICEV stock by cohort')
-        ax = (self.stock_cohort.loc['ICE']/1e6).plot(kind='bar',stacked=True,width=1,cmap='Spectral',title='ICEV stock by cohort')
+        ax = (self.stock_cohort.loc['ICE']/1e6).loc[:'2050'].plot(kind='bar',stacked=True,width=1,cmap='Spectral',title='ICEV stock by cohort')
         ax.xaxis.set_major_locator(MultipleLocator(10))
         ax.set_xticklabels([1995,2000,2010,2020,2030,2040,2050])
 #        ax.set_xticklabels([2015,2020,2025,2030,2035,2040,2045,2050])
@@ -925,6 +940,9 @@ class FleetModel:
         
         fig = (self.enr_cint*1000).unstack('enr').plot(title='ENR_CINT')
         plt.ylabel('Emissions intensity, fuels \n g CO2-eq/kWh')
+        if cropx:
+            plt.xlim(right=max_year)
+            
         pp.savefig(bbox_inches='tight')
 
         """kept commented"""       
