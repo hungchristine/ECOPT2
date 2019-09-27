@@ -106,8 +106,8 @@ def run_experiment():
 
         # Make run ID
         now = datetime.now().isoformat(timespec='minutes').replace(':','_')
-        run_id = f'run_{tec_add_gradient[0]}_{seg_batt_caps[0]}_{B_term_prod[0]}_{B_term_oper_EOL[0]}_{r_term_factors[0]}_{u_term_factors[0]}_{pkm_scenario[1]}' #'_{seg_batt_caps[0]}'
-        run_tag = run_id + now
+        run_id = f'{tec_add_gradient[0]}_{seg_batt_caps[0]}_{B_term_prod[0]}_{B_term_oper_EOL[0]}_{r_term_factors[0]}_{u_term_factors[0]}_{pkm_scenario[1]}' #'_{seg_batt_caps[0]}'
+        run_tag = 'run_'+run_id + now
         run_id_list.append(run_id)
 
         # run_id = f'run_{i}'  # alternate format
@@ -148,7 +148,7 @@ def run_experiment():
 
         # Pickle the scenario fleet object
         os.chdir(fp)
-        with open('run_'+run_tag+'.pkl','wb') as f:
+        with open(run_tag+'.pkl','wb') as f:
             pickle.dump(fm,f)
             
         fm.vis_GAMS(fp,run_id)
@@ -167,7 +167,7 @@ def run_experiment():
             },
             'output': {
 #                'totc': 42,   # life, the universe, and everything…
-                 'first year of 100% BEV market share': fm.full_BEV_year,
+                 'first year otimef 100% BEV market share': fm.full_BEV_year,
                  'totc': fm.totc,
                  'BEV shares in 2030': fm.shares_2030.loc[:,'BEV'].to_string()
 #                 'totc in optimization period':fm.totc_opt # collect these from all runs into a dataframe...ditto with shares of BEV/ICE
@@ -199,6 +199,11 @@ def run_experiment():
             stock_comp = pd.DataFrame(fm.veh_stck)
         else:
             stock_comp[run_id] = fm.veh_stck
+        
+        try:
+            int(fm.full_BEV_year)
+        except:
+            pass
         
         full_BEV_yr_list.append(fm.full_BEV_year)
         totc_list.append(fm.totc_opt)
@@ -236,7 +241,19 @@ with pd.ExcelWriter('cumulative_scenario_output'+now+'.xlsx') as writer:
     full_BEV_yr.to_excel(writer,sheet_name='1st_year_full_BEV')
     scenario_totcs.to_excel(writer,sheet_name='totc')
    
-full_BEV_yr.plot()
+pp = PdfPages('cumulative_run_vis_'+now+'.pdf')
+
+ax = plt.scatter(full_BEV_yr,run_id_list)
+ax.axes.set_xbound(lower=2020,upper=2050)
+pp.savefig(bbox_inches='tight')
+
+
+shares_2030.groupby('tec').plot(kind='bar',cmap='viridis')
+pp.savefig(bbox_inches='tight')
+shares_2050.groupby('tec').plot(kind='bar',cmap='viridis')
+pp.savefig(bbox_inches='tight')
+
+pp.close()
 
  
 #        bounds = ['high','baseline','low']
