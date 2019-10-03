@@ -19,6 +19,8 @@ import itertools
 import gams
 import gmspy
 
+import fleet_model
+
 class GAMSRunner:
     def __init__(self):
         """ Optimization Initialization """
@@ -123,7 +125,18 @@ class GAMSRunner:
         fleet.fleet_vkm = fleet.passenger_demand/fleet.occupancy_rate
         fleet.veh_oper_dist = fleet.fleet_vkm/fleet.veh_stck_tot
         
-#        fleet.veh_partab = fleet.build_veh_partab(seg_batt_caps,B_term_prod,B_term_oper_EOL,r_term_factors,u_term_factors)#.stack()
+        """ recalculate age functions"""
+        fleet.veh_lift_cdf = pd.Series(norm.cdf(fleet.age_int,fleet.avg_age,fleet.std_dev_age),index=fleet.age)#pd.Series(pd.read_pickle(fleet.import_fp+'input.pkl'))#pd.DataFrame()  # [age] TODO Is it this one we feed to gams?
+        fleet.veh_lift_cdf.index = fleet.veh_lift_cdf.index.astype('str')
+        
+        fleet.veh_lift_age = pd.Series(1-fleet.veh_lift_cdf)     # [age] # probability of car of age x to die in current year
+        
+        #lifetime = [1-fleet.veh_lift_age[i+1]/fleet.veh_lift_age[i] for i in range(len(fleet.age)-1)]
+        fleet.veh_lift_pdf = pd.Series(fleet_model.calc_steadystate_vehicle_age_distributions(fleet.age_int,fleet.avg_age,fleet.std_dev_age), index = fleet.age)   # idealized age PDF given avg fleet age and std dev
+        fleet.veh_lift_pdf.index = fleet.veh_lift_pdf.index.astype('str')
+        
+        fleet.veh_lift_mor = pd.Series(fleet_model.calc_probability_of_vehicle_retirement(fleet.age_int,fleet.veh_lift_pdf), index = fleet.age)
+        fleet.veh_lift_mor.index = fleet.veh_lift_mor.index.astype('str')
             
     def run_GAMS(self, fleet, filename):
         # Pass to GAMS all necessary sets and parameters

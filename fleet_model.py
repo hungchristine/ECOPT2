@@ -664,13 +664,15 @@ class FleetModel:
     def import_from_MESSAGE(self):
         pass
 
-    def vis_GAMS(self,fp,filename,max_year=50, cropx=True):
+    def vis_GAMS(self,fp,filename,max_year=50, cropx=True,suppress_vis=False):
         """ visualize key GAMS parameters for quality checks"""
         """To do: split into input/output visualization; add plotting of CO2 and stocks together"""
 #        ch_path = os.path.dirname(fp)
         os.chdir(fp)
         pp = PdfPages('output_vis_'+filename+'.pdf')
         plt.rcParams.update({'figure.max_open_warning': 0}) # suppress max 20 figures warning
+        if suppress_vis:
+            plt.ioff()
         
         def fix_age_legend(ax,title='Vehicle ages'):
             patches, labels = ax.get_legend_handles_labels()
@@ -686,8 +688,6 @@ class FleetModel:
                 ax.legend(patches,labels,bbox_to_anchor=(1.05,1.02), ncol=2, title=title)
                 
             if cropx and ax.get_xlim()[1]==80:
-                print('here!')
-                print(ax.get_xlim())
                 ax.set_xlim(right=max_year)
             pp.savefig(bbox_inches='tight')
             

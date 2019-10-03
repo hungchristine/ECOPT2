@@ -16,6 +16,12 @@ from datetime import datetime
 import yaml
 import pandas as pd
 
+
+import matplotlib
+import matplotlib.pyplot as plt
+from matplotlib.ticker import (MultipleLocator, FormatStrFormatter, AutoMinorLocator)
+from matplotlib.backends.backend_pdf import PdfPages
+
 import pickle
 import os
 
@@ -169,8 +175,8 @@ def run_experiment():
 #                'totc': 42,   # life, the universe, and everything…
                  'first year of 100% BEV market share': fm.full_BEV_year,
                  'totc': fm.totc,
-                 'BEV shares in 2030': fm.shares_2030.loc[:,'BEV'].to_string()
-#                 'totc in optimization period':fm.totc_opt # collect these from all runs into a dataframe...ditto with shares of BEV/ICE
+                 'BEV shares in 2030': fm.shares_2030.loc[:,'BEV'].to_string(),
+                 'totc in optimization period':fm.totc_opt # collect these from all runs into a dataframe...ditto with shares of BEV/ICE
             }
         }
         
@@ -219,7 +225,11 @@ fleet,run_id_list, shares_2030, shares_2050, add_share, stock_comp, full_BEV_yr_
 
 
 full_BEV_yr = pd.DataFrame(full_BEV_yr_list,index = run_id_list)
+
 scenario_totcs = pd.DataFrame(totc_list, index=run_id_list)
+scenario_totcs = pd.DataFrame(totc_list, index = run_id_list, columns=['totc_opt'])
+scenario_totcs['Abs. difference from totc_opt'] = default_totc_opt - scenario_totcs['totc_opt']
+scenario_totcs['%_change_in_totc_opt'] = scenario_totcs['totc_opt']/default_totc_opt  
 
 # Export potentially helpful output for analyzing across scenarios
 with open('run_'+now+'.pkl', 'wb') as f:

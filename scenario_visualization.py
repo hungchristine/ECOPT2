@@ -31,6 +31,7 @@ import os
 fp = r'C:\Users\chrishun\Box Sync\YSSP_temp\visualization output\Run_2019-09-27T19_37\Sensitivity_analysis'
 
 os.chdir(fp)
+now = datetime.now().isoformat(timespec='minutes').replace(':','_')
 
 
 def fix_legend(ax,title='Vehicle ages'):
@@ -97,6 +98,15 @@ def fix_legend(ax,title='Vehicle ages'):
 #    scenariot_tots.to_excel(writer,sheet_name='totc_opt1')
 ##    default_fleet.__getattribute__('veh_partab').to_excel(writer,sheet_name='orig_vehpartab')
 
+with open('sensitivity_analysis_2019-09-29T20_24.pkl','rb') as f:
+    new = pickle.load(f)
+    
+shares_2030=new[0]
+shares_2050=new[1]
+add_share = new[2]
+stock_comp = new[3]
+full_BEV_yr = new[4]
+
 
 """Visualization code assumes that sensitivity analysis has just been run """
 """Prepwork for baseline comparisons"""
@@ -113,16 +123,16 @@ for i,df in shares_2050.groupby('tec'):
     if i=='BEV':
         shares_2050_BEV = df
         e=default_fleet.__getattribute__('shares_2050')
-        shares_2050_BEV['baseline']=d[d.index.get_level_values('tec').isin(['BEV'])]
+        shares_2050_BEV['baseline']=e[e.index.get_level_values('tec').isin(['BEV'])]
 
 
 keys = shares_2030_BEV.columns.to_list()
-values = ['avg veh lifetime',
+values = ['average veh lifetime',
  'std dev veh lifetime',
  'market increase constraint',
  'occupancy rate',
  'passenger demand',
- 'veh stck tot',
+ 'total vehicle stock',
  'EOL emissions, BEV, u',
  'EOL emissions, BEV, A',
  'EOL emissions, BEV, B',
@@ -155,61 +165,69 @@ values = ['avg veh lifetime',
  'Production energy req., ICE, A',
  'Production energy req., ICE, B',
  'Production energy req., ICE, r',
- 'Electricity CO2 intensity, CINT, u',
- 'Electricity CO2 intensity, CINT, A',
- 'Electricity CO2 intensity, CINT, B',
- 'Electricity CO2 intensity, CINT, r',
- 'Fossil fuel CO2 intensity, CINT, u',
- 'Fossil fuel CO2 intensity, CINT, A',
- 'Fossil fuel CO2 intensity, CINT, B',
- 'Fossil fuel CO2 intensity, CINT, r']
+ 'Electricity CO2 intensity, u',
+ 'Electricity CO2 intensity, A',
+ 'Electricity CO2 intensity, B',
+ 'Electricity CO2 intensity, r',
+ 'Fossil fuel CO2 intensity, u',
+ 'Fossil fuel CO2 intensity, A',
+ 'Fossil fuel CO2 intensity, B',
+ 'Fossil fuel CO2 intensity, r']
 
 scen_names = dict(zip(keys,values))
 
 # Fix names of scenarios in the dataframes
 
 # First, fix mislabelled columns (this should be temporary)
-stock_comp.rename(columns={'level':'avg_age_sensitivity','levelc':'EOLT_CINT_BEV_u-term'},inplace=True)
+stockcomp_plot.rename(index={'level':'avg_age_sensitivity','levelc':'EOLT_CINT_BEV_u-term'},inplace=True)
 
 shares_2030_BEV.rename(columns=scen_names,inplace=True)
 shares_2050_BEV.rename(columns=scen_names,inplace=True)
 
-stock_comp.rename(columns=scen_names,inplace=True)
+stockcomp_plot.rename(index=scen_names,inplace=True)
 scenario_totcs.rename(index=scen_names,inplace=True)
+full_BEV_yr.rename(index=scen_names,inplace=True)
 
+font = {'size'   : 12}	
+matplotlib.rc('font', **font)
 
-pp = PdfPages('sensitivity_vis_'+now+'.pdf')
+pp = PdfPages('sensitivity_results_vis_'+now+'.pdf')
 fig=plt.subplots(1,1,figsize=(9,18))
 
 run_id_list2 = full_BEV_yr.index.values
-ax = plt.scatter(full_BEV_yr,run_id_list2)
+ax = plt.scatter(full_BEV_yr,run_id_list2,zorder=10)
+ax.axes.margins(y=0.01)
+ax.axes.grid(axis='y',color='lightgrey',linestyle=':')
 ax.axes.set_xbound(lower=2020,upper=2050)
+ax.axes.set_ylabel('Perturbed parameter',labelpad=5)
+ax.axes.set_xlabel('First year of 100% market share for BEVs',labelpad=5)
+
 pp.savefig(bbox_inches='tight')
 
 # Make custom colormap for vehicle shares, by scenarios
-#colors1 = plt.cm.Greys(np.linspace(0., 1, 6))
-#colors2 = plt.cm.BuGn(np.linspace(0, 1, 8))
-#colors3 = plt.cm.BuPu(np.linspace(0., 1, 8))
-#colors4 = plt.cm.YlGn_r(np.linspace(0, 1, 8))
-#colors5 = plt.cm.YlOrBr(np.linspace(0., 1, 8))
-#colors6 = plt.cm.Reds(np.linspace(0, 1, 8))
-
-colors1 = plt.cm.Greys(np.linspace(0., 1, 6))
-colors2 = plt.cm.Red(np.linspace(0, 1, 8))
-colors3 = plt.cm.BuPu(np.linspace(0., 1, 8))
-colors4 = plt.cm.YlGn_r(np.linspace(0, 1, 8))
-colors5 = plt.cm.YlOrBr(np.linspace(0., 1, 8))
-colors6 = plt.cm.Reds(np.linspace(0, 1, 8))
-colors = np.vstack((colors1, colors2,colors3,colors4,colors5,colors6))
-
-scen_cmap = mcolors.LinearSegmentedColormap.from_list('my_colormap', colors)
-#Make custom colormap for vehicle shares, by sinusoidal terms
 colors1 = plt.cm.Greys(np.linspace(0., 1, 6))
 colors2 = plt.cm.BuGn(np.linspace(0, 1, 8))
 colors3 = plt.cm.BuPu(np.linspace(0., 1, 8))
 colors4 = plt.cm.YlGn_r(np.linspace(0, 1, 8))
 colors5 = plt.cm.YlOrBr(np.linspace(0., 1, 8))
 colors6 = plt.cm.Reds(np.linspace(0, 1, 8))
+
+#colors1 = plt.cm.Greys(np.linspace(0., 1, 6))
+#colors2 = plt.cm.Red(np.linspace(0, 1, 8))
+#colors3 = plt.cm.BuPu(np.linspace(0., 1, 8))
+#colors4 = plt.cm.YlGn_r(np.linspace(0, 1, 8))
+#colors5 = plt.cm.YlOrBr(np.linspace(0., 1, 8))
+#colors6 = plt.cm.Reds(np.linspace(0, 1, 8))
+#colors = np.vstack((colors1, colors2,colors3,colors4,colors5,colors6))
+
+scen_cmap = mcolors.LinearSegmentedColormap.from_list('my_colormap', colors)
+#Make custom colormap for vehicle shares, by sinusoidal terms
+#colors1 = plt.cm.Greys(np.linspace(0., 1, 6))
+#colors2 = plt.cm.BuGn(np.linspace(0, 1, 8))
+#colors3 = plt.cm.BuPu(np.linspace(0., 1, 8))
+#colors4 = plt.cm.YlGn_r(np.linspace(0, 1, 8))
+#colors5 = plt.cm.YlOrBr(np.linspace(0., 1, 8))
+#colors6 = plt.cm.Reds(np.linspace(0, 1, 8))
 
 colors = np.vstack((colors1, colors2,colors3,colors4,colors5,colors6))
 
@@ -223,17 +241,30 @@ scen_cmap = mcolors.LinearSegmentedColormap.from_list('my_colormap', colors)
 # Normalize market share datafraes for easier visualization
 shares_2030_plot = shares_2030_BEV.divide(shares_2030_BEV.loc[:,'baseline'],axis='index')
 shares_2050_plot = shares_2050_BEV.divide(shares_2050_BEV.loc[:,'baseline'],axis='index')
+
 #stockcomp_plot = stock_comp.sum(level=[0,1]).T
 stockcomp_plot = stockcomp_plot.divide(stockcomp_plot.loc['Baseline'].sum(),level=0)
         
 ax = shares_2030_plot.plot(kind='bar',cmap='Dark2', figsize=(12,12),width=0.95)
 ## OBS: FIX THIS TO BE RELATIVE TO MINIMUM
-ax.axes.set_ybound(lower=0.95,upper=1.05)
-fix_legend(ax,'2030 market shares')
+ax.axes.set_ybound(lower=0.98,upper=1.02)
+plt.ylabel('Change in BEV market shares in 2030 by segment, \n relative to baseline scenario',labelpad=5)
+locs,labels=plt.xticks()
+plt.xticks(locs,labels=['mini','small','medium','large','executive','luxury and SUV'],rotation='horizontal')
+plt.xlabel('Vehicle segment',labelpad=5)
+plt.grid(axis='y', color='lightgrey',linestyle=':',which='both')
+fix_legend(ax,'Perturbed parameters')
 pp.savefig(bbox_inches='tight')
 
-ax = shares_2050_plot.plot(kind='bar',cmap='Dark2',figsize=(12,12))
-fix_legend(ax,'2050 market shares')
+ax = shares_2050_plot.plot(kind='bar',cmap='Dark2',figsize=(12,12),width=0.95)
+## OBS: FIX THIS TO BE RELATIVE TO MINIMUM
+ax.axes.set_ybound(lower=0.98,upper=1.02)
+plt.ylabel('Change in BEV market shares in 2050 by segment, \n relative to baseline scenario',labelpad=5)
+locs,labels=plt.xticks()
+plt.xticks(locs,labels=['mini','small','medium','large','executive','luxury and SUV'],rotation='horizontal')
+plt.xlabel('Vehicle segment',labelpad=5)
+plt.grid(axis='y', color='lightgrey',linestyle=':',which='both')
+fix_legend(ax,'Perturbed parameters')
 pp.savefig(bbox_inches='tight')
 
 # Make custom colormap for stock composition
@@ -245,12 +276,20 @@ colors = np.vstack((colors1, colors2))
 
 mymap = mcolors.LinearSegmentedColormap.from_list('my_colormap', colors)
 
-stockcomp_plot.plot(kind='bar',stacked=True,width=1,figsize=(18,8),cmap=mymap)
+stockcomp_plot.plot(kind='bar',stacked=True,width=0.95,figsize=(18,8),cmap=mymap)
+plt.ylabel('Change in technology and segment stocks \n relative to baseline scenario',labelpad=5)
+plt.xlabel('Perturbed parameter',labelpad=5)
 #stock_comp.sum(level=[0,1]).T.plot(kind='bar',stacked=True,width=1,figsize=(18,8),cmap=mymap)
 pp.savefig(bbox_inches='tight')
 
 fig=plt.subplots(1,1,figsize=(8,18))
-plt.scatter(x=scenario_totcs.iloc[:,2],y=scenario_totcs.index.values)
-#pp.savefig(bbox_inches='tight')
+plt.scatter(x=scenario_totcs.iloc[:,2],y=scenario_totcs.index.values,zorder=10)
+plt.margins(y=0.01)
+plt.grid(axis='y',color='lightgrey',linestyle=':')
+xmin, xmax, ymin, ymax = plt.axis()
+plt.vlines(x=1,ymin=ymin,ymax=ymax,color='darkgrey',zorder=2)
+plt.xlabel('Change in total CO2 emissions \n relative to baseline scenario',labelpad=5)
+plt.ylabel('Perturbed parameter',labelpad=5)
+pp.savefig(bbox_inches='tight')
 
-            
+pp.close()
