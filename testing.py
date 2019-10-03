@@ -8,12 +8,23 @@ import logging
 import sys
 
 import fleet_model
+import gams_runner
 #import sigmoid
 #import test_gams
 from itertools import product
 from datetime import datetime
 import yaml
 import pandas as pd
+
+
+import matplotlib
+import matplotlib.pyplot as plt
+from matplotlib.ticker import (MultipleLocator, FormatStrFormatter, AutoMinorLocator)
+from matplotlib.backends.backend_pdf import PdfPages
+
+import pickle
+import os
+
 """
 #fleet.read_all_sets("C:\\Users\\chrishun\\Box Sync5\\YSSP_temp\\EVD4EUR_input.gdx")
 #fleet.add_to_GAMS()
@@ -46,9 +57,19 @@ log = logging.getLogger(__name__)
 # Make output YAML less ugly, see https://stackoverflow.com/a/30682604
 yaml.SafeDumper.ignore_aliases = lambda *args: True
 
+# Make timestamp and directory for scenario run results for output files
+now = datetime.now().isoformat(timespec='minutes').replace(':','_')
+fp = r'C:\Users\chrishun\Box Sync\YSSP_temp\visualization output\Run_'+now
+
+try:
+    os.mkdir(fp)
+    os.chdir(fp)
+except:
+    print("cannot make folder!")
+        
 def run_experiment():
     # Load parameter values from YAML
-    with open('temp_input.yaml', 'r') as stream:
+    with open(r'C:\Users\chrishun\Box Sync\YSSP_temp\temp_input.yaml', 'r') as stream:
         try:
             params = yaml.safe_load(stream)
             print('finished')
@@ -65,19 +86,34 @@ def run_experiment():
     id_and_value = [params[p].items() for p in param_names]
     # NB could also change the names here
     
+    # Calculate total number of runs
+    count = 1
+    for x in params:
+        temp = len(params[x])
+        #temp += len(id_and_value[x])
+        count = temp * count
+        
     shares_2030 = None
+    shares_2050 = None
+    add_share = None
+    stock_comp = None
+    fleet_dict = {}
     run_id_list = []
+    totc_list = []
     full_BEV_yr_list = []
     
+    gams_run = gams_runner.GAMSRunner()
+
+    
     for i, run_params in enumerate(product(*id_and_value)):
-        # Same order as in param_names. Each is a tuple of (id, values)
+        print('Starting run '+str(i+1)+' of '+str(count)+'\n\n')
 #        veh_seg_shr, tec_add_gradient, seg_batt_caps = run_params
         veh_stck_int_seg, tec_add_gradient, seg_batt_caps, B_term_prod, B_term_oper_EOL, r_term_factors, u_term_factors, pkm_scenario = run_params
 
         # Make run ID
         now = datetime.now().isoformat(timespec='minutes').replace(':','_')
-        run_id = f'run_{tec_add_gradient[0]}_{seg_batt_caps[0]}_{pkm_scenario[1]}' #'_{seg_batt_caps[0]}'
-        run_tag = run_id+now
+        run_id = f'run_{tec_add_gradient[0]}_{seg_batt_caps[0]}_{B_term_prod[0]}_{B_term_oper_EOL[0]}_{r_term_factors[0]}_{u_term_factors[0]}_{pkm_scenario[1]}' #'_{seg_batt_caps[0]}'
+        run_tag = run_id + now
         run_id_list.append(run_id)
 
         # run_id = f'run_{i}'  # alternate format
@@ -105,9 +141,10 @@ def run_experiment():
                                     pkm_scenario = pkm_scenario[1])#,
 #                                    growth_constraint = growth_constraint[1])
         
-        fm.run_GAMS(run_tag)
+        """fm.run_GAMS(run_tag)"""
+        gams_run.run_GAMS(fm,run_tag)
 
-        exceptions = fm.db.get_database_dvs()
+        exceptions = gams_run.db.get_database_dvs()
         if len(exceptions) > 1:
             print(exceptions[0].symbol.name)
             dunno = exceptions[0].symbol_dvs
@@ -115,7 +152,12 @@ def run_experiment():
             dunno2 = exceptions[0].symbol
             print(fm.db.number_symbols)
 
-        fm.vis_GAMS(run_id)
+        # Pickle the scenario fleet object
+        os.chdir(fp)
+        with open('run_'+run_tag+'.pkl','wb') as f:
+            pickle.dump(fm,f)
+            
+        fm.vis_GAMS(fp,run_id)
         
         # Save log info
         info[run_tag] = {
@@ -133,38 +175,80 @@ def run_experiment():
 #                'totc': 42,   # life, the universe, and everything…
                  'first year of 100% BEV market share': fm.full_BEV_year,
                  'totc': fm.totc,
-                 'BEV shares in 2030': fm.shares_2030.loc[:,'BEV'].to_string()
-#                 'totc in optimization period':fm.totc_opt # collect these from all runs into a dataframe...ditto with shares of BEV/ICE
+                 'BEV shares in 2030': fm.shares_2030.loc[:,'BEV'].to_string(),
+                 'totc in optimization period':fm.totc_opt # collect these from all runs into a dataframe...ditto with shares of BEV/ICE
             }
         }
         
             # Save pertinent info to compare across scenarios in dataframe
         fm.shares_2030.name = run_id
+        fm.shares_2050.name = run_id
+        fm.add_share.name = run_id
+        fm.veh_stck.name = run_id
+        
         if shares_2030 is None:
             shares_2030 = pd.DataFrame(fm.shares_2030)
         else:
             shares_2030[run_id] = fm.shares_2030
-            
+        
+        if shares_2050 is None:
+            shares_2050 = pd.DataFrame(fm.shares_2050)
+        else:
+            shares_2050[run_id] = fm.shares_2050   
+        
+        if add_share is None:
+            add_share = pd.DataFrame(fm.add_share.stack().stack())
+        else:
+            add_share[run_id] = fm.add_share.stack().stack()
+        
+        if stock_comp is None:
+            stock_comp = pd.DataFrame(fm.veh_stck)
+        else:
+            stock_comp[run_id] = fm.veh_stck
+        
         full_BEV_yr_list.append(fm.full_BEV_year)
+        totc_list.append(fm.totc_opt)
 
         # Display the info for this run
         log.info(repr(info[run_tag]))
+        print('\n\n\n ********** End of run ' + str(i+1)+ ' ************** \n\n\n')
 
     # Write log to file
-    now = datetime.now().isoformat(timespec='seconds').replace(':','_')
     with open(f'output_{now}.yaml', 'w') as f:
         yaml.safe_dump(info, f)
     
-    return fm, shares_2030, run_id_list, full_BEV_yr_list
+    return fm, run_id_list, shares_2030,  shares_2050, add_share, stock_comp, full_BEV_yr_list, totc_list#, fleet_dict
 
-shares_2030 = pd.DataFrame()
-full_BEV_years = pd.DataFrame()
 
-fleet,shares_2030,run_id_list, full_BEV_yr_list = run_experiment()
-shares_2030.plot(kind='bar')
+""" Run the full experiment """
+fleet,run_id_list, shares_2030, shares_2050, add_share, stock_comp, full_BEV_yr_list, totc_list = run_experiment()
+
+
 full_BEV_yr = pd.DataFrame(full_BEV_yr_list,index = run_id_list)
+
+scenario_totcs = pd.DataFrame(totc_list, index=run_id_list)
+scenario_totcs = pd.DataFrame(totc_list, index = run_id_list, columns=['totc_opt'])
+scenario_totcs['Abs. difference from totc_opt'] = default_totc_opt - scenario_totcs['totc_opt']
+scenario_totcs['%_change_in_totc_opt'] = scenario_totcs['totc_opt']/default_totc_opt  
+
+# Export potentially helpful output for analyzing across scenarios
+with open('run_'+now+'.pkl', 'wb') as f:
+    pickle.dump([shares_2030, shares_2050, add_share, stock_comp, full_BEV_yr, scenario_totcs], f)
+"""with open('run_2019-09-22T14_50.pkl','rb') as f:
+    d=pickle.load(f)
+d[0][run_id_list[0]].add_share"""
+
+with pd.ExcelWriter('cumulative_scenario_output'+now+'.xlsx') as writer:
+    shares_2030.to_excel(writer,sheet_name='tec_shares_in_2030')
+    shares_2050.to_excel(writer,sheet_name='tec_shares_in_2050')
+    add_share.to_excel(writer,sheet_name='add_shares')
+    stock_comp.to_excel(writer,sheet_name='total_stock')
+    full_BEV_yr.to_excel(writer,sheet_name='1st_year_full_BEV')
+    scenario_totcs.to_excel(writer,sheet_name='totc')
+   
 full_BEV_yr.plot()
 
+ 
 #        bounds = ['high','baseline','low']
 
 #    for element in itertools.product(experiment_list,bounds):

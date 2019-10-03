@@ -32,6 +32,11 @@ def list2set(db, var, name, comment='', verbose=True):
     a_set : GamsSet instance
 
     """
+    
+    ### Try something like:
+    ## if isinstance(db.get_symbol(name), GamsSet):
+    ##  db.merge_record(name)
+    ## else:
     a_set = db.add_set(name, 1, comment)
     try:
         for v in var:
@@ -266,6 +271,39 @@ def var2df(name, db=None, ws=None, gdx_filepath=None):
     df = df.unstack()
     return df
 
+def eq2series(name, db=None, ws=None, gdx_filepath=None):
+    """
+    Read in a equation from a GAMS database or gdx file
+
+    Parameters
+    ----------
+    name: str
+        Name of Gams Equation
+    db : Gams Database or None
+        If available, read from this pre-existing database
+    ws : Gams WorkSpace or None
+        If available, use that workspace to read a gdx file, otherwise generate one
+    gdx_filepath : string or None
+        Path to gdx file,
+
+    Returns
+    -------
+    Pandas Series
+        Series holding the values of the variable, with row indexes potentially multiindex
+
+    See Also
+    --------
+    var2series
+    """
+    # Sort out database access or file reading
+    db = _iwantitall(db, ws, gdx_filepath)
+        
+    # Read in data and recast as Pandas Series
+    data = dict((tuple(rec.keys), rec.marginal) for rec in db[name])
+    df = pd.Series(data)
+    df.index.rename(db[name].domains_as_strings,inplace=True)
+    df = df.unstack()
+    return df
 
 def _iwantitall(db, ws, gdx_filepath):
     """ Internal method to read a pre-existing database, or setup one to read a gdx file
