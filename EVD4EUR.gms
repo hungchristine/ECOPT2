@@ -77,8 +77,11 @@ grdeq           parameters for gradient of change (fleet additions) - individual
 
 ** Load sets defined in Python class
 *$gdxin C:\Users\chrishun\Box Sync\YSSP_temp\run_slow_baseline_def_def_def_def_iTEM2_Base2019-09-24T12_50_input.gdx
+*$gdxin C:\Users\chrishun\Box Sync\YSSP_temp\run_def_baseline_def_def_def_def_iTEM2-Base2019-10-04T18_47_input.gdx
+
 $if not set gdxincname $abort 'no include file name for data file provided'
 $gdxin %gdxincname%
+
 *$GDXIN 'troubleshooting_params'
 $LOAD year
 $LOAD modelyear
@@ -170,7 +173,7 @@ INIT_TEC(tec)
 INIT_AGE(age)
 SEG_TEC(seg,tec)
 SEG_TEC_AGE(seg,tec,age)
-*BEV_CAPAC(seg)                  Correspondence of battery capacities used in each segment
+BEV_CAPAC(seg)                  Correspondence of battery capacities used in each segment
 
 **DEMAND --------------------
 
@@ -192,10 +195,11 @@ VEH_STCK_INT_TEC(tec)            Initial share of vehicles in stock tech
 VEH_STCK_INT_SEG(seg)            Initial stock distribution by segment
 VEH_STCK_INT(tec,seg,age)        Initial size of stock of vehicles by age cohort and segment
 
-** GRADIENT OF CHANGE -------
+** CONSTRAINTS -------
 VEH_ADD_GRD(grdeq,tec)           Parameter for gradient of change constraint (fleet additions) - individual (IND) for each tech or related to all tech (ALL)
 *VEH_SEG_SHR(seg)                 Parameter for segment share minimums in fleet
 GRO_CNSTRNT(year)                Segment growth rate constraint relative to stock additions
+* MANUF_CNSTRNT(year)             Annual manufacturing capacity (for batteries destined for Europe), in MWh
 ;
 
 
@@ -225,9 +229,11 @@ $GDXIN 'EVD4EUR_input'
 $GDXIN
 
 * Load in parameter values defined in Python class
-$if not set gdxincname $abort 'no include file name for data file provided'
+*$gdxin C:\Users\chrishun\Box Sync\YSSP_temp\run_def_baseline_def_def_def_def_iTEM2-Base2019-10-04T18_47_input.gdx
 *$gdxin C:\Users\chrishun\Box Sync\YSSP_temp\run_slow_baseline_def_def_def_def_iTEM2_Base2019-09-24T12_50_input.gdx
+
 $gdxin %gdxincname%
+$if not set gdxincname $abort 'no include file name for data file provided'
 
 $LOAD YEAR_PAR
 $LOAD VEH_PARTAB
@@ -253,7 +259,7 @@ $LOAD VEH_STCK_INT_TEC
 $LOAD VEH_STCK_INT_SEG
 
 $LOAD VEH_STCK_INT
-*$LOAD BEV_CAPAC
+$LOAD BEV_CAPAC
 $LOAD VEH_ADD_GRD
 *$LOAD VEH_SEG_SHR
 $LOAD GRO_CNSTRNT
@@ -272,14 +278,52 @@ $GDXIN
 *        E = 0.03
 *        F = 0.34
 */;
-
-*PARAMETER BEV_CAPAC(seg)
-*/
-*       A =
-*       B =
-*       C =
 *
-*/;
+
+PARAMETER MANUF_CNSTRNT(year)
+/
+2010	=37.3416608
+2011	=37.92857143
+2012	=37.92857143
+2013	=71.96938776
+2014	=71.96938776
+2015	=88.68586006
+2016	=103.8826531
+2017	=165.5816327
+2018=	292.930758
+2019=	403.8673469
+2020=	540.0306122
+2021=	735.7653061
+2022=	999.5816327
+2023=	1186.502187
+2024=	1347.892128
+2025=	1501.116327
+2026=	1671.887755
+2027=	1833.581633
+2028=	1952.72449
+2029=	2000
+2030=	2100
+2031=	2150
+2032=	2200
+2033=	2200
+2034=	2200
+2035=	2200
+2036=	2200
+2037=	2200
+2038=	2200
+2039=	2200
+2040=	2200
+2041=	2200
+2042=	2200
+2043=	2200
+2044=	2200
+2045=	2200
+2046=	2200
+2047=	2200
+2048=	2200
+2049=	2200
+2050=	2200
+/;
 
 
 
@@ -351,6 +395,7 @@ VEH_TOT_REM(year)
 ANN_TOTC(year)                          Total CO2 emissions from LDVs, by year                              [t CO2-eq]
 VEH_STCK_CHRT(tec,seg,prodyear,age,modelyear)
 *OPER(tec,seg,year,prodyear)
+TOTAL_NEW_CAP(year)                     Total battery capacity added to fleet                               [MWh]
 ;
 
 
@@ -394,6 +439,9 @@ EQ_STCK_GRD
 * Keeping segment shares constant
 EQ_SEG_GRD
 
+* Manufacturing capacity constraint
+EQ_NEW_BATT_CAP      
+EQ_ADD_CAP
 
 **EMISSION and ENERGY MODELS incl OBJ. FUNCTION --------------------------------------
 
@@ -480,11 +528,25 @@ EQ_STCK_CHK(modelyear)..                                                    VEH_
 
 *** Constraints -----------------------------------------------------------------------
 
-* stock additions by technology
+* stock additions by technology; consumer uptake constraint
 EQ_STCK_ADD0(tec,seg,'2019','0')..                                 VEH_STCK_ADD_OPTYEAR1('BEV',seg,'2019','0') =e= 0;
 EQ_STCK_GRD0(tec,seg,'2020','0')..                                 VEH_STCK_ADD(tec,seg,'2020','0') =l= ((1 + VEH_ADD_GRD('IND',tec)) * VEH_STCK_ADD_OPTYEAR1(tec,seg,'2019','0')) + 5e4;
 
 EQ_STCK_GRD(tec,seg,optyear,age)$(ord(optyear)>1 and ord(age)=1)..     VEH_STCK_ADD(tec,seg,optyear,age) =l= ((1 + VEH_ADD_GRD('IND',tec)) * VEH_STCK_ADD(tec,seg,optyear-1,age)) + 5e4;
+
+* Segment share constraint (segments kept constant)
+EQ_SEG_GRD(seg,optyear,age)$(ord(optyear)>1 and ord(age)=1)..          sum(tec,VEH_STCK_ADD(tec,seg,optyear,age)) =l= VEH_STCK_INT_SEG(seg) * sum((tec,segj), VEH_STCK_ADD(tec,segj,optyear,age));
+                                                      
+
+* lithium refining constraint;
+   
+
+*------ Battery manufacturing constraint;
+* calculate total new capacity of batteries in BEVs added to stock each year
+EQ_NEW_BATT_CAP(optyear)..                              TOTAL_NEW_CAP(optyear) =e= sum((tec,seg,age),VEH_STCK_ADD('BEV',seg,optyear,age)*BEV_CAPAC(seg)/1000);
+
+EQ_ADD_CAP(optyear)..                                   TOTAL_NEW_CAP(optyear) =l= MANUF_CNSTRNT(optyear)*1000;
+
 
 * Segment share constraint (keep segment shares constant over analysis period)
 *** This works and I have no idea why. (EQ_TOT_ADD must be removed for this to work)
@@ -501,12 +563,8 @@ EQ_STCK_GRD(tec,seg,optyear,age)$(ord(optyear)>1 and ord(age)=1)..     VEH_STCK_
 
 *EQ_SEG_GRD(seg,optyear,age)$(ord(optyear)>1 and ord(age)=1)..          sum(tec,VEH_STCK_ADD(tec,seg,optyear,age)) =l= 1.2*sum((tec,segj),VEH_STCK_ADD(tec,segj,optyear-1,age));
 
-EQ_SEG_GRD(seg,optyear,age)$(ord(optyear)>1 and ord(age)=1)..          sum(tec,VEH_STCK_ADD(tec,seg,optyear,age)) =l= VEH_STCK_INT_SEG(seg) * sum((tec,segj), VEH_STCK_ADD(tec,segj,optyear,age));
 
 
-*------ Calculate total new capacity of batteries in BEVs added to stock each year
-* EQ_NEW_BATT_CAP(year,seg)..                                       TOTAL_NEW_CAP(year) = (sum(seg),VEH_STCK_ADD(year,seg)*BEV_CAPC(seg))
-*EQ_ADD_CAP(year)..                                                 TOTAL_NEW_CAP(year) =l= CURRENT TOTAL CAPACITY EARMARKED FOR EUROPE (parameter)
 
 
 
