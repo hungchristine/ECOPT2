@@ -302,8 +302,8 @@ default_fleet = load_default()
 default_totc_opt = default_fleet.__getattribute__('totc_opt')
 os.chdir(save_dir)
 
-c_2030,c_2050,c_add,c_stock,c_full,c_totc,c_ids = experiment_setup(complex_params,"complex")
 s_2030,s_2050,s_add,s_stock,s_full,s_totc,s_ids = experiment_setup(params,"simple")
+c_2030,c_2050,c_add,c_stock,c_full,c_totc,c_ids = experiment_setup(complex_params,"complex")
 
 try:
     shares_2030 = s_2030.join(c_2030,rsuffix='c')

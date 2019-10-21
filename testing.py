@@ -3,7 +3,7 @@
 Created on Thu Apr 25 17:26:23 2019
 
 @author: chrishun
-"""
+  """
 import logging
 import sys
 
@@ -34,7 +34,7 @@ import os
 #a=[1/6 for i in range(6)]
 #b=[1/6 for i in range(6)]
 #c=0.3
-#
+#.
 #fleet = fleet_model.FleetModel(a,b,c)
 #sigm = sigmoid.Sigmoid
 #fun = getattr(sigmoid, f'make_{sigmoid_case}')
@@ -69,10 +69,12 @@ except:
         
 def run_experiment():
     # Load parameter values from YAML
-    with open(r'C:\Users\chrishun\Box Sync\YSSP_temp\temp_input.yaml', 'r') as stream:
+    # r'C:\Users\chrishun\Box Sync\YSSP_temp\temp_input.yaml'
+    # r'C:\Users\chrishun\Box Sync\YSSP_temp\temp_input_presubmission.yaml'
+    with open(r'C:\Users\chrishun\Box Sync\YSSP_temp\GAMS_input.yaml', 'r') as stream:
         try:
             params = yaml.safe_load(stream)
-            print('finished')
+            print('finished reading parameter values')
         except yaml.YAMLError as exc:
             print(exc)
 
@@ -142,7 +144,7 @@ def run_experiment():
 #                                    growth_constraint = growth_constraint[1])
         
         """fm.run_GAMS(run_tag)"""
-        gams_run.run_GAMS(fm,run_tag)
+        gams_run.run_GAMS(fm, run_tag)
 
         exceptions = gams_run.db.get_database_dvs()
         if len(exceptions) > 1:
@@ -157,6 +159,7 @@ def run_experiment():
         with open('run_'+run_tag+'.pkl','wb') as f:
             pickle.dump(fm,f)
             
+        fm.figure_calculations()
         fm.vis_GAMS(fp,run_id)
         
         # Save log info
@@ -228,8 +231,11 @@ full_BEV_yr = pd.DataFrame(full_BEV_yr_list,index = run_id_list)
 
 scenario_totcs = pd.DataFrame(totc_list, index=run_id_list)
 scenario_totcs = pd.DataFrame(totc_list, index = run_id_list, columns=['totc_opt'])
-scenario_totcs['Abs. difference from totc_opt'] = default_totc_opt - scenario_totcs['totc_opt']
-scenario_totcs['%_change_in_totc_opt'] = scenario_totcs['totc_opt']/default_totc_opt  
+try:
+    scenario_totcs['Abs. difference from totc_opt'] = default_totc_opt - scenario_totcs['totc_opt']
+    scenario_totcs['%_change_in_totc_opt'] = scenario_totcs['totc_opt']/default_totc_opt  
+except:
+    print("No comparison to default performed")
 
 # Export potentially helpful output for analyzing across scenarios
 with open('run_'+now+'.pkl', 'wb') as f:

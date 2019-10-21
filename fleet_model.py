@@ -13,7 +13,7 @@ from scipy.stats import norm
 import matplotlib
 import matplotlib.pyplot as plt
 from matplotlib.colors import LinearSegmentedColormap
-from matplotlib.ticker import (MultipleLocator, FormatStrFormatter, AutoMinorLocator)
+from matplotlib.ticker import (MultipleLocator, FormatStrFormatter, AutoMinorLocator, IndexLocator,IndexFormatter,LinearLocator)
 
 import seaborn
 from matplotlib.backends.backend_pdf import PdfPages
@@ -111,7 +111,8 @@ class FleetModel:
         self.passenger_demand.name = ''
         self.passenger_demand.index = self.veh_stck_tot.index
         self.fleet_vkm = self.passenger_demand/self.occupancy_rate
-        self.veh_oper_dist = self.fleet_vkm/self.veh_stck_tot
+#        self.veh_oper_dist = self.fleet_vkm/self.veh_stck_tot
+        self.veh_oper_dist = [10000 for i in range(0,len(self.fleet_vkm))]
         
 #        self.veh_oper_dist = pd.Series([-97.052*i+207474 for i in range(2000,2051)],index=[str(i) for i in range(2000,2051)]) 
         #self.veh_oper_dist.index.names=['year']
@@ -199,7 +200,7 @@ class FleetModel:
         
         # Temporary introduction of seg-specific VEH_PARTAB from Excel; will later be read in from YAML
 #        self.veh_partab = pd.DataFrame(pd.read_excel(self.import_fp,sheet_name = 'genlogfunc',usecols='A:G',index_col=[0,1,2],skipfooter=6)).stack()
-        self.veh_partab = self.build_veh_partab(seg_batt_caps,B_term_prod,B_term_oper_EOL,r_term_factors,u_term_factors)#.stack()
+        self.veh_partab = self.build_veh_partab(B_term_prod,B_term_oper_EOL,r_term_factors,u_term_factors)#.stack()
         """" if modify_b_ice or modify_b_bev:
                 self.veh_partab.loc[:,'ICE',:,'B']=self.veh_partab.loc[:,'ICE',:,'A'].values*modify_b_ice
                 self..veh_partab.loc[:,'BEV',:,'B'] = self.veh_partab.loc[:,'BEV',:,'A'].values*modify_b_bev"""
@@ -219,6 +220,10 @@ class FleetModel:
         self.gro_cnstrnt = [self.growth_constraint for i in range(len(self.modelyear))]
         self.gro_cnstrnt = pd.Series(self.gro_cnstrnt, index=self.modelyear)
         self.gro_cnstrnt.index = self.gro_cnstrnt.index.astype('str')
+        
+        self.manuf_cnstrnt = pd.read_excel(self.import_fp,sheet_name='MANUF_CONSTR',header=None,usecols='A,B',skiprows=[0])
+        self.manuf_cnstrnt = self._process_df_to_series(self.manuf_cnstrnt)
+#        self.manuf_cnstrnt.index = self.manuf_cnstrnt.index.astype('str')
         
         self.enr_partab = pd.read_excel(self.import_fp,sheet_name='ENR_PARTAB',usecols='A:F',index_col=[0,1]).stack()
 
@@ -297,10 +302,10 @@ class FleetModel:
         self.enr = gmspy.set2list('enr', db)"""
 
          #spy.param2series('VEH_PAY', db) # series, otherwise makes giant sparse dataframe        
-    def build_BEV(self, seg_batt_caps):
+    def build_BEV(self):
         self.lookup_table = pd.read_excel(self.import_fp, sheet_name='Sheet6',header=[0,1],index_col=0, nrows=3)
         self.prod_df = pd.DataFrame()
-        for key,value in seg_batt_caps.items():
+        for key,value in self.seg_batt_caps.items():
             self.prod_df[key] = self.lookup_table[key,value]
         mi = pd.MultiIndex.from_product([self.prod_df.index.to_list(),['BEV'],['batt']])
         self.prod_df.index = mi
@@ -312,19 +317,19 @@ class FleetModel:
 #        body_weight = [923,np.average(923,1247),1247,1407,average(1407,1547),1547]
         return self.prod_df
     
-    def BEV_weight(self, seg_batt_caps):
+    def BEV_weight(self):
         """ Use this function to calculate weight-based operation energy requirements"""
         pass
         
 
-    def build_veh_partab(self,seg_batt_caps,B_term_prod,B_term_oper_EOL,r_term_factors,u_term_factors):
+    def build_veh_partab(self,B_term_prod,B_term_oper_EOL,r_term_factors,u_term_factors):
         """ TO DO: separate A-terms for battery and rest-of-vehicle and apply different b-factors"""
         self.A_terms_raw = pd.read_excel(self.import_fp,sheet_name='genlogfunc',header=[0],index_col=[0,1,2],usecols='A:F',nrows=48)
         self.A_terms_raw.columns.names=['comp']
         self.A_terms_raw = self.A_terms_raw.stack().to_frame('a')
         
         # Retrieve production emission factors for chosen battery capacities and place in raw A factors (with component resolution)
-        self.batt_list = self.build_BEV(seg_batt_caps)
+        self.batt_list = self.build_BEV()
         for index, value in self.prod_df.iteritems():
             self.A_terms_raw.loc[index,'a'] = value
         
@@ -663,7 +668,26 @@ class FleetModel:
     
     def import_from_MESSAGE(self):
         pass
-
+    def figure_calculations(self):
+        operation_em = self.veh_oper_cohort.sum(level=['prodyear','tec','seg'])
+        operation_em.sort_index(axis=0,level=0,inplace=True)
+        op = operation_em.loc['2000':'2050']
+        
+        init_stock = self.veh_stck_add.replace(0,np.nan)
+        init_stock.dropna(axis=0,inplace=True)
+        init_stock = init_stock.droplevel('age')
+        init_stock.index.rename('prodyear',level=2,inplace=True)
+        init_stock.index = init_stock.index.reorder_levels([2,0,1])
+        init_stock.sort_index(inplace=True)
+        
+        self.op_intensity = op/init_stock
+        
+        temp_prod = self.veh_prod_cint.copy(deep=True)
+        temp_prod.index = temp_prod.index.reorder_levels([2,0,1])
+        temp_prod.sort_index(inplace=True)
+        self.op_intensity.sort_index(inplace=True)
+#        self.LC_intensity - self.op_intensity.add(temp_prod,axis='index')
+        
     def vis_GAMS(self,fp,filename,max_year=50, cropx=True,suppress_vis=False):
         """ visualize key GAMS parameters for quality checks"""
         """To do: split into input/output visualization; add plotting of CO2 and stocks together"""
@@ -680,30 +704,38 @@ class FleetModel:
             if len(labels)==12:
                 order = [11,9,7,5,3,1,10,8,6,4,2,0]
                 labels = [x+', '+y for x,y in itertools.product(['BEV','ICEV'],['mini','small','medium','large','executive','luxury and SUV'])]
-                ax.legend([patches[idx] for idx in order],[labels[idx] for idx in range(11,-1,-1)],bbox_to_anchor = (1.05,1.02),ncol=2,title=title)#loc='upper left'
+                ax.legend([patches[idx] for idx in order],[labels[idx] for idx in range(11,-1,-1)],bbox_to_anchor = (1.05,1.02),loc='upper left',ncol=2,title=title)
             elif len(labels)==6:
                 order = [5,3,1,4,2,0]
-                ax.legend([patches[idx] for idx in order],[labels[idx] for idx in order],bbox_to_anchor=(1.05,1.02),ncol=2, title=title)
+                ax.legend([patches[idx] for idx in order],[labels[idx] for idx in order],bbox_to_anchor=(1.05,1.02),loc='upper left',ncol=2, title=title)
+            elif len(labels)>34:
+                ax.legend(patches,labels,bbox_to_anchor=(1.05,1.02), loc='upper left', ncol=3, title=title)
             else:
-                ax.legend(patches,labels,bbox_to_anchor=(1.05,1.02), ncol=2, title=title)
+                ax.legend(patches,labels,bbox_to_anchor=(1.05,1.02), loc='upper left', ncol=2, title=title)
                 
             if cropx and ax.get_xlim()[1]==80:
                 ax.set_xlim(right=max_year)
             pp.savefig(bbox_inches='tight')
             
-        def plot_subplots(grouped_df,title,labels):
+        def plot_subplots(grouped_df,title, labels, xlabel='year'):
             for (key,ax) in zip(grouped_df.groups.keys(),axes.flatten()):
-                grouped_df.get_group(key).plot(ax=ax,cmap='jet',legend=False)
-#                x_label = grouped_df.index.get_level_values('year')
-#                ax.xaxis.set_major_locator(MultipleLocator(20))
-                ax.set_xticklabels([2000,2010,2020,2030,2040,2050])
-#                ax.set_xticklabels(x_label)
-                ax.set_xlabel('year')
+                d = grouped_df.get_group(key)
+                if d.index.nlevels==3:
+                    d = grouped_df.get_group(key).reset_index(level=[0,1],drop=True)
+                elif d.index.nlevels==2:
+                    d = grouped_df.get_group(key).reset_index(level=[0],drop=True)
+                
+                d.plot(ax=ax,cmap='jet',legend=False)
+                
+                ax.set_xlabel(xlabel)
                 ax.set_title(key,fontsize=10,fontweight='bold')
                 
-#                ax.xaxis.set_minor_locator(MultipleLocator(5))
+                ax.xaxis.set_minor_locator(LinearLocator(4))
                 ax.grid(which='minor',axis='x',c='lightgrey',alpha=0.55,linestyle=':',lw=0.3)
-                ax.grid(which='major',axis='x',c='darkgrey',alpha=0.75,linestyle='--',lw=1)
+                ax.grid(which='major',axis='x',c='darkgrey',alpha=0.75,linestyle=':',lw=1)
+                
+                ax.grid(which='minor',axis='y',c='lightgrey',alpha=0.55,linestyle=':',lw=0.3)
+                ax.grid(which='major',axis='y',c='darkgrey',alpha=0.75,linestyle=':',lw=1)
 
                 plt.subplots_adjust(hspace=0.45)
                 fig.suptitle(title)
@@ -724,17 +756,22 @@ class FleetModel:
         """--- Plot total stocks by age, technology, and segment---"""   
         fig, axes = plt.subplots(4,3, figsize=(12,12), sharey=True,sharex=True)
         plt.ylim(0,np.ceil(self.stock_df_plot.sum(axis=1).max()/5e7)*5e7)
+        
         if cropx:
             plt.xlim(right=max_year)
         
         for (key, ax) in zip(self.stock_df_plot_grouped.groups.keys(), axes.flatten()):
-            #print(key)
 #            if(key==('BEV','B')):
 #                fix_age_legend(ax)
-            self.stock_df_plot_grouped.get_group(key).plot(ax=ax,kind='area',cmap='Spectral_r',legend=False)
+            d = self.stock_df_plot_grouped.get_group(key).reset_index(level=[0,1],drop=True)
+            ax = d.plot(ax=ax,kind='area',cmap='Spectral_r',legend=False)
+#             self.stock_df_plot_grouped.get_group(key).plot(ax=ax,kind='area',cmap='Spectral_r',legend=False)
             #handles,labels = ax.get_legend_handles_labels()
             ax.xaxis.set_major_locator(MultipleLocator(10))
-            ax.set_xticklabels([2000,2010,2020,2030,2040,2050],fontsize=9, rotation=45)
+            ax.xaxis.set_minor_locator(MultipleLocator(5))
+            ax.xaxis.set_tick_params(rotation=45)
+#            ax.set_xticklabels([2000,2010,2020,2030,2040,2050],fontsize=9, rotation=45)
+#            ax.set_xticklabels(self.stock_df_plot_grouped.groups[key].get_level_values('year'))
             ax.set_xlabel('year')
             ax.text(0.5,0.9,key,horizontalalignment='center',transform=ax.transAxes,fontweight='bold')
 #            plt.xticks(rotation=45)
@@ -773,8 +810,8 @@ class FleetModel:
         
         ax = self.add_share.plot(kind='area',cmap=paired,title='Share of stock additions, by technology and vehicle segment')
         ax.xaxis.set_minor_locator(MultipleLocator(1))
-        ax.grid(which='minor',axis='x',c='w',alpha=0.6,linestyle=':',lw=0.3)
-        ax.grid(which='major',axis='x',c='darkgrey',alpha=0.75,linestyle='--',lw=1)
+        ax.grid(which='minor',axis='x',c='w',alpha=0.6,linestyle=(0,(5,10)),lw=0.1)
+        ax.grid(which='major',axis='x',c='darkgrey',alpha=0.75,linestyle='--',lw=0.5,)
         fix_age_legend(ax,'Vehicle technology and segment') 
         
         """--- Plot total emissions by tec and lifecycle phase---"""
@@ -847,22 +884,33 @@ class FleetModel:
         """--- Plot total stocks by age and technology ---"""
 #        ax = self.stock_df_plot.loc['BEV'].sum(level=1).plot(kind='area',cmap='Spectral_r',title='BEV stocks by age')
 #        ax = (self.stock_cohort.iloc[:,48:].loc['BEV'].loc['2020':'2050']/1e6).plot(kind='bar',stacked=True,width=1,cmap='Spectral',title='BEV stock by cohort')
-        ax = (self.stock_cohort/1e6).loc['BEV'].loc['2020':'2050'].plot(kind='bar',stacked=True,width=1,cmap='Spectral',title='BEV stock by cohort')
-
-        ax.xaxis.set_major_locator(MultipleLocator(5))
-        ax.set_xticklabels([2015,2020,2025,2030,2035,2040,2045,2050])
+        temp_stock_cohort = (self.stock_cohort/1e6).loc['BEV'].loc['2020':'2050']
+        temp_stock_cohort[temp_stock_cohort<0.4] = 0 # Drops very small vehicle stocks in earlier years
+        temp_stock_cohort = temp_stock_cohort.replace(0,np.nan).dropna(how='all',axis=1)
+        ax = temp_stock_cohort.plot(kind='bar',stacked=True,width=1,cmap='Spectral',title='BEV stock by vintage cohort')
+        ax.xaxis.set_major_locator(IndexLocator(10,0))
+        ax.xaxis.set_major_formatter(IndexFormatter(temp_stock_cohort.index))
+        ax.xaxis.set_tick_params(rotation=45)
+        ax.xaxis.set_minor_locator(IndexLocator(5,0))
+#        ax.set_xticklabels([2015,2020,2025,2030,2035,2040,2045,2050])
         plt.ylabel('BEV stock, in millions of vehicles')
         plt.xlabel('year')
-        fix_age_legend(ax,title='Vehicle cohort')
+        fix_age_legend(ax,title='Vehicle vintage')
         
 #        ax = (self.stock_cohort.iloc[:,48:].loc['ICE'].loc['2020':]/1e6).plot(kind='bar',stacked=True,width=1,cmap='Spectral',title='ICEV stock by cohort')
-        ax = (self.stock_cohort.loc['ICE']/1e6).loc[:'2050'].plot(kind='bar',stacked=True,width=1,cmap='Spectral',title='ICEV stock by cohort')
-        ax.xaxis.set_major_locator(MultipleLocator(10))
-        ax.set_xticklabels([1995,2000,2010,2020,2030,2040,2050])
+        temp_stock_cohort = (self.stock_cohort/1e6).loc['ICE'].loc[:'2050']
+        temp_stock_cohort[temp_stock_cohort<0.4] = 0 # Drops very small vehicle stocks in earlier years
+        temp_stock_cohort = temp_stock_cohort.replace(0,np.nan).dropna(how='all',axis=1)
+        ax = temp_stock_cohort.plot(kind='bar',stacked=True,width=1,cmap='Spectral',title='ICEV stock by vintage cohort')
+        ax.xaxis.set_major_locator(IndexLocator(10,0))
+        ax.xaxis.set_major_formatter(IndexFormatter(temp_stock_cohort.index))
+        ax.xaxis.set_tick_params(rotation=45)
+        ax.xaxis.set_minor_locator(IndexLocator(5,0))
+#        ax.set_xticklabels([1995,2000,2010,2020,2030,2040,2050])
 #        ax.set_xticklabels([2015,2020,2025,2030,2035,2040,2045,2050])
         plt.ylabel('ICEV stock, in millions of vehicles')
         plt.xlabel('year')
-        fix_age_legend(ax,title='Vehicle cohort')
+        fix_age_legend(ax,title='Vehicle vintage')
         
 #        ax = self.stock_df_plot.loc['ICE'].sum(level=1).plot(kind='area',cmap='Spectral_r',title='ICE stocks by age')
 #        fix_age_legend(ax)          
@@ -872,6 +920,7 @@ class FleetModel:
 #        tec_cm = LinearSegmentedColormap.from_list('tec',['xkcd:aubergine','lavender'])
         tec_cm = LinearSegmentedColormap.from_list('tec',['xkcd:burgundy','xkcd:light mauve'])
         ax = self.stock_add.sum(axis=1).unstack('seg').sum(axis=1).unstack('tec').plot(kind='area',cmap=tec_cm,title='Stock additions by technology')
+        plt.xlabel('year')
         fix_age_legend(ax,'Vehicle technology') 
 #        fig,axes = plt.subplots(1,2,figsize=(6,3))
 #        stock_add_grouped = self.stock_add.unstack('seg').groupby('tec')
@@ -922,7 +971,7 @@ class FleetModel:
         title = 'VEH_PROD_CINT'
         plot_subplots(self.veh_prod_cint.unstack('tec').groupby(['seg']),title=title,labels=labels)
         fig.text(0.04,0.5,'Production emissions intensity \n(t CO2/vehicle)', ha='center', rotation='vertical')
-        pp.savefig(bbox_inches='tight')       
+        pp.savefig(bbox_inches='tight')    
         
         fig, axes = plt.subplots(3,2,figsize=(9,9),sharey=True)
         title = 'VEH_OPER_EINT - check ICE sigmoid function' 
@@ -930,6 +979,65 @@ class FleetModel:
         fig.text(0.04,0.5,'Operation energy intensity \n(kWh/km)', ha='center', rotation='vertical')
         pp.savefig(bbox_inches='tight')
         
+#        fig, axes = plt.subplots(3,2,figsize=(9,9),sharey=True)
+#        title = 'VEH_OPER_CINT' 
+#        temp_oper_cint = self.veh_oper_cint.loc[~self.veh_oper_cint.index.duplicated(keep='first')]*1e6
+#        plot_subplots(temp_oper_cint.unstack('tec').groupby(['seg']),title=title,labels=labels)
+#        fig.text(0.04,0.5,'Operation emissions intensity \n(g CO2-eq/km)', ha='center', rotation='vertical')
+#        pp.savefig(bbox_inches='tight')
+#        
+#        fig, axes = plt.subplots(3,2,figsize=(9,9),sharey=True)
+#        title = 'Lifetime operation emissions by cohort for whole fleet' 
+#        plot_subplots(self.veh_op_cohort.unstack('tec').groupby(['seg']),title=title,labels=labels)
+#        fig.text(0.04,0.5,'Operation emissions \n(t)', ha='center', rotation='vertical')
+#        pp.savefig(bbox_inches='tight')
+        
+#        fig, axes = plt.subplots(3,2,figsize=(9,9),sharey=True)
+#        title = 'Operating emissions, back calculated from fleet emissions' 
+#        plot_subplots(self.veh_op_intensity.unstack('tec').groupby(['seg']),title=title,labels=labels)
+#        fig.text(0.04,0.5,'Lifetime operation emissions intensity \n(t/vehicle)', ha='center', rotation='vertical')
+#        pp.savefig(bbox_inches='tight')
+        
+        
+        fig, axes = plt.subplots(3,2,figsize=(9,9),sharey=True)
+        title = 'initial stock of each cohort' 
+        plot_subplots(self.stock_add.unstack('tec').groupby(['seg']),title=title,labels=labels)
+        fig.text(0.04,0.5,'Total vehicles, by segment and technology \n(t)', ha='center', rotation='vertical')
+        pp.savefig(bbox_inches='tight')
+
+        """ Check each vintage cohort's LC emissions (actually just production and lifetime operation emissions) for various assumptions of lifetime (in years)"""
+#        fig, axes = plt.subplots(3,2,figsize=(9,9),sharey=True)
+#        title = 'Average Lifetime emissions per vehicle (11 years)' 
+#        ax = plot_subplots(self.LC_emissions_avg.unstack('tec').groupby(['seg']),title=title,labels=labels)
+#        ax.set_xlabel('Vintage cohort')
+#        fig.text(0.04,0.5,'Lifetime emissions intensity (without EOL) \n(t/average vehicle)', ha='center', rotation='vertical')
+#        pp.savefig(bbox_inches='tight')      
+        
+        for i in range(0,len(self.LC_emissions_avg)):
+            fig, axes = plt.subplots(3,2,figsize=(9,9),sharey=True)
+            if i==27:
+                title = f'Full lifetime emissions per vehicle ({i} year lifetime)' 
+            else:
+                title = f'Average lifetime emissions per vehicle ({i} year lifetime)' 
+            ax = plot_subplots(self.LC_emissions_avg[i].unstack('tec').groupby(['seg']),title=title,labels=labels,xlabel='Vintage cohort')
+            fig.text(0.04,0.5,f'Lifetime emissions intensity (without EOL) \n(t/{i}-year-old vehicle)', ha='center', rotation='vertical')
+            pp.savefig(bbox_inches='tight')      
+        
+        """------- Calculate lifecycle emissions (actually production + operation) by cohort for QA  ------- """
+        """ See figure_calculations for calculation of these dataframes """
+#        fig, axes = plt.subplots(3,2,figsize=(9,9),sharey=True)
+#        title = 'Operating emissions, back calculated from fleet emissions' 
+#        plot_subplots(op_intensity.unstack('tec').groupby(['seg']),title=title,labels=labels)
+#        fig.text(0.04,0.5,'Operation emissions intensity  \n(t/vehicle)', ha='center', rotation='vertical')
+#        pp.savefig(bbox_inches='tight')
+
+        """ See figure_calculations for calculation of these dataframes """
+#        fig, axes = plt.subplots(3,2,figsize=(9,9),sharey=True)
+#        title = 'Lifetime operation emissions by cohort for whole fleet' 
+#        plot_subplots(self.LC_intensity.unstack('tec').groupby(['seg']),title=title,labels=labels)
+#        fig.text(0.04,0.5,'Operation emissions \n(t)', ha='center', rotation='vertical')
+#        pp.savefig(bbox_inches='tight')
+#        
         """ Need to fix! """
 #        fig, axes = plt.subplots(3,2,figsize=(9,9),sharey=True)
 #        title = 'VEH_OPER_CINT'
