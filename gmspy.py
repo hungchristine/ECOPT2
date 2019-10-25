@@ -197,7 +197,7 @@ def param2df(name, db=None, ws=None, gdx_filepath=None):
     db = _iwantitall(db, ws, gdx_filepath)
 
     # Read in data and recast as Pandas Series
-    print(name)
+#    print(name)
     ds = pd.Series(dict((tuple(rec.keys), rec.value) for rec in db[name]))
     df = ds.unstack()
 

@@ -24,6 +24,7 @@ from matplotlib.backends.backend_pdf import PdfPages
 
 import pickle
 import os
+import traceback
 
 """
 #fleet.read_all_sets("C:\\Users\\chrishun\\Box Sync5\\YSSP_temp\\EVD4EUR_input.gdx")
@@ -59,11 +60,19 @@ yaml.SafeDumper.ignore_aliases = lambda *args: True
 
 # Make timestamp and directory for scenario run results for output files
 now = datetime.now().isoformat(timespec='minutes').replace(':','_')
-fp = r'C:\Users\chrishun\Box Sync\YSSP_temp\visualization output\Run_'+now
+5
+yaml_name = 'unit_test.yaml' # 'GAMS_input.yaml'
+
+if yaml_name == 'unit_test.yaml':
+    fp = r'C:\Users\chrishun\Box Sync\YSSP_temp\visualization output\unit_test_'+now
+else:
+    fp = r'C:\Users\chrishun\Box Sync\YSSP_temp\visualization output\Run_'+now
 
 try:
     os.mkdir(fp)
     os.chdir(fp)
+#    with open(fp+'\failed.txt','w+') as f:
+#        f.write('If I exist, run failed!')
 except:
     print("cannot make folder!")
         
@@ -71,7 +80,8 @@ def run_experiment():
     # Load parameter values from YAML
     # r'C:\Users\chrishun\Box Sync\YSSP_temp\temp_input.yaml'
     # r'C:\Users\chrishun\Box Sync\YSSP_temp\temp_input_presubmission.yaml'
-    with open(r'C:\Users\chrishun\Box Sync\YSSP_temp\GAMS_input.yaml', 'r') as stream:
+#    with open(r'C:\Users\chrishun\Box Sync\YSSP_temp\GAMS_input.yaml', 'r') as stream:
+    with open(r'C:\Users\chrishun\Box Sync\YSSP_temp\unit_test.yaml', 'r') as stream:
         try:
             params = yaml.safe_load(stream)
             print('finished reading parameter values')
@@ -82,7 +92,7 @@ def run_experiment():
     info = {}
 
     # Explicit list of parameters
-    param_names = ['veh_stck_int_seg','tec_add_gradient','seg_batt_caps','B_term_prod','B_term_oper_EOL','r_term_factors','u_term_factors','pkm_scenario']#,'seg_batt_caps']
+    param_names = ['veh_stck_int_seg','tec_add_gradient','seg_batt_caps','B_term_prod','B_term_oper_EOL','r_term_factors','u_term_factors','eur_batt_share','pkm_scenario']#,'seg_batt_caps']
 
     # Run experiments
     id_and_value = [params[p].items() for p in param_names]
@@ -95,6 +105,7 @@ def run_experiment():
         #temp += len(id_and_value[x])
         count = temp * count
         
+    # data structures for comparing results from multiple runs
     shares_2030 = None
     shares_2050 = None
     add_share = None
@@ -110,11 +121,11 @@ def run_experiment():
     for i, run_params in enumerate(product(*id_and_value)):
         print('Starting run '+str(i+1)+' of '+str(count)+'\n\n')
 #        veh_seg_shr, tec_add_gradient, seg_batt_caps = run_params
-        veh_stck_int_seg, tec_add_gradient, seg_batt_caps, B_term_prod, B_term_oper_EOL, r_term_factors, u_term_factors, pkm_scenario = run_params
+        veh_stck_int_seg, tec_add_gradient, seg_batt_caps, B_term_prod, B_term_oper_EOL, r_term_factors, u_term_factors, eur_batt_share, pkm_scenario = run_params
 
         # Make run ID
         now = datetime.now().isoformat(timespec='minutes').replace(':','_')
-        run_id = f'run_{tec_add_gradient[0]}_{seg_batt_caps[0]}_{B_term_prod[0]}_{B_term_oper_EOL[0]}_{r_term_factors[0]}_{u_term_factors[0]}_{pkm_scenario[1]}' #'_{seg_batt_caps[0]}'
+        run_id = f'run_{tec_add_gradient[0]}_{seg_batt_caps[0]}_{B_term_prod[0]}_{B_term_oper_EOL[0]}_{r_term_factors[0]}_{u_term_factors[0]}_{eur_batt_share[0]}_{pkm_scenario[1]}' #'_{seg_batt_caps[0]}'
         run_tag = run_id + now
         run_id_list.append(run_id)
 
@@ -140,12 +151,19 @@ def run_experiment():
                                     B_term_oper_EOL = B_term_oper_EOL[1],
                                     r_term_factors = r_term_factors[1],
                                     u_term_factors = u_term_factors[1],
+                                    eur_batt_share = eur_batt_share[1],
                                     pkm_scenario = pkm_scenario[1])#,
-#                                    growth_constraint = growth_constraint[1])
+#                                    growth_constraint = growth_constraint[1]) 
         
         """fm.run_GAMS(run_tag)"""
-        gams_run.run_GAMS(fm, run_tag)
-
+        try:
+            gams_run.run_GAMS(fm, run_tag)
+        except Exception:
+            print("failed run, deleting folder")
+            traceback.print_exc()
+            os.chdir('..')
+            os.rmdir(fp)
+            
         exceptions = gams_run.db.get_database_dvs()
         if len(exceptions) > 1:
             print(exceptions[0].symbol.name)
@@ -155,12 +173,10 @@ def run_experiment():
             print(fm.db.number_symbols)
 
         # Pickle the scenario fleet object
-        os.chdir(fp)
+#        os.chdir(fp)
+        
         with open('run_'+run_tag+'.pkl','wb') as f:
             pickle.dump(fm,f)
-            
-        fm.figure_calculations()
-        fm.vis_GAMS(fp,run_id)
         
         # Save log info
         info[run_tag] = {
@@ -172,7 +188,8 @@ def run_experiment():
                 'B_term_oper_EOL ': B_term_oper_EOL,
                 'r_term_factors ': r_term_factors,
                 'u_term_factors ': u_term_factors,
-                'pkm_scenario': pkm_scenario
+                'pkm_scenario': pkm_scenario,
+                'European share of global batter manuf. capacity': eur_batt_share
             },
             'output': {
 #                'totc': 42,   # life, the universe, and everything…
@@ -183,7 +200,21 @@ def run_experiment():
             }
         }
         
-            # Save pertinent info to compare across scenarios in dataframe
+#        with open(fp+'\failed.txt','a+') as f:
+#            f.write('Successful run. Next: visualization!')
+            
+        try:
+            fm.figure_calculations()
+            fm.vis_GAMS(fp,run_id,info[run_tag]['params'],export_png=False)
+        except Exception:
+            print("failed visualization, deleting folder")
+            traceback.print_exc()
+            os.chdir('..')
+            os.rmdir(fp)        
+        
+#        os.rename(fp,fp+'_success_vis')
+        
+        # Save pertinent info to compare across scenarios in dataframe
         fm.shares_2030.name = run_id
         fm.shares_2050.name = run_id
         fm.add_share.name = run_id
@@ -226,11 +257,18 @@ def run_experiment():
 """ Run the full experiment """
 fleet,run_id_list, shares_2030, shares_2050, add_share, stock_comp, full_BEV_yr_list, totc_list = run_experiment()
 
-
+#with open(fp+'\failed.txt','a+') as f:
+#    f.write('Successfully completed all runs!')
+    
 full_BEV_yr = pd.DataFrame(full_BEV_yr_list,index = run_id_list)
 
 scenario_totcs = pd.DataFrame(totc_list, index=run_id_list)
 scenario_totcs = pd.DataFrame(totc_list, index = run_id_list, columns=['totc_opt'])
+# Load a "baseline" fleet and extract parameters for comparison
+#with open('run_2019-09-22T14_50.pkl','rb') as f:
+#    d=pickle.load(f)
+#    default_totc_opt = d[0][run_id_list[0]].totc_opt
+
 try:
     scenario_totcs['Abs. difference from totc_opt'] = default_totc_opt - scenario_totcs['totc_opt']
     scenario_totcs['%_change_in_totc_opt'] = scenario_totcs['totc_opt']/default_totc_opt  
@@ -240,6 +278,7 @@ except:
 # Export potentially helpful output for analyzing across scenarios
 with open('run_'+now+'.pkl', 'wb') as f:
     pickle.dump([shares_2030, shares_2050, add_share, stock_comp, full_BEV_yr, scenario_totcs], f)
+
 """with open('run_2019-09-22T14_50.pkl','rb') as f:
     d=pickle.load(f)
 d[0][run_id_list[0]].add_share"""
@@ -254,7 +293,9 @@ with pd.ExcelWriter('cumulative_scenario_output'+now+'.xlsx') as writer:
    
 full_BEV_yr.plot()
 
- 
+#os.remove(fp+'\failed.txt')
+
+
 #        bounds = ['high','baseline','low']
 
 #    for element in itertools.product(experiment_list,bounds):

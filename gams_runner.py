@@ -38,7 +38,13 @@ class GAMSRunner:
         # Clear database for new run
 #        self.db.clear() # need to add functionality to gmspy --> check if Symbol exists in database, write over
         self.db = self.ws.add_database()#database_name='pyGAMSdb')
-        self.update_fleet(fleet)
+        if filename.find('unit_test'):
+            fleet.veh_add_grd = dict()
+            for element in itertools.product(*[fleet.grdeq,fleet.tecs]):
+                fleet.veh_add_grd[element] = fleet.tec_add_gradient
+        else:
+            self.update_fleet(fleet)
+
         years = gmspy.list2set(self.db,fleet.cohort,'year')
         modelyear = gmspy.list2set(self.db,fleet.modelyear,'modelyear')
         tecs = gmspy.list2set(self.db, fleet.tecs, 'tec')
@@ -208,11 +214,11 @@ class GAMSRunner:
         p_dict = {}
         for p in parameters:
             try:
-                print(p)
+#                print(p)
                 p_dict[p] = gmspy.param2df(p,gdx_filepath=self.export_model)
             except ValueError:
                 try:
-                    print('param2series')
+#                    print('param2series')
                     p_dict[p] = gmspy.param2series(p,gdx_filepath=self.export_model)
                 except:
                     print(f'Warning!: p_dict ValueError in {p}!')
@@ -303,15 +309,18 @@ class GAMSRunner:
             fleet.avg_oper_dist.drop(columns='age',inplace=True)
             fleet.avg_oper_dist = fleet.avg_oper_dist.reorder_levels(['tec','enr','seg','age','modelyear','prodyear'])
     #        fleet.op_emissions_avg = fleet.veh_oper_cint_avg.multiply(fleet.avg_oper_dist)
-            fleet.d = fleet.avg_oper_dist.join(fleet.veh_oper_cint_avg)
+            fleet.d = fleet.avg_oper_dist.join(fleet.veh_oper_cint_avg,lsuffix='_dist')
             fleet.d.columns=['dist','intensity']
             fleet.op_emissions_avg = fleet.d.dist * fleet.d.intensity
             fleet.op_emissions_avg.index = fleet.op_emissions_avg.index.droplevel(level=['enr']) # these columns are unncessary/redundant
-            fleet.op_emissions_avg = fleet.op_emissions_avg.drop_duplicates()
+            fleet.op_emissions_avg.to_csv('op_emiss_avg_with_duplicates.csv')
+            fleet.op_emissions_avg = fleet.op_emissions_avg.reset_index().drop_duplicates().set_index(['tec','seg','age','modelyear','prodyear'])
+            fleet.op_emissions_avg.to_csv('op_emiss_avg_without_duplicates.csv')
+#            fleet.op_emissions_avg = fleet.op_emissions_avg.drop_duplicates() # replaced by reset_index/drop_duplicates/set_index above
             fleet.op_emissions_avg = fleet.op_emissions_avg.sum(level=['tec','seg','prodyear']) # sum the operating emissions over all model years
             fleet.op_emissions_avg = fleet.op_emissions_avg.reorder_levels(order=['tec','seg','prodyear']) # reorder MultiIndex to add production emissions
-            
-            return fleet.op_emissions_avg.add(fleet.veh_prod_cint) 
+            fleet.op_emissions_avg.columns = ['']
+            return fleet.op_emissions_avg.add(fleet.veh_prod_cint,axis=0) 
         
         fleet.LC_emissions_avg = [quality_check(i) for i in range(0,28)]
 
