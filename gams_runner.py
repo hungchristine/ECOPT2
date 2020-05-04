@@ -3,6 +3,8 @@
 Created on Sun Sep 22 12:37:00 2019
 
 @author: chrishun
+
+This code 
 """
 
 import os
@@ -26,7 +28,7 @@ class GAMSRunner:
         """ Optimization Initialization """
         self.current_path = os.path.dirname(os.path.realpath(__file__))
         self.export_fp = 'C:\\Users\\chrishun\\Box Sync\\YSSP_temp\\Model run data\\'
-        self.ws = gams.GamsWorkspace(working_directory=self.current_path,debug=2)
+        self.ws = gams.GamsWorkspace(working_directory=self.current_path, debug=2)
 #        self.db = self.ws.add_database()#database_name='pyGAMSdb')
         self.opt = self.ws.add_options()
         self.opt.LogLine = 2
@@ -40,32 +42,32 @@ class GAMSRunner:
         self.db = self.ws.add_database()#database_name='pyGAMSdb')
         if filename.find('unit_test'):
             fleet.veh_add_grd = dict()
-            for element in itertools.product(*[fleet.grdeq,fleet.tecs]):
+            for element in itertools.product(*[fleet.grdeq, fleet.tecs]):
                 fleet.veh_add_grd[element] = fleet.tec_add_gradient
         else:
             self.update_fleet(fleet)
 
-        years = gmspy.list2set(self.db,fleet.cohort,'year')
-        modelyear = gmspy.list2set(self.db,fleet.modelyear,'modelyear')
+        years = gmspy.list2set(self.db, fleet.cohort,'year')
+        modelyear = gmspy.list2set(self.db, fleet.modelyear,'modelyear')
         tecs = gmspy.list2set(self.db, fleet.tecs, 'tec')
         #cohort = gmspy.list2set(self.db, self.cohort, 'prodyear') ## prodyear is an alias of year, not a set of its own
         age = gmspy.list2set(self.db, fleet.age, 'age')
         enr = gmspy.list2set(self.db, fleet.enr, 'enr')
         seg = gmspy.list2set(self.db, fleet.seg, 'seg')
         demeq =  gmspy.list2set(self.db, fleet.demeq, 'demeq')
-        dstvar = gmspy.list2set(self.db,fleet.dstvar,'dstvar')
-        enreq = gmspy.list2set(self.db,fleet.enreq,'enreq')
-        grdeq = gmspy.list2set(self.db,fleet.grdeq,'grdeq')
-        inityear = gmspy.list2set(self.db,fleet.inityear,'inityear')
-        lfteq = gmspy.list2set(self.db,fleet.lfteq,'lfteq')
-        sigvar = gmspy.list2set(self.db,fleet.sigvar,'sigvar')
+        dstvar = gmspy.list2set(self.db, fleet.dstvar,'dstvar')
+        enreq = gmspy.list2set(self.db, fleet.enreq,'enreq')
+        grdeq = gmspy.list2set(self.db, fleet.grdeq,'grdeq')
+        inityear = gmspy.list2set(self.db, fleet.inityear,'inityear')
+        lfteq = gmspy.list2set(self.db, fleet.lfteq,'lfteq')
+        sigvar = gmspy.list2set(self.db, fleet.sigvar,'sigvar')
         veheq = gmspy.list2set(self.db, fleet.veheq,'veheq')
-        optyear = gmspy.list2set(self.db,fleet.optyear,'optyear')
+        optyear = gmspy.list2set(self.db, fleet.optyear,'optyear')
 
         veh_oper_dist = gmspy.df2param(self.db, fleet.veh_oper_dist, ['year'], 'VEH_OPER_DIST')
         veh_stck_tot = gmspy.df2param(self.db, fleet.veh_stck_tot, ['year'], 'VEH_STCK_TOT')
-        veh_stck_int_seg = gmspy.df2param(self.db,fleet.veh_stck_int_seg,['seg'],'VEH_STCK_INT_SEG')
-        bev_capac = gmspy.df2param(self.db,fleet.seg_batt_caps,['seg'],'BEV_CAPAC')
+        veh_stck_int_seg = gmspy.df2param(self.db, fleet.veh_stck_int_seg, ['seg'], 'VEH_STCK_INT_SEG')
+        bev_capac = gmspy.df2param(self.db, fleet.seg_batt_caps, ['seg'], 'BEV_CAPAC')
 
         veh_lift_cdf = gmspy.df2param(self.db, fleet.veh_lift_cdf, ['age'], 'VEH_LIFT_CDF')
         veh_lift_pdf = gmspy.df2param(self.db, fleet.veh_lift_pdf, ['age'], 'VEH_LIFT_PDF')
@@ -82,7 +84,7 @@ class GAMSRunner:
         
         #age_par = gmspy.df2param(self.db,self.age_par, ['age'], 'AGE_PAR')
         year_par = gmspy.df2param(self.db, fleet.year_par, ['year'], 'YEAR_PAR')
-        veh_partab = gmspy.df2param(self.db, fleet.veh_partab,['veheq','tec','seg','sigvar'],'VEH_PARTAB')
+        veh_partab = gmspy.df2param(self.db, fleet.veh_partab, ['veheq', 'tec', 'seg', 'sigvar'], 'VEH_PARTAB')
 
         veh_add_grd = self.db.add_parameter_dc('VEH_ADD_GRD', ['grdeq','tec'])
         # Prep work making add gradient df from given rate constraint
@@ -94,22 +96,22 @@ class GAMSRunner:
         print(veh_add_grd)
 #        veh_add_grd = gmspy.df2param(self.db,self.veh_add_grd, ['grdeq','tec'], 'VEH_ADD_GRD')
     
-        gro_cnstrnt = gmspy.df2param(self.db, fleet.gro_cnstrnt,['year'],'GRO_CNSTRNT')
+        gro_cnstrnt = gmspy.df2param(self.db, fleet.gro_cnstrnt, ['year'],'GRO_CNSTRNT')
         
-        manuf_cnstrnt = gmspy.df2param(self.db,fleet.manuf_cnstrnt,['year'],'MANUF_CNSTRNT')
+        manuf_cnstrnt = gmspy.df2param(self.db, fleet.manuf_cnstrnt, ['year'],'MANUF_CNSTRNT')
         
         enr_partab = gmspy.df2param(self.db, fleet.enr_partab,['enr','enreq','sigvar'],'ENR_PARTAB')
         
         print('exporting database...'+filename+'_input')
         self.db.suppress_auto_domain_checking = 1
-        self.db.export(os.path.join(self.current_path,filename+'_input'))
+        self.db.export(os.path.join(self.current_path, filename+'_input'))
 
     def get_output_from_GAMS(self,gams_db,output_var):
          temp_GMS_output = []
          temp_index_list = []
          
          for rec in gams_db[output_var]:
-            if gams_db[output_var].number_records ==1: # special case for totc
+            if gams_db[output_var].number_records == 1: # special case for totc
                 temp_output_df = gams_db[output_var].first_record().level
                 return temp_output_df
             
@@ -146,7 +148,7 @@ class GAMSRunner:
         fleet.veh_lift_mor = pd.Series(fleet_model.calc_probability_of_vehicle_retirement(fleet.age_int,fleet.veh_lift_pdf), index = fleet.age)
         fleet.veh_lift_mor.index = fleet.veh_lift_mor.index.astype('str')
             
-    def run_GAMS(self, fleet, filename):
+    def run_GAMS(self, fleet, run_tag, filename):
         # Pass to GAMS all necessary sets and parameters
         self._load_experiment_data_in_gams(fleet, filename)
         #self.db.export(' _custom.gdx')
@@ -158,16 +160,27 @@ class GAMSRunner:
             return temp
         
         #Run GMS Optimization
+        
+        """"    # create a GAMSModelInstance and solve it with single links in the network blocked
+    mi = cp.add_modelinstance()
+    x = mi.sync_db.add_variable("x", 2, VarType.Positive)
+    xup = mi.sync_db.add_parameter("xup", 2, "upper bound on x")
+    # instantiate the GAMSModelInstance and pass a model definition and GAMSModifier to declare upper bound of X mutable
+    mi.instantiate("transport use lp min z", GamsModifier(x, UpdateAction.Upper, xup))
+    mi.solve() """
         try:
+
             model_run = self.ws.add_job_from_file(fleet.gms_file) # model_run is type GamsJob
             
             opt = self.ws.add_options()
             opt.defines["gdxincname"] = self.db.name
-            model_run.run(opt,databases=self.db)#,create_out_db = True)
+            print(f"Using input gdx file: {self.db.name}")
+            print("running GAMS model, please wait...")
+            model_run.run(opt, databases=self.db)#,create_out_db = True)
             print("Ran GAMS model: "+fleet.gms_file)
 
             gams_db = model_run.out_db
-            self.export_model = os.path.join(self.export_fp,filename+'_solution.gdx')
+            self.export_model = os.path.join(self.export_fp,run_tag+'_solution.gdx')
             gams_db.export(self.export_model)
             print("Completed export of solution database")# + self.export_fp)
             
@@ -176,7 +189,7 @@ class GAMSRunner:
             fleet.totc_opt = self.get_output_from_GAMS(gams_db,'TOTC_OPT')
             
         except:
-            print("ERROR in running model")
+            print(f"ERROR in running model {fleet.gms_file}")
             exceptions = self.db.get_database_dvs()
             try:
                 print(exceptions.symbol.name)
@@ -290,6 +303,7 @@ class GAMSRunner:
         fleet.LC_emissions = fleet.op_emissions.add(fleet.veh_prod_cint) 
         
                 
+        
         """" Test calculation for average lifetime vehicle (~12 years)"""
         def quality_check(age=12):
             fleet.veh_oper_cint_avg = fleet.veh_oper_cint.index.levels[3].astype(int)
@@ -298,14 +312,14 @@ class GAMSRunner:
             fleet.veh_oper_cint.sort_index(level='age',inplace=True)
             fleet.veh_oper_cint.sort_index(level='age',inplace=True)
             fleet.veh_oper_cint_avg = fleet.veh_oper_cint.reset_index(level='age')
-            fleet.veh_oper_cint_avg = fleet.veh_oper_cint_avg[fleet.veh_oper_cint_avg.age<=age] # then, drop ages > 11 (corresponding to 10 in age conventions here)
+            fleet.veh_oper_cint_avg = fleet.veh_oper_cint_avg[fleet.veh_oper_cint_avg.age<=age] # then, drop ages over lifetime 
             fleet.veh_oper_cint_avg = fleet.veh_oper_cint_avg.set_index([fleet.veh_oper_cint_avg.index, fleet.veh_oper_cint_avg.age])
             fleet.veh_oper_cint_avg.drop(columns='age',inplace=True)
             fleet.veh_oper_cint_avg = fleet.veh_oper_cint_avg.reorder_levels(['tec','enr','seg','age','modelyear','prodyear'])
     
-            fleet.avg_oper_dist = fleet.full_oper_dist.reset_index(level='age')
-            fleet.avg_oper_dist = fleet.avg_oper_dist[fleet.avg_oper_dist.age<=age]
-            fleet.avg_oper_dist = fleet.avg_oper_dist.set_index([fleet.avg_oper_dist.index,fleet.avg_oper_dist.age])
+            fleet.avg_oper_dist = fleet.full_oper_dist.reset_index(level='age') 
+            fleet.avg_oper_dist = fleet.avg_oper_dist[fleet.avg_oper_dist.age<=age]  # again, drop ages over lifetime 
+            fleet.avg_oper_dist = fleet.avg_oper_dist.set_index([fleet.avg_oper_dist.index,fleet.avg_oper_dist.age]) # make same index for joining with fleet.veh_oper_cint_avg
             fleet.avg_oper_dist.drop(columns='age',inplace=True)
             fleet.avg_oper_dist = fleet.avg_oper_dist.reorder_levels(['tec','enr','seg','age','modelyear','prodyear'])
     #        fleet.op_emissions_avg = fleet.veh_oper_cint_avg.multiply(fleet.avg_oper_dist)
@@ -338,15 +352,19 @@ class GAMSRunner:
         
         add_gpby = fleet.stock_add.sum(axis=1).unstack('seg').unstack('tec')
         fleet.add_share = add_gpby.div(add_gpby.sum(axis=1),axis=0)
+        
         """ Export technology shares in 2030 to evaluate speed of uptake"""
         fleet.shares_2030 = fleet.add_share.loc['2030']#.to_string()
         fleet.shares_2050 = fleet.add_share.loc['2050']
-        fleet.eq = e_dict['EQ_STCK_GRD']
         
+        try:
+            fleet.eq = e_dict['EQ_STCK_GRD']
+        except:
+            print('No equation EQ_STCK_GRD')
+            
         """ Export first year of 100% BEV market share """
         tec_shares = fleet.add_share.stack().stack().sum(level=['prodyear','tec'])
         fleet.full_BEV_year = int((tec_shares.loc[:,'BEV']==1).idxmax()) - 1
         if fleet.full_BEV_year == 1999:
             fleet.full_BEV_year = np.nan
         temp = fleet.veh_stck.unstack(['year','tec']).sum()
-   

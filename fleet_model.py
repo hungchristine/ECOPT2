@@ -43,7 +43,8 @@ class FleetModel:
         lightweighting_scenario: whether (how aggressively) LDVs are lightweighted in the experiment
         
     """
-    def __init__(self, veh_stck_int_seg, tec_add_gradient, seg_batt_caps, B_term_prod, B_term_oper_EOL, r_term_factors=0.2, u_term_factors=2025, pkm_scenario='iTEM2-Base', eur_batt_share=0.5, occupancy_rate=1.643, data_from_message=None):
+    def __init__(self, veh_stck_int_seg, tec_add_gradient, seg_batt_caps, B_term_prod, B_term_oper_EOL, r_term_factors=0.2, 
+                 u_term_factors=2025, pkm_scenario='iTEM2-Base', eur_batt_share=0.5, occupancy_rate=1.643, data_from_message=None):
         self.B_prod = B_term_prod
         self.B_oper = B_term_oper_EOL
         
@@ -62,8 +63,9 @@ class FleetModel:
         self.fuelcell_specs = pd.DataFrame() # possible fuel cell powers (and acceptable segment assignments, CO2 production emissions, critical material content, fuel efficiency(?), mass)
         self.lightweighting = pd.DataFrame() # lightweighting data table - lightweightable materials and coefficients for corresponding lightweighting material(s)
         
-        self.el_intensity = data_from_message # regional el-mix intensities as time series from MESSAGE
-        self.trsp_dem = data_from_message # EUR transport demand as time series from MESSAGE
+        if data_from_message is not None:
+            self.el_intensity = data_from_message # regional el-mix intensities as time series from MESSAGE
+            self.trsp_dem = data_from_message # EUR transport demand as time series from MESSAGE
         """ boundary conditions for constraints, e.g., electricity market supply constraints, crit. material reserves? could possibly belong in experiment specifications as well..."""
         
         """ GAMS-relevant attributes"""
@@ -74,6 +76,7 @@ class FleetModel:
         self.cohort = [str((2000-28)+i) for i in range(81+28)]  # vehicle cohorts (production year)
         self.optyear = [str(2020+i) for i in range(61)]
         self.age = [str(i) for i in range(28)]                  # vehicle age, up to 27 years old
+#        self.age = [str(i) for i in range(11)]
         self.enr = ['ELC','FOS']                                # fuel types; later include H2, 
         self.seg = ['A','B','C','D','E','F']                    # From ACEA: Small, lower medium, upper medium, executive
         self.demeq= ['STCK_TOT','OPER_DIST','OCUP']             # definition of 
@@ -159,6 +162,8 @@ class FleetModel:
         VEH_LIFT_MOR(age)$(ord(age)= 20) = 1"""
         self.avg_age = 11.1 # From ACEA 2019-2020 report
         self.std_dev_age = 2.21
+#        self.avg_age = 11
+#        self.std_dev_age = 0
         self.veh_lift_cdf = pd.Series(norm.cdf(self.age_int,self.avg_age,self.std_dev_age),index=self.age)#pd.Series(pd.read_pickle(self.import_fp+'input.pkl'))#pd.DataFrame()  # [age] TODO Is it this one we feed to gams?
         self.veh_lift_cdf.index = self.veh_lift_cdf.index.astype('str')
         
@@ -307,8 +312,10 @@ class FleetModel:
 
          #spy.param2series('VEH_PAY', db) # series, otherwise makes giant sparse dataframe        
     def build_BEV(self):
-        self.lookup_table = pd.read_excel(self.import_fp, sheet_name='Sheet6',header=[0,1],index_col=0, nrows=3)
+        self.lookup_table = pd.read_excel(self.import_fp, sheet_name='Sheet6',header=[0,1],index_col=0, nrows=3) # fetch battery portfolio
         self.prod_df = pd.DataFrame()
+        
+        # assemble production emissions for battery for defined battery capacities
         for key,value in self.seg_batt_caps.items():
             self.prod_df[key] = self.lookup_table[key,value]
         mi = pd.MultiIndex.from_product([self.prod_df.index.to_list(),['BEV'],['batt']])
@@ -370,24 +377,25 @@ class FleetModel:
         
         # Begin building final VEH_PARTAB parameter table
         self.temp_df['A'] = self.A
-        self.B = pd.concat([self.temp_prod_df,self.temp_oper_df],axis=0).dropna(how='any',axis=1)
+        self.B = pd.concat([self.temp_prod_df,self.temp_oper_df] ,axis=0).dropna(how='any', axis=1)
         self.B = self.B.unstack(['comp']).sum(axis=1)
         self.temp_df['B']=self.B
 
         # Add same r values across all technologies...can add BEV vs ICE resolution here
-        temp_r = pd.DataFrame.from_dict(r_term_factors,orient='index',columns=['r'])
-        self.temp_df = self.temp_df.join(temp_r, on=['tec'],how='left')
+        temp_r = pd.DataFrame.from_dict(r_term_factors, orient='index', columns=['r'])
+        self.temp_df = self.temp_df.join(temp_r, on=['tec'], how='left')
 #        self.temp_df['r'] = r_term_factors
 
         # Add technology-specific u values
         temp_u = pd.DataFrame.from_dict(u_term_factors,orient='index', columns=['u'])
-        self.temp_df = self.temp_df.join(temp_u,on=['tec'],how='left')
+        self.temp_df = self.temp_df.join(temp_u, on=['tec'], how='left')
         
 #        self.temp_df.drop(labels=0,axis=1,inplace=True)
 #        self.temp_df.index.names=[None,None,None]
         
         return self.temp_df
 
+### NB:  _load_exeperiment_data_in_gams moved to gams_runner
         """
     def _load_experiment_data_in_gams(self,filename): # will become unnecessary as we start calculating/defining sets and/or parameters within the class
         years = gmspy.list2set(self.db,self.cohort,'year')
@@ -760,16 +768,27 @@ class FleetModel:
                 
         ## Make paired colormap for comparing tecs
         paired = LinearSegmentedColormap.from_list('paired',colors=['indigo','thistle','mediumblue','lightsteelblue','darkgreen','yellowgreen','olive','lightgoldenrodyellow','darkorange','navajowhite','darkred','salmon'],N=12)
+        light = LinearSegmentedColormap.from_list('light',colors=['thistle','lightsteelblue','yellowgreen','lightgoldenrodyellow','navajowhite','salmon'],N=6)
+        dark = LinearSegmentedColormap.from_list('dark',colors=['indigo','mediumblue','darkgreen','olive','darkorange','darkred'],N=6)
         paired_tec = LinearSegmentedColormap.from_list('paired_by_tec',colors=['indigo','mediumblue','darkgreen','olive','darkorange','darkred','thistle','lightsteelblue','yellowgreen','lightgoldenrodyellow','navajowhite','salmon'],N=12)
 #        co = plt.get_cmap('tab20')
 #        paired = matplotlib.colors.LinearSegmentedColormap.from_list('paired',co.colors[:12],N=12)
        
-        div_page = plt.figure(figsize=(20,8))
+        div_page = plt.figure(figsize=(25,8))
         ax = plt.subplot(111)
         ax.axis('off')
         df_param = pd.DataFrame.from_dict(param_values)
         df_param = df_param.T
-        ax.table(cellText=df_param.values, colLabels=df_param.columns, rowLabels = df_param.index, colWidths = [0.1,0.9],cellLoc='left', loc=8)#,fontsize=25)
+#        df_param_text = df_param.values
+#        for item in df_param:
+#            item.replace('{','')
+#            item.replace('}} ,','\n')
+#            item.replace('}','')
+            
+        param_table = plt.table(cellText=df_param.values , colLabels=['scenario \n name','values'], rowLabels=df_param.index, colWidths = [0.1,0.9], cellLoc='left', loc=8)
+        param_table.auto_set_font_size(False)
+        param_table.set_fontsize(14)
+        param_table.scale(1,2.5)
         export_fig('tec-seg-cohort')
 #        pp.savefig(bbox_inches='tight')
         
@@ -826,7 +845,6 @@ class FleetModel:
         #ax.axvline(x=2020,ls='dotted')
         
         """--- Plot stock addition shares by segment and technology ---"""
-
         
         ax = self.add_share.plot(kind='area',cmap=paired,title='Share of stock additions, by technology and vehicle segment')
         ax.xaxis.set_minor_locator(MultipleLocator(1))
@@ -834,7 +852,19 @@ class FleetModel:
         ax.grid(which='major',axis='x',c='darkgrey',alpha=0.75,linestyle='--',lw=0.5,)
         fix_age_legend(ax,'Vehicle technology and segment') 
         
+        """--- Plot tech split of stock additions by segment ---"""
+        temp_df = self.add_share/self.add_share.sum(axis=1,level=0)
+        ax = temp_df.plot(kind='area',cmap=paired,title='Technological split of total segment additions')
+        ax.xaxis.set_minor_locator(MultipleLocator(1))
+        ax.yaxis.set_minor_locator(MultipleLocator(0.25))
+        ax.grid(which='minor',axis='x',c='w',alpha=0.6,linestyle=(0,(5,10)),lw=0.1)
+        ax.grid(which='major',axis='x',c='darkgrey',alpha=0.75,linestyle='--',lw=0.5,)
+        ax.grid(which='minor',axis='y',c='w',alpha=0.6,linestyle='dotted',lw=0.1)
+        fix_age_legend(ax,'Vehicle technology and segment') 
+        
+        
         """--- Plot total emissions by tec and lifecycle phase---"""
+        
         cmap_em = LinearSegmentedColormap.from_list('emissions',['lightsteelblue','midnightblue','silver','grey','lemonchiffon','gold'],N=6)
         tec_cm = LinearSegmentedColormap.from_list('tec',['xkcd:burgundy','xkcd:light mauve'])
 
@@ -1056,7 +1086,7 @@ class FleetModel:
 #        fig.text(0.04,0.5,'Lifetime emissions intensity (without EOL) \n(t/average vehicle)', ha='center', rotation='vertical')
 #        pp.savefig(bbox_inches='tight')      
         
-        for i in range(0,len(self.LC_emissions_avg)):
+        """for i in range(0,len(self.LC_emissions_avg)):
             fig, axes = plt.subplots(3,2,figsize=(9,9),sharey=True)
             if i==27:
                 title = f'Full lifetime emissions per vehicle ({i} year lifetime)' 
@@ -1064,7 +1094,7 @@ class FleetModel:
                 title = f'Average lifetime emissions per vehicle ({i} year lifetime)' 
             ax = plot_subplots(self.LC_emissions_avg[i].unstack('tec').groupby(['seg']),title=title,labels=labels,xlabel='Vintage cohort')
             fig.text(0.04,0.5,f'Lifetime emissions intensity (without EOL) \n(t/{i}-year-old vehicle)', ha='center', rotation='vertical')
-            pp.savefig(bbox_inches='tight')      
+            pp.savefig(bbox_inches='tight') """
         
         """------- Calculate lifecycle emissions (actually production + operation) by cohort for QA  ------- """
         """ See figure_calculations for calculation of these dataframes """

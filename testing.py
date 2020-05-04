@@ -60,13 +60,15 @@ yaml.SafeDumper.ignore_aliases = lambda *args: True
 
 # Make timestamp and directory for scenario run results for output files
 now = datetime.now().isoformat(timespec='minutes').replace(':','_')
-5
-yaml_name = 'unit_test.yaml' # 'GAMS_input.yaml'
+#yaml_name = 'unit_test.yaml'
+yaml_name = 'GAMS_input.yaml'
 
 if yaml_name == 'unit_test.yaml':
     fp = r'C:\Users\chrishun\Box Sync\YSSP_temp\visualization output\unit_test_'+now
+    input_file = r'C:\Users\chrishun\Box Sync\YSSP_temp\unit_test.yaml'
 else:
     fp = r'C:\Users\chrishun\Box Sync\YSSP_temp\visualization output\Run_'+now
+    input_file = r'C:\Users\chrishun\Box Sync\YSSP_temp\GAMS_input.yaml'
 
 try:
     os.mkdir(fp)
@@ -81,7 +83,7 @@ def run_experiment():
     # r'C:\Users\chrishun\Box Sync\YSSP_temp\temp_input.yaml'
     # r'C:\Users\chrishun\Box Sync\YSSP_temp\temp_input_presubmission.yaml'
 #    with open(r'C:\Users\chrishun\Box Sync\YSSP_temp\GAMS_input.yaml', 'r') as stream:
-    with open(r'C:\Users\chrishun\Box Sync\YSSP_temp\unit_test.yaml', 'r') as stream:
+    with open(input_file, 'r') as stream:
         try:
             params = yaml.safe_load(stream)
             print('finished reading parameter values')
@@ -92,7 +94,15 @@ def run_experiment():
     info = {}
 
     # Explicit list of parameters
-    param_names = ['veh_stck_int_seg','tec_add_gradient','seg_batt_caps','B_term_prod','B_term_oper_EOL','r_term_factors','u_term_factors','eur_batt_share','pkm_scenario']#,'seg_batt_caps']
+    param_names = ['veh_stck_int_seg',
+                   'tec_add_gradient',
+                   'seg_batt_caps',
+                   'B_term_prod',
+                   'B_term_oper_EOL',
+                   'r_term_factors',
+                   'u_term_factors',
+                   'eur_batt_share',
+                   'pkm_scenario']#,'seg_batt_caps']
 
     # Run experiments
     id_and_value = [params[p].items() for p in param_names]
@@ -105,7 +115,7 @@ def run_experiment():
         #temp += len(id_and_value[x])
         count = temp * count
         
-    # data structures for comparing results from multiple runs
+    # Create data structures for comparing results from multiple runs
     shares_2030 = None
     shares_2050 = None
     add_share = None
@@ -121,6 +131,7 @@ def run_experiment():
     for i, run_params in enumerate(product(*id_and_value)):
         print('Starting run '+str(i+1)+' of '+str(count)+'\n\n')
 #        veh_seg_shr, tec_add_gradient, seg_batt_caps = run_params
+        # Unpack the defined run parameters
         veh_stck_int_seg, tec_add_gradient, seg_batt_caps, B_term_prod, B_term_oper_EOL, r_term_factors, u_term_factors, eur_batt_share, pkm_scenario = run_params
 
         # Make run ID
@@ -157,7 +168,7 @@ def run_experiment():
         
         """fm.run_GAMS(run_tag)"""
         try:
-            gams_run.run_GAMS(fm, run_tag)
+            gams_run.run_GAMS(fm, run_tag, yaml_name)
         except Exception:
             print("failed run, deleting folder")
             traceback.print_exc()
@@ -193,10 +204,10 @@ def run_experiment():
             },
             'output': {
 #                'totc': 42,   # life, the universe, and everything…
-                 'first year of 100% BEV market share': fm.full_BEV_year,
+#                 'first year of 100% BEV market share': fm.full_BEV_year,
                  'totc': fm.totc,
-                 'BEV shares in 2030': fm.shares_2030.loc[:,'BEV'].to_string(),
-                 'totc in optimization period':fm.totc_opt # collect these from all runs into a dataframe...ditto with shares of BEV/ICE
+#                 'BEV shares in 2030': fm.shares_2030.loc[:,'BEV'].to_string(),
+#                 'totc in optimization period':fm.totc_opt # collect these from all runs into a dataframe...ditto with shares of BEV/ICE
             }
         }
         
@@ -205,43 +216,44 @@ def run_experiment():
             
         try:
             fm.figure_calculations()
-            fm.vis_GAMS(fp,run_id,info[run_tag]['params'],export_png=False)
+            fm.vis_GAMS(fp, run_id, info[run_tag]['params'], export_png=False)
         except Exception:
             print("failed visualization, deleting folder")
             traceback.print_exc()
             os.chdir('..')
-            os.rmdir(fp)        
+            if os.path.exists(fp):
+                os.rmdir(fp)        
         
 #        os.rename(fp,fp+'_success_vis')
         
         # Save pertinent info to compare across scenarios in dataframe
-        fm.shares_2030.name = run_id
-        fm.shares_2050.name = run_id
-        fm.add_share.name = run_id
-        fm.veh_stck.name = run_id
+#        fm.shares_2030.name = run_id
+#        fm.shares_2050.name = run_id
+#        fm.add_share.name = run_id
+#        fm.veh_stck.name = run_id
         
-        if shares_2030 is None:
-            shares_2030 = pd.DataFrame(fm.shares_2030)
-        else:
-            shares_2030[run_id] = fm.shares_2030
+#        if shares_2030 is None:
+#            shares_2030 = pd.DataFrame(fm.shares_2030)
+#        else:
+#            shares_2030[run_id] = fm.shares_2030
+#        
+#        if shares_2050 is None:
+#            shares_2050 = pd.DataFrame(fm.shares_2050)
+#        else:
+#            shares_2050[run_id] = fm.shares_2050   
+#        
+#        if add_share is None:
+#            add_share = pd.DataFrame(fm.add_share.stack().stack())
+#        else:
+#            add_share[run_id] = fm.add_share.stack().stack()
+#        
+#        if stock_comp is None:
+#            stock_comp = pd.DataFrame(fm.veh_stck)
+#        else:
+#            stock_comp[run_id] = fm.veh_stck
         
-        if shares_2050 is None:
-            shares_2050 = pd.DataFrame(fm.shares_2050)
-        else:
-            shares_2050[run_id] = fm.shares_2050   
-        
-        if add_share is None:
-            add_share = pd.DataFrame(fm.add_share.stack().stack())
-        else:
-            add_share[run_id] = fm.add_share.stack().stack()
-        
-        if stock_comp is None:
-            stock_comp = pd.DataFrame(fm.veh_stck)
-        else:
-            stock_comp[run_id] = fm.veh_stck
-        
-        full_BEV_yr_list.append(fm.full_BEV_year)
-        totc_list.append(fm.totc_opt)
+#        full_BEV_yr_list.append(fm.full_BEV_year)
+#        totc_list.append(fm.totc_opt)
 
         # Display the info for this run
         log.info(repr(info[run_tag]))
@@ -255,7 +267,7 @@ def run_experiment():
 
 
 """ Run the full experiment """
-fleet,run_id_list, shares_2030, shares_2050, add_share, stock_comp, full_BEV_yr_list, totc_list = run_experiment()
+fleet, run_id_list, shares_2030, shares_2050, add_share, stock_comp, full_BEV_yr_list, totc_list = run_experiment()
 
 #with open(fp+'\failed.txt','a+') as f:
 #    f.write('Successfully completed all runs!')
@@ -283,15 +295,15 @@ with open('run_'+now+'.pkl', 'wb') as f:
     d=pickle.load(f)
 d[0][run_id_list[0]].add_share"""
 
-with pd.ExcelWriter('cumulative_scenario_output'+now+'.xlsx') as writer:
-    shares_2030.to_excel(writer,sheet_name='tec_shares_in_2030')
-    shares_2050.to_excel(writer,sheet_name='tec_shares_in_2050')
-    add_share.to_excel(writer,sheet_name='add_shares')
-    stock_comp.to_excel(writer,sheet_name='total_stock')
-    full_BEV_yr.to_excel(writer,sheet_name='1st_year_full_BEV')
-    scenario_totcs.to_excel(writer,sheet_name='totc')
+#with pd.ExcelWriter('cumulative_scenario_output'+now+'.xlsx') as writer:
+#    shares_2030.to_excel(writer,sheet_name='tec_shares_in_2030')
+#    shares_2050.to_excel(writer,sheet_name='tec_shares_in_2050')
+#    add_share.to_excel(writer,sheet_name='add_shares')
+#    stock_comp.to_excel(writer,sheet_name='total_stock')
+#    full_BEV_yr.to_excel(writer,sheet_name='1st_year_full_BEV')
+#    scenario_totcs.to_excel(writer,sheet_name='totc')
    
-full_BEV_yr.plot()
+#full_BEV_yr.plot()
 
 #os.remove(fp+'\failed.txt')
 
