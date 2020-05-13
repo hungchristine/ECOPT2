@@ -219,7 +219,7 @@ VEH_LIFT_MOR(age)                Age distribution = 1 - CDF
 VEH_PAY(prodyear,age,year)       Correspondence between a vehicle production year and its age (up to 20) in a given year
 VEH_STCK_INT_TEC(tec)            Initial share of vehicles in stock tech
 VEH_STCK_INT_SEG(seg)            Initial stock distribution by segment
-VEH_STCK_INT(tec,seg,age)        Initial size of stock of vehicles by age cohort and segment
+VEH_STCK_INT(tec,seg,reg,age)        Initial size of stock of vehicles by age cohort and segment
 
 ** CONSTRAINTS -------
 VEH_ADD_GRD(grdeq,tec)           Parameter for gradient of change constraint (fleet additions) - individual (IND) for each tech or related to all tech (ALL)
@@ -288,7 +288,7 @@ $LOAD VEH_PAY
 $LOAD VEH_STCK_INT_TEC
 $LOAD VEH_STCK_INT_SEG
 
-$LOAD VEH_STCK_INT
+*$LOAD VEH_STCK_INT
 $LOAD BEV_CAPAC
 $LOAD VEH_ADD_GRD
 *$LOAD VEH_SEG_SHR
@@ -309,6 +309,25 @@ FOS .LOW  .CINT     0.3     0.25    0.2     2035
 
 PARAMETER VEH_STCK_TOT(year, reg)
 /
+2000	.HIGH	=       500000
+2001	.HIGH	=       500000
+2002	.HIGH	=       500000
+2003	.HIGH	=       500000
+2004	.HIGH	=       500000
+2005	.HIGH	=       500000
+2006	.HIGH	=       500000
+2007	.HIGH	=       500000
+2008	.HIGH	=       500000
+2009	.HIGH	=       500000
+2010	.HIGH	=       500000
+2011	.HIGH	=       500000
+2012	.HIGH	=       500000
+2013	.HIGH	=       500000
+2014	.HIGH	=       500000
+2015	.HIGH	=       500000
+2016	.HIGH	=       500000
+2017	.HIGH	=       500000
+2018	.HIGH	=       500000
 2019	.HIGH	=       500000
 2020	.HIGH	=       509677.4194
 2021	.HIGH	=       519354.8387
@@ -341,6 +360,55 @@ PARAMETER VEH_STCK_TOT(year, reg)
 2048	.HIGH	=	780645.1613
 2049	.HIGH	=	790322.5806
 2050	.HIGH	=	800000
+2051	.HIGH	=	800000
+2052	.HIGH	=	800000
+2053	.HIGH	=	800000
+2054	.HIGH	=	800000
+2055	.HIGH	=	800000
+2056	.HIGH	=	800000
+2057	.HIGH	=	800000
+2058	.HIGH	=	800000
+2059	.HIGH	=	800000
+2060	.HIGH	=	800000
+2061	.HIGH	=	800000
+2062	.HIGH	=	800000
+2063	.HIGH	=	800000
+2064	.HIGH	=	800000
+2065	.HIGH	=	800000
+2066	.HIGH	=	800000
+2067	.HIGH	=	800000
+2068	.HIGH	=	800000
+2069	.HIGH	=	800000
+2070    .HIGH   =       800000
+2071	.HIGH	=	800000
+2072	.HIGH	=	800000
+2073	.HIGH	=	800000
+2074	.HIGH	=	800000
+2075	.HIGH	=	800000
+2076	.HIGH	=	800000
+2077	.HIGH	=	800000
+2078	.HIGH	=	800000
+2079	.HIGH	=	800000
+2080    .HIGH   =       800000
+2000	.LOW	=	200000
+2001	.LOW	=       200000
+2002	.LOW	=       200000
+2003	.LOW	=       200000
+2004	.LOW	=       200000
+2005	.LOW	=       200000
+2006	.LOW	=       200000
+2007	.LOW	=       200000
+2008	.LOW	=       200000
+2009	.LOW	=       200000
+2010	.LOW	=       200000
+2011	.LOW	=       200000
+2012	.LOW	=       200000
+2013	.LOW	=       200000
+2014	.LOW	=       200000
+2015	.LOW	=       200000
+2016	.LOW	=       200000
+2017	.LOW	=       200000
+2018	.LOW	=       200000
 2019	.LOW	=	200000
 2020	.LOW	=	203225.8065
 2021	.LOW	=	206451.6129
@@ -373,6 +441,36 @@ PARAMETER VEH_STCK_TOT(year, reg)
 2048	.LOW	=	293548.3871
 2049	.LOW	=	296774.1935
 2050	.LOW	=	300000
+2051	.LOW	=	300000
+2052	.LOW	=	300000
+2053	.LOW	=	300000
+2054	.LOW	=	300000
+2055	.LOW	=	300000
+2056	.LOW	=	300000
+2057	.LOW	=	300000
+2058	.LOW	=	300000
+2059	.LOW	=	300000
+2060	.LOW	=	300000
+2061	.LOW	=	300000
+2062	.LOW	=	300000
+2063	.LOW	=	300000
+2064	.LOW	=	300000
+2065	.LOW	=	300000
+2066	.LOW	=	300000
+2067	.LOW	=	300000
+2068	.LOW	=	300000
+2069	.LOW	=	300000
+2070	.LOW	=	300000
+2071	.LOW	=	300000
+2072	.LOW	=	300000
+2073	.LOW	=	300000
+2074	.LOW	=	300000
+2075	.LOW	=	300000
+2076	.LOW	=	300000
+2077	.LOW	=	300000
+2078	.LOW	=	300000
+2079	.LOW	=	300000
+2080	.LOW	=	300000
 /;
 
 * temporary definition; to introduce for all inityears
@@ -541,7 +639,7 @@ SEG_TEC(seg,tec) = (VEH_STCK_INT_TEC(tec))*(VEH_STCK_INT_SEG(seg));
 SEG_TEC_AGE(seg,tec,age) = (VEH_STCK_INT_TEC(tec)*VEH_STCK_INT_SEG(seg))*VEH_LIFT_PDF(age);
 $offtext
 
-*VEH_STCK_INT(tec,seg,age) = (VEH_STCK_INT_TEC(tec)*VEH_LIFT_PDF(age)*VEH_STCK_INT_SEG(seg))*VEH_STCK_TOT('2000');
+VEH_STCK_INT(tec,seg,reg,age) = (VEH_STCK_INT_TEC(tec)*VEH_LIFT_PDF(age)*VEH_STCK_INT_SEG(seg))*VEH_STCK_TOT('2000',reg);
 
 
 *-----------------------------------------------------------------------------------

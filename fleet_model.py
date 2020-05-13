@@ -12,7 +12,7 @@ import numpy as np
 from scipy.stats import norm
 import matplotlib
 import matplotlib.pyplot as plt
-from matplotlib.colors import LinearSegmentedColormap
+from matplotlib.colors import LinearSegmentedColormap, ListedColormap
 from matplotlib.ticker import (MultipleLocator, FormatStrFormatter, AutoMinorLocator, IndexLocator,IndexFormatter,LinearLocator)
 
 import seaborn
@@ -905,7 +905,7 @@ class FleetModel:
             export_fig(ax.get_title)
 #            pp.savefig(bbox_inches='tight')
             
-        def plot_subplots(grouped_df, title, labels, xlabel='year'):
+        def plot_subplots(grouped_df, title, labels, cmap='jet',xlabel='year'):
             for (key,ax) in zip(grouped_df.groups.keys(),axes.flatten()):
                 d = grouped_df.get_group(key)
                 if d.index.nlevels==3:
@@ -913,7 +913,7 @@ class FleetModel:
                 elif d.index.nlevels==2:
                     d = grouped_df.get_group(key).reset_index(level=[0], drop=True)
                 
-                d.plot(ax=ax,cmap='jet', legend=False)
+                d.plot(ax=ax,cmap=cmap, legend=False)
                 
                 ax.set_xlabel(xlabel)
                 ax.set_title(key,fontsize=10,fontweight='bold')
@@ -1018,6 +1018,7 @@ class FleetModel:
 #        ax = (self.stock_add.sum(axis=1).unstack('seg').unstack('tec')/1e6).groupby('reg').plot(kind='area',cmap=paired,title='Stock additions, by segment and technology')
             fix_age_legend(ax, 'Vehicle technology and segment') 
             ax.set_ylabel('Vehicles added to stock \n millions of vehicles')
+            plt.ylim(0,np.ceil(self.stock_df_plot.sum(axis=1).max()))#/5e7)*5e7)
             #axes = self.stock_add.unstack('seg').groupby('tec').plot(kind='area',cmap='jet',title='Stock additions by segment and technology')
             #ax.set_xticklabels([2000,2010,2020,2030,2040,2050])
             #ax.set_xlabel('year')
@@ -1042,7 +1043,7 @@ class FleetModel:
             
             """--- Plot share of BEVs in stock additions ---"""
             temp_df = (self.add_share/self.add_share.sum(axis=1,level=0)).drop('ICE',axis=1, level=1)
-            ax = temp_df.loc[region].plot(cmap=paired,title=f'Share of BEVs in stock additions in region {region}')
+            ax = temp_df.loc[region].plot(kind='line', cmap=paired, title=f'Share of BEVs in stock additions in region {region}')
             ax.xaxis.set_minor_locator(MultipleLocator(1))
             ax.yaxis.set_minor_locator(MultipleLocator(0.25))
             ax.grid(which='minor', axis='x', c='w', alpha=0.6, linestyle=(0,(5,10)), lw=0.1)
@@ -1113,7 +1114,9 @@ class FleetModel:
         fix_age_legend(ax,'Vehicle segment and technology') 
         
         """--- Plot total stocks by age, segment and technology ---"""   
-        ax = self.stock_df_plot.sum(axis=1).unstack('seg').unstack('tec').unstack('reg').plot(kind='area',cmap=paired,title='Total stocks by segment, technology and region')
+#        ax = self.stock_df_plot.sum(axis=1).unstack('seg').unstack('tec').unstack('reg').plot(kind='area',cmap=paired,title='Total stocks by segment, technology and region')
+        stock_tec_seg_reg = self.stock_df_plot.sum(axis=1).unstack('seg').unstack('tec').unstack('reg').drop('PROD', level='reg', axis=1)
+        ax = stock_tec_seg_reg.plot(kind='area', cmap='jet', title='Total stocks by segment, technology and region')
         fix_age_legend(ax,'Vehicle segment, technology and region') 
         
         """--- Plot total stocks by technology and segment ---"""
@@ -1271,11 +1274,25 @@ class FleetModel:
 #        pp.savefig(bbox_inches='tight')
         
         
-        fig, axes = plt.subplots(3,2,figsize=(9,9),sharey=True)
+        fig, axes = plt.subplots(3, 2, figsize=(9,9), sharey=True)
         title = 'initial stock of each cohort' 
         plot_subplots(self.stock_add.unstack('tec').groupby(['seg']),title=title,labels=labels)
         fig.text(0.04,0.5,'Total vehicles, by segment and technology \n(t)', ha='center', rotation='vertical')
         pp.savefig(bbox_inches='tight')
+        
+        fig, axes = plt.subplots(3, 2, figsize=(9,9), sharey=True)
+        title = 'VEH_OPER_CINT for BEVs, by region and segment' 
+        veh_op_cint_plot = self.veh_oper_cint.drop(labels='PROD', axis=0, level='reg').droplevel(['prodyear','enr']).drop_duplicates().unstack(['reg']).loc(axis=0)['BEV']
+        veh_op_cint_plot = (veh_op_cint_plot.swaplevel(-2,-1,axis=0)*1000).unstack('age')
+        
+        k_r_cmap = ListedColormap(['k' for i in np.arange(0, (len(veh_op_cint_plot.columns)/2))]+['r' for i in np.arange(0, (len(veh_op_cint_plot.columns)/2))])
+        plot_subplots(veh_op_cint_plot.groupby(['seg']), title=title, cmap=k_r_cmap, labels=['HIGH','LOW'])
+#        ax = veh_op_cint_plot.groupby(['seg']).plot(stacked=True, cmap=k_r_cmap)
+        fig.text(0.04,0.5,'Vehicle operating emissions intensity, by region and segment \n (kg CO2-eq/km)', ha='center', rotation='vertical')
+        ax.legend(labels=labels,bbox_to_anchor=(0.2,-0.3), ncol=2, fontsize='large')
+        pp.savefig(bbox_inches='tight')
+        
+        pp.close()
 
         """ Check each vintage cohort's LC emissions (actually just production and lifetime operation emissions) for various assumptions of lifetime (in years)"""
 #        fig, axes = plt.subplots(3,2,figsize=(9,9),sharey=True)
@@ -1381,7 +1398,7 @@ class FleetModel:
 #        plt.savefig('CO2.png',pad_inches=2, dpi=600)
 #        pp.savefig()
                 
-        pp.close()
+        
 #        plt.clf()
         """For later: introduce figure plotting vehicle stock vs emissions"""
         
