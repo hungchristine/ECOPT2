@@ -279,17 +279,21 @@ class FleetModel:
         self.sets = gmspy.ls(gdx_filepath=gdx_file, entity='Set')
         ws = gams.GamsWorkspace()
         db = ws.add_database_from_gdx(gdx_file)
-#        display(self.sets[5])
         self.year = gmspy.set2list(self.sets[0], db=db, ws=ws)
-#        display(gmspy.set2list(self.sets[5], db=db, ws=ws))
         self.age = gmspy.set2list(self.sets[4], db=db, ws=ws)
         self.tecs = gmspy.set2list(self.sets[5], db=db, ws=ws)
         self.enr = gmspy.set2list(self.sets[6], db=db, ws=ws)
         self.reg = gmspy.set2list(self.sets[7], db=db, ws=ws)
         self.seg = gmspy.set2list(self.sets[8], db=db, ws=ws)
        
-        self.import_model_results(db)
-    
+        self.read_gams_db(db)  # generate p_dict and v_dict
+
+        # Retrieve parameters required for visualization and calculations
+        self.veh_oper_dist = self._p_dict['VEH_OPER_DIST']
+        
+        # Retrieve GAMS-calculated parameters and variables
+        self.import_model_results()
+        
     def main(self):
         #
         pass
@@ -343,25 +347,84 @@ class FleetModel:
          #spy.param2series('VEH_PAY', db) # series, otherwise makes giant sparse dataframe        
 
     def get_output_from_GAMS(self, gams_db, output_var):
-         temp_GMS_output = []
-         temp_index_list = []
+        """ DEPRECATED. Replaced by v_dict functionality in import_model_results
+        Import variable results from GAMS database 
+        Follows variable structure in GAMS, i.e., uses Multi-Index Series"""
+        temp_GMS_output = []
+        temp_index_list = []
          
-         for rec in gams_db[output_var]:
-            if gams_db[output_var].number_records == 1: # special case for totc
-                temp_output_df = gams_db[output_var].first_record().level
-                return temp_output_df
+        for rec in gams_db[output_var]:
+           if gams_db[output_var].number_records == 1: # special case for totc
+               temp_output_df = gams_db[output_var].first_record().level
+               return temp_output_df
             
-            dict1 = {}
-            dict1.update({'level':rec.level})
-            temp_GMS_output.append(dict1)
-            temp_index_list.append(rec.keys)
-         temp_domain_list = list(gams_db[output_var].domains_as_strings)
-         temp_index = pd.MultiIndex.from_tuples(temp_index_list,names=temp_domain_list)
-         temp_output_df = pd.DataFrame(temp_GMS_output,index = temp_index)
+           dict1 = {}
+           dict1.update({'level':rec.level})
+           temp_GMS_output.append(dict1)
+           temp_index_list.append(rec.keys)
+        temp_domain_list = list(gams_db[output_var].domains_as_strings)
+        temp_index = pd.MultiIndex.from_tuples(temp_index_list,names=temp_domain_list)
+        temp_output_df = pd.DataFrame(temp_GMS_output,index = temp_index)
 
-         return temp_output_df
+        return temp_output_df
      
-    def import_model_results(self, gams_db):
+    def read_gams_db(self, gams_db):
+        """ Fetch sets, parameters, variables and equations from GAMS database"""
+        sets = gmspy.ls(db=gams_db, entity='Set')
+        parameters = gmspy.ls(db=gams_db, entity='Parameter')
+        variables = gmspy.ls(db=gams_db, entity='Variable')
+        equations = gmspy.ls(db=gams_db, entity='Equation')
+            
+        # Export parameters
+        self._p_dict = {}
+        for p in parameters:
+            try:
+                self._p_dict[p] = gmspy.param2df(p, db=gams_db)
+#            except ValueError:
+#                try:
+#                    self._p_dict[p] = gmspy.param2series(p, db=gams_db)
+##                    print('param2series')
+#                except:
+#                    pass
+#                print(f'Warning!: p_dict ValueError in {p}!')
+#                pass
+            except AttributeError:
+                print(f'Warning!: p_dict AttributeError in {p}! Probably no records for this parameter.')
+                pass
+            
+        # Export variables
+        self._v_dict = {}
+        for v in variables:
+            try:
+                self._v_dict[v] = gmspy.var2df(v, db=gams_db)
+#            except ValueError:
+#                try:
+#                    self._v_dict[v] = gmspy.var2series(v, db=gams_db)
+            except ValueError:
+                if len(gams_db[v]) == 1: # special case for totc
+                   self._v_dict[v] = gams_db[v].first_record().level
+                else:
+                    print(f'Warning!: v_dict ValueError in {v}!')
+                pass
+            except TypeError: # This is specifically for seg_add
+                print(f'Warning! v-dict TypeError in {v}! Probably no records for this variable.')
+                pass
+        
+        self._e_dict={}
+        for e in equations:
+            try:
+                self._e_dict[e] = gmspy.eq2series(e, db=gams_db)
+            except ValueError:
+                if len(gams_db[e]) == 1: # special case for totc
+                       self._e_dict[e] = gams_db[e].first_record().level
+                else:
+                    print(f'Warning!: e_dict ValueError in {e}!')
+            except:
+                print(f'Warning!: Error in {e}')
+                print(sys.exc_info()[0])
+                pass
+            
+    def import_model_results(self):
 
         def reorder_age_headers(df_unordered):
             temp = df_unordered
@@ -369,108 +432,66 @@ class FleetModel:
             temp.sort_index(inplace=True,axis=1)
             return temp
         
-        self.veh_stck_delta = self.get_output_from_GAMS(gams_db,'VEH_STCK_DELTA')
-        self.veh_stck_add = self.get_output_from_GAMS(gams_db,'VEH_STCK_ADD')
-        self.veh_stck_rem = self.get_output_from_GAMS(gams_db, 'VEH_STCK_REM')
-        self.veh_stck = self.get_output_from_GAMS(gams_db,'VEH_STCK')
-        self.veh_totc = self.get_output_from_GAMS(gams_db,'VEH_TOTC')
-        self.annual_totc = self.veh_totc.unstack('year').sum()
+        """--- Import the parameters that are calculated within the GAMS model ---"""
+        self.veh_prod_cint = self._p_dict['VEH_PROD_CINT']
+        self.veh_prod_cint = self.veh_prod_cint.stack().to_frame()
+        self.veh_prod_cint.index.rename(['tec','seg','prodyear'],inplace=True)
+        
+        self.veh_oper_eint = self._p_dict['VEH_OPER_EINT']
+        self.veh_oper_eint = self.veh_oper_eint.stack().to_frame()
+        self.veh_oper_eint.index.rename(['tec','seg','year'],inplace=True)
+        
+        self.veh_oper_cint = self._p_dict['VEH_OPER_CINT']
+        self.veh_oper_cint = self.veh_oper_cint.stack().to_frame()
+        self.veh_oper_cint.index.names = ['tec','enr','seg','reg','age','modelyear','prodyear']
+        
+        """--- Import post-processing parameters ---"""
+        self.veh_oper_cohort = self._p_dict['VEH_OPER_COHORT']
+        self.veh_stock_cohort = self._p_dict['VEH_STCK_CHRT']
+#        self.veh_stock_cohort.
+        
+        """--- Import model results ---"""
+        self.veh_stck_delta =self._v_dict['VEH_STCK_DELTA']
+        self.veh_stck_add = self._v_dict['VEH_STCK_ADD']
+        self.veh_stck_rem = self._v_dict['VEH_STCK_REM']
+        self.veh_stck = self._v_dict['VEH_STCK']
+        self.veh_totc = self._v_dict['VEH_TOTC']
+        self.annual_totc = self.veh_totc.sum(axis=0)#self.veh_totc.unstack('year').sum()
 
-        self.veh_prod_totc = self.get_output_from_GAMS(gams_db,'VEH_PROD_TOTC')
-        self.veh_oper_totc = self.get_output_from_GAMS(gams_db,'VEH_OPER_TOTC')
-        self.total_op_emissions = self.veh_oper_totc.unstack('year').sum()
-        self.veh_eolt_totc = self.get_output_from_GAMS(gams_db,'VEH_EOLT_TOTC')
-        
-        self.veh_oper_cohort = self.get_output_from_GAMS(gams_db,'VEH_OPER_COHORT')
-        self.veh_stock_cohort = self.get_output_from_GAMS(gams_db,'VEH_STCK_CHRT')
+        self.veh_prod_totc = self._v_dict['VEH_PROD_TOTC']
+        self.veh_oper_totc = self._v_dict['VEH_OPER_TOTC']
+        self.total_op_emissions = self.veh_oper_totc.sum(axis=0)#.unstack('year').sum()
+        self.veh_eolt_totc = self._v_dict['VEH_EOLT_TOTC']
                 
-        self.emissions = self.veh_prod_totc.join(self.veh_oper_totc,rsuffix='op').join(self.veh_eolt_totc, rsuffix='eolt')
-        self.emissions.columns = ['Production','Operation','End-of-life']
-        self.emissions = self.emissions.unstack(['tec','year']).sum().unstack([None,'tec'])
-        
-        
-        """ Fetch variable and stock compositions"""
-        sets = gmspy.ls(db=gams_db, entity='Set')
-        parameters = gmspy.ls(db=gams_db, entity='Parameter')
-        variables = gmspy.ls(db=gams_db, entity='Variable')
-        equations = gmspy.ls(db=gams_db, entity='Equation')
-        years = gmspy.set2list(sets[0], db=gams_db)
-            
-        # Export parameters
-        p_dict = {}
-        for p in parameters:
-            try:
-#                print(p)
-                p_dict[p] = gmspy.param2df(p, db=gams_db)
-            except ValueError:
-                try:
-#                    print('param2series')
-                    p_dict[p] = gmspy.param2series(p, db=gams_db)
-                except:
-                    print(f'Warning!: p_dict ValueError in {p}!')
-                    pass
-            except AttributeError:
-                print(f'Warning!: p_dict AttributeError in {p}!')
-                pass
-            
-        # Export variables
-        v_dict = {}
-        for v in variables:
-            try:
-                v_dict[v] = gmspy.var2df(v, db=gams_db)
-            except ValueError:
-                try:
-                    v_dict[v] = gmspy.var2series(v, db=gams_db)
-                except:
-                    print(f'Warning!: v_dict ValueError in {v}!')
-                    pass
-            except TypeError: # This is specifically for seg_add
-                print(f'Warning! v-dict TypeError in {v}!')
-                pass
-        
-        e_dict={}
-        for e in equations:
-            try:
-                e_dict[e] = gmspy.eq2series(e, db=gams_db)
-            except:
-                print(f'Warning!: Error in {e}')
-                pass
-        
-        # Prepare model output dataframes for visualization
-        self.stock_df = v_dict['VEH_STCK']
+        self.emissions = pd.concat([self.veh_prod_totc.stack(), self.veh_oper_totc.stack(), self.veh_eolt_totc.stack()], axis=1)
+        self.emissions.columns = ['Production', 'Operation', 'End-of-life']
+        self.emissions = self.emissions.unstack(['tec', 'year']).sum().unstack([None, 'tec'])
+
+        """--- Prepare model output dataframes for visualization ---"""
+        self.stock_df = self._v_dict['VEH_STCK']
+        self.stock_df2 = self._v_dict['VEH_STCK']
         self.stock_df = reorder_age_headers(self.stock_df)
-        self.stock_add = v_dict['VEH_STCK_ADD']
+        self.stock_add = self._v_dict['VEH_STCK_ADD']
         self.stock_add = reorder_age_headers(self.stock_add)
-        self.stock_add = self.stock_add.dropna(axis=1,how='any')
-        self.stock_add.index.rename(['tec','seg','reg','prodyear'],inplace=True)
+        self.stock_add = self.stock_add.dropna(axis=1, how='any')
+        self.stock_add.index.rename(['tec','seg','reg','prodyear'], inplace=True)
         self.stock_df_plot = self.stock_df.stack().unstack('age')  
         self.stock_df_plot = reorder_age_headers(self.stock_df_plot)
 
         self.stock_df_plot_grouped = self.stock_df_plot.groupby(['tec','seg'])
         
-        """self.stock_cohort = v_dict['VEH_STCK_CHRT']
-        self.stock_cohort = self.stock_cohort.droplevel(level='age',axis=0)
-        self.stock_cohort = self.stock_cohort.stack().unstack('prodyear').sum(axis=0,level=['tec','modelyear'])"""
-        
-        self.veh_prod_cint = p_dict['VEH_PROD_CINT']
-        self.veh_prod_cint = self.veh_prod_cint.stack()
-        self.veh_prod_cint.index.rename(['tec','seg','prodyear'],inplace=True)
-        
-        self.veh_oper_eint = p_dict['VEH_OPER_EINT']
-        self.veh_oper_eint = self.veh_oper_eint.stack()
-        self.veh_oper_eint.index.rename(['tec','seg','year'],inplace=True)
-        
-        self.veh_oper_cint = p_dict['VEH_OPER_CINT']
-        self.veh_oper_cint = self.veh_oper_cint.stack()
-        self.veh_oper_cint.index.names = ['tec','enr','seg','reg','age','modelyear','prodyear']
-        
-        self.veh_oper_dist = p_dict['VEH_OPER_DIST']
+        self.stock_cohort = self._p_dict['VEH_STCK_CHRT']
+        self.stock_cohort.index.rename(['tec','seg','reg','prodyear','age'], inplace=True)
+        self.stock_cohort.columns.rename('modelyear', inplace=True)
+        self.stock_cohort = self.stock_cohort.droplevel(level='age', axis=0)
+        self.stock_cohort = self.stock_cohort.stack().unstack('prodyear').sum(axis=0, level=['tec', 'reg', 'modelyear'])#.unstack('modelyear')
+
+        self.veh_oper_dist = self._p_dict['VEH_OPER_DIST']
         self.veh_oper_dist.index = self.veh_oper_dist.index.get_level_values(0) # recast MultiIndex as single index
         
         self.full_oper_dist = self.veh_oper_dist.reindex(self.veh_oper_cint.index, level='modelyear')
-        self.op_emissions = self.veh_oper_cint.multiply(self.full_oper_dist)
+        self.op_emissions = self.veh_oper_cint.multiply(self.full_oper_dist)#.to_frame())
         self.op_emissions.index = self.op_emissions.index.droplevel(level=['enr','age']) # these columns are unncessary/redundant
-        self.op_emissions = self.op_emissions.drop_duplicates()
         self.op_emissions = self.op_emissions.sum(level=['tec','seg','reg','prodyear']) # sum the operating emissions over all model years
         self.op_emissions = self.op_emissions.reorder_levels(order=['tec','seg','reg','prodyear']) # reorder MultiIndex to add production emissions
   
@@ -478,11 +499,12 @@ class FleetModel:
         
         add_gpby = self.stock_add.sum(axis=1).unstack('seg').unstack('tec')
         self.add_share = add_gpby.div(add_gpby.sum(axis=1),axis=0)
+        
         " Export technology shares in 2030 to evaluate speed of uptake"
         self.shares_2030 = self.add_share.loc(axis=0)[:,'2030']#.to_string()
         self.shares_2050 = self.add_share.loc(axis=0)[:,'2050']
 
-        self.enr_cint = p_dict['ENR_CINT']
+        self.enr_cint = self._p_dict['ENR_CINT']
         self.enr_cint = self.enr_cint.stack()
         self.enr_cint.index.rename(['enr','reg','year'],inplace=True)
 
@@ -825,26 +847,7 @@ class FleetModel:
         
         # Export for troubleshooting
         #self.db.export('add_sets.gdx')
-        
-    """def get_output_from_GAMS(self,gams_db,output_var):
-         temp_GMS_output = []
-         temp_index_list = []
-         
-         for rec in gams_db[output_var]:
-            if gams_db[output_var].number_records ==1: # special case for totc
-                temp_output_df = gams_db[output_var].first_record().level
-                return temp_output_df
-            
-            dict1 = {}
-            dict1.update({'level':rec.level})
-            temp_GMS_output.append(dict1)
-            temp_index_list.append(rec.keys)
-         temp_domain_list = list(gams_db[output_var].domains_as_strings)
-         temp_index = pd.MultiIndex.from_tuples(temp_index_list,names=temp_domain_list)
-         temp_output_df = pd.DataFrame(temp_GMS_output,index = temp_index)
-
-         return temp_output_df"""
-        
+                
     def calc_crit_materials(self):
         # performs critical material mass accounting
         pass
