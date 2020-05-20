@@ -4,6 +4,8 @@
 *.lst
 *.log*
 *.lxi
+*.opt
+*.~gm
 
 # Output YAML files
 testing_*.yaml
@@ -31,3 +33,6 @@ __pycache__/
 # Python-generated GAMS temp files
 _gams_py_*
 
+*.pdf
+*.xls*
+*.zip
