@@ -2,7 +2,7 @@
 
 *.gdx
 *.lst
-*.log
+*.log*
 *.lxi
 
 # Output YAML files
@@ -24,3 +24,10 @@ __pycache__/
 
 # Python egg metadata, regenerated from source files by setuptools.
 /*.egg-info
+
+# Output pickles
+*.pkl
+
+# Python-generated GAMS temp files
+_gams_py_*
+
