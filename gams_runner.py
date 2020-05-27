@@ -25,10 +25,11 @@ import gmspy
 import fleet_model
 
 class GAMSRunner:
+    """--- This class sets up the GAMS environment for running experiments ---"""
     def __init__(self):
         """ Optimization Initialization """
         self.current_path = os.path.dirname(os.path.realpath(__file__))
-        self.export_fp = 'C:\\Users\\chrishun\\Box Sync\\YSSP_temp\\Model run data\\'
+        self.export_fp = os.path.join(self.current_path, 'Model run data') #r'C:\Users\chrishun\Box Sync\YSSP_temp\Model run data\'
         self.ws = gams.GamsWorkspace(working_directory=self.current_path, debug=2)
 #        self.db = self.ws.add_database()#database_name='pyGAMSdb')
         self.opt = self.ws.add_options()
@@ -88,12 +89,13 @@ class GAMSRunner:
         veh_partab = gmspy.df2param(self.db, fleet.veh_partab, ['veheq', 'tec', 'seg', 'sigvar'], 'VEH_PARTAB')
 
         veh_add_grd = self.db.add_parameter_dc('VEH_ADD_GRD', ['grdeq','tec'])
+        
         # Prep work making add gradient df from given rate constraint
         
         # adding growth constraint for each tec    
         for keys,value in iter(fleet.veh_add_grd.items()):
             veh_add_grd.add_record(keys).value = value
-        print('_load_experiment_data')
+
 #        veh_add_grd = gmspy.df2param(self.db,self.veh_add_grd, ['grdeq','tec'], 'VEH_ADD_GRD')
     
         gro_cnstrnt = gmspy.df2param(self.db, fleet.gro_cnstrnt, ['year'],'GRO_CNSTRNT')
@@ -102,7 +104,7 @@ class GAMSRunner:
         
         enr_partab = gmspy.df2param(self.db, fleet.enr_partab,['enr','enreq','sigvar'],'ENR_PARTAB')
         
-        print('exporting database...'+filename+'_input')
+        print('\n exporting database...'+filename+'_input')
         self.db.suppress_auto_domain_checking = 1
         self.db.export(os.path.join(self.current_path, filename+'_input'))
 
@@ -125,7 +127,7 @@ class GAMSRunner:
 
          return temp_output_df
      
-    def update_fleet(self,fleet):
+    def update_fleet(self, fleet):
         """ tec_add_gradient --> veh_add_grd """
         fleet.veh_add_grd = dict()
         for element in itertools.product(*[fleet.grdeq,fleet.tecs]):
@@ -163,27 +165,26 @@ class GAMSRunner:
     mi.instantiate("transport use lp min z", GamsModifier(x, UpdateAction.Upper, xup))
     mi.solve() """
         try:
-
             model_run = self.ws.add_job_from_file(fleet.gms_file) # model_run is type GamsJob
             
             opt = self.ws.add_options()
             opt.defines["gdxincname"] = self.db.name
-            print(f"Using input gdx file: {self.db.name}")
-            print("running GAMS model, please wait...")
+            print('\n'+ f'Using input gdx file: {self.db.name}')
+            print('running GAMS model, please wait...')
             model_run.run(opt, databases=self.db)#,create_out_db = True)
-            print("Ran GAMS model: "+fleet.gms_file)
+            print('\n Ran GAMS model: ' + fleet.gms_file)
 
             gams_db = model_run.out_db
-            self.export_model = os.path.join(self.export_fp,run_tag+'_solution.gdx')
+            self.export_model = os.path.join(self.export_fp, run_tag+'_solution.gdx')
             gams_db.export(self.export_model)
-            print("Completed export of solution database")# + self.export_fp)
+            print('\n' + f'Completed export of solution database to {self.export_model}')
             
             """ Fetch model outputs"""
             fleet.totc = self.get_output_from_GAMS(gams_db,'TOTC')
             fleet.totc_opt = self.get_output_from_GAMS(gams_db,'TOTC_OPT')
             
         except:
-            print(f"ERROR in running model {fleet.gms_file}")
+            print('\n' + f'ERROR in running model {fleet.gms_file}')
             exceptions = self.db.get_database_dvs()
             try:
                 print(exceptions.symbol.name)
@@ -343,7 +344,6 @@ class GAMSRunner:
         
         fleet.LC_emissions_avg = [quality_check(i) for i in range(0, 28)]
 
-            
 #            fleet.LC_emissions_avg = fleet.op_emissions_avg.add(fleet.veh_prod_cint) 
                
 #        with pd.ExcelWriter('troubleshooting_output_1.xlsx') as writer:
