@@ -60,8 +60,8 @@ yaml.SafeDumper.ignore_aliases = lambda *args: True
 
 # Make timestamp and directory for scenario run results for output files
 now = datetime.now().isoformat(timespec='minutes').replace(':','_')
-#yaml_name = 'unit_test.yaml'
-yaml_name = 'GAMS_input.yaml'
+#yaml_name = 'unit_test'#.yaml'
+yaml_name = 'GAMS_input'#.yaml'
 
 if yaml_name == 'unit_test.yaml':
     fp = r'C:\Users\chrishun\Box Sync\YSSP_temp\visualization output\unit_test_'+now
@@ -83,6 +83,7 @@ def run_experiment():
     # r'C:\Users\chrishun\Box Sync\YSSP_temp\temp_input.yaml'
     # r'C:\Users\chrishun\Box Sync\YSSP_temp\temp_input_presubmission.yaml'
 #    with open(r'C:\Users\chrishun\Box Sync\YSSP_temp\GAMS_input.yaml', 'r') as stream:
+    
     with open(input_file, 'r') as stream:
         try:
             params = yaml.safe_load(stream)
@@ -106,6 +107,7 @@ def run_experiment():
 
     # Run experiments
     id_and_value = [params[p].items() for p in param_names]
+
     # NB could also change the names here
     
     # Calculate total number of runs
@@ -123,10 +125,10 @@ def run_experiment():
     fleet_dict = {}
     run_id_list = []
     totc_list = []
-    full_BEV_yr_list = []
+    full_BEV_yr_df = pd.DataFrame()
     
+    # Create a GAMSRunner object to run the experiments
     gams_run = gams_runner.GAMSRunner()
-
     
     for i, run_params in enumerate(product(*id_and_value)):
         print('Starting run '+str(i+1)+' of '+str(count)+'\n\n')
@@ -168,12 +170,15 @@ def run_experiment():
         
         """fm.run_GAMS(run_tag)"""
         try:
-            gams_run.run_GAMS(fm, run_tag, yaml_name)
+            gams_run.run_GAMS(fm, run_tag, yaml_name) # run the GAMS model
         except Exception:
             print("failed run, deleting folder")
             traceback.print_exc()
             os.chdir('..')
             os.rmdir(fp)
+            # Force quit if single run has failed
+            if count == 1:
+                sys.exit()
             
         exceptions = gams_run.db.get_database_dvs()
         if len(exceptions) > 1:
@@ -215,7 +220,7 @@ def run_experiment():
 #            f.write('Successful run. Next: visualization!')
             
         try:
-            fm.figure_calculations()
+            fm.figure_calculations()  # run extra calculations for cross-experiment figures
             fm.vis_GAMS(fp, run_id, info[run_tag]['params'], export_png=False)
         except Exception:
             print("failed visualization, deleting folder")
@@ -227,33 +232,33 @@ def run_experiment():
 #        os.rename(fp,fp+'_success_vis')
         
         # Save pertinent info to compare across scenarios in dataframe
-#        fm.shares_2030.name = run_id
-#        fm.shares_2050.name = run_id
-#        fm.add_share.name = run_id
-#        fm.veh_stck.name = run_id
+        fm.shares_2030.name = run_id
+        fm.shares_2050.name = run_id
+        fm.add_share.name = run_id
+        fm.veh_stck.name = run_id
         
-#        if shares_2030 is None:
-#            shares_2030 = pd.DataFrame(fm.shares_2030)
-#        else:
-#            shares_2030[run_id] = fm.shares_2030
-#        
-#        if shares_2050 is None:
-#            shares_2050 = pd.DataFrame(fm.shares_2050)
-#        else:
-#            shares_2050[run_id] = fm.shares_2050   
-#        
-#        if add_share is None:
-#            add_share = pd.DataFrame(fm.add_share.stack().stack())
-#        else:
-#            add_share[run_id] = fm.add_share.stack().stack()
-#        
-#        if stock_comp is None:
-#            stock_comp = pd.DataFrame(fm.veh_stck)
-#        else:
-#            stock_comp[run_id] = fm.veh_stck
+        if shares_2030 is None:
+            shares_2030 = pd.DataFrame(fm.shares_2030)
+        else:
+            shares_2030[run_id] = fm.shares_2030
         
-#        full_BEV_yr_list.append(fm.full_BEV_year)
-#        totc_list.append(fm.totc_opt)
+        if shares_2050 is None:
+            shares_2050 = pd.DataFrame(fm.shares_2050)
+        else:
+            shares_2050[run_id] = fm.shares_2050   
+        
+        if add_share is None:
+            add_share = pd.DataFrame(fm.add_share.stack().stack())
+        else:
+            add_share[run_id] = fm.add_share.stack().stack()
+        
+        if stock_comp is None:
+            stock_comp = pd.DataFrame(fm.veh_stck)
+        else:
+            stock_comp[run_id] = fm.veh_stck
+        
+        full_BEV_yr_df.append(fm.full_BEV_year, ignore_index=True)
+        totc_list.append(fm.totc_opt)
 
         # Display the info for this run
         log.info(repr(info[run_tag]))
@@ -263,16 +268,18 @@ def run_experiment():
     with open(f'output_{now}.yaml', 'w') as f:
         yaml.safe_dump(info, f)
     
-    return fm, run_id_list, shares_2030,  shares_2050, add_share, stock_comp, full_BEV_yr_list, totc_list#, fleet_dict
+    # Return last fleet object for troubleshooting
+    return fm, run_id_list, shares_2030,  shares_2050, add_share, stock_comp, full_BEV_yr_df, totc_list#, fleet_dict
 
 
-""" Run the full experiment """
-fleet, run_id_list, shares_2030, shares_2050, add_share, stock_comp, full_BEV_yr_list, totc_list = run_experiment()
+""" Run the full experiment portfolio; also returns last instance of FleetModel object for troubleshooting"""
+fm, run_id_list, shares_2030, shares_2050, add_share, stock_comp, full_BEV_yr_df, totc_list = run_experiment()
 
 #with open(fp+'\failed.txt','a+') as f:
 #    f.write('Successfully completed all runs!')
-    
-full_BEV_yr = pd.DataFrame(full_BEV_yr_list,index = run_id_list)
+
+""" Perform calculations across the experiments"""
+full_BEV_yr = pd.DataFrame(full_BEV_yr_df, index = run_id_list)
 
 scenario_totcs = pd.DataFrame(totc_list, index=run_id_list)
 scenario_totcs = pd.DataFrame(totc_list, index = run_id_list, columns=['totc_opt'])
@@ -289,7 +296,7 @@ except:
 
 # Export potentially helpful output for analyzing across scenarios
 with open('run_'+now+'.pkl', 'wb') as f:
-    pickle.dump([shares_2030, shares_2050, add_share, stock_comp, full_BEV_yr, scenario_totcs], f)
+    pickle.dump([shares_2030, shares_2050, add_share, stock_comp, full_BEV_yr_df, scenario_totcs], f)
 
 """with open('run_2019-09-22T14_50.pkl','rb') as f:
     d=pickle.load(f)

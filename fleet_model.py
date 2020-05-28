@@ -56,223 +56,240 @@ class FleetModel:
     """
     def __init__(self, veh_stck_int_seg=None, tec_add_gradient=None, seg_batt_caps=None, B_term_prod=None, B_term_oper_EOL=None, r_term_factors=0.2, 
                  u_term_factors=2025, pkm_scenario='iTEM2-Base', eur_batt_share=0.5, occupancy_rate=1.643, data_from_message=None, gdx_file=None):
-#        if gdx_file is not None:
-           
-        self.B_prod = B_term_prod
-        self.B_oper = B_term_oper_EOL
+#        self.current_path = os.path.dirname(os.path.realpath(__file__))
+        " Instantiate filepaths "
+        home_fp = os.path.dirname(os.path.realpath(__file__))
+
+#        os.chdir(home_fp)
         
-        self.current_path = os.path.dirname(os.path.realpath(__file__))
-#        ch_path = os.path.dirname(os.path.abspath(__file__))+r'\visualization output\ '
-        os.chdir(r'C:\Users\chrishun\Box Sync\YSSP_temp')
-       #self.gdx_file = 'C:\\Users\\chrishun\\Box Sync\\YSSP_temp\\EVD4EUR_input.gdx'#EVD4EUR_ver098.gdx'
-        self.gms_file = 'C:\\Users\\chrishun\\Box Sync\\YSSP_temp\\EVD4EUR.gms' # GAMS model file
-        self.import_fp = 'C:\\Users\\chrishun\\Box Sync\\YSSP_temp\\GAMS_input_new.xls'
-        self.export_fp = 'C:\\Users\\chrishun\\Box Sync\\YSSP_temp\\Model run data\\'
+#       self.gdx_file = 'C:\\Users\\chrishun\\Box Sync\\YSSP_temp\\EVD4EUR_input.gdx'#EVD4EUR_ver098.gdx'  # for reading in inputs from gdx file
+        self.gms_file = os.path.join(home_fp, r'EVD4EUR.gms') # GAMS model file
+        self.import_fp = os.path.join(home_fp, r'GAMS_input_new.xls')
+        self.export_fp = os.path.join(home_fp, r'Model run data')
         self.keeper = "{:%d-%m-%y, %H_%M}".format(datetime.now())
-#        self.xl_writer = pd.ExcelWriter('output'+self.keeper+'.xlsx')
+
+        
+        if gdx_file is not None:
+            self._from_gdx(gdx_file)
+        else: 
+            try:
+                self._from_python(veh_stck_int_seg, tec_add_gradient, seg_batt_caps, 
+                                  B_term_prod, B_term_oper_EOL, r_term_factors, u_term_factors, 
+                                  pkm_scenario, eur_batt_share, occupancy_rate, data_from_message)
+#                self.B_prod = B_term_prod # not currently used
+#                self.B_oper = B_term_oper_EOL # not currently used
+            except AttributeError as err:
+                print(f"Exception: {err}")
+                print("Generating empty fleet object")   
+
+    def _from_python(self, veh_stck_int_seg, tec_add_gradient, seg_batt_caps, 
+                     B_term_prod, B_term_oper_EOL, r_term_factors, u_term_factors, 
+                     pkm_scenario, eur_batt_share, occupancy_rate, data_from_message):
+        
+        """--- For instantiating Fleet object using Python ---"""
+        """ static input data.....hardcoded and/or read in from Excel? """
+        self.battery_specs = pd.DataFrame() # possible battery_sizes (and acceptable segment assignments, CO2 production emissions, critical material content, mass)
+        self.fuelcell_specs = pd.DataFrame() # possible fuel cell powers (and acceptable segment assignments, CO2 production emissions, critical material content, fuel efficiency(?), mass)
+        self.lightweighting = pd.DataFrame() # lightweighting data table - lightweightable materials and coefficients for corresponding lightweighting material(s)
+        self.tec_add_gradient = tec_add_gradient
+        
+        if data_from_message is not None:
+            self.el_intensity = data_from_message # regional el-mix intensities as time series from MESSAGE
+            self.trsp_dem = data_from_message # EUR transport demand as time series from MESSAGE
+        """ boundary conditions for constraints, e.g., electricity market supply constraints, crit. material reserves? could possibly belong in experiment specifications as well..."""
+        
+        """ GAMS-relevant attributes"""
+        #  --------------- GAMS sets / domains -------------------------------
+        self.tecs = ['ICE', 'BEV']                               # drivetrain technologies; can include e.g., alternative battery chemistries
+        self.modelyear = [str((2000)+i) for i in range(81)]
+        self.inityear=[str(2000+i) for i in range(21)]          # reduce to one/five year(s)? Originally 2000-2020
+        self.cohort = [str((2000-28)+i) for i in range(81+28)]  # vehicle cohorts (production year)
+        self.optyear = [str(2020+i) for i in range(61)]
+        self.age = [str(i) for i in range(28)]                  # vehicle age, up to 27 years old
+#        self.age = [str(i) for i in range(11)]
+        self.enr = ['ELC', 'FOS']                                # fuel types; later include H2, 
+        self.seg = ['A', 'B', 'C', 'D', 'E', 'F']                    # From ACEA: Small, lower medium, upper medium, executive
+        self.reg = ['HIGH', 'LOW', 'PROD']#['1', '2', '3', '4', '5', '6'] # study regions
+        self.demeq= ['STCK_TOT', 'OPER_DIST', 'OCUP']             # definition of 
+        self.dstvar=['mean', 'stdv']
+        self.enreq=['CINT']
+        self.grdeq=['IND', 'ALL']
+        self.veheq = ['PROD_EINT', 'PROD_CINT_CSNT', 'OPER_EINT', 'EOLT_CINT']
+        self.lfteq = ['LFT_DISTR', 'AGE_DISTR']
+        self.sigvar = ['A', 'B', 'r', 'u']                         # S-curve terms
+        self.critmats = ['Cu', 'Li', 'Co', 'Pt', '', '']           # critical elements to count for; to incorporate later
+        self.age_int = list(map(int,self.age))
+        
+        # --------------- GAMS Parameters -------------------------------------
+
+        """needs to be made in terms of tec as well??"""
+        """Currently uses generalized logistic growth curve"""
+        
+        """ Currently uses smoothed total vehicle stock instead of stock from MESSAGE-Transport, which swings widely """
+        self.veh_stck_tot = pd.DataFrame(pd.read_excel(self.import_fp,sheet_name='VEH_STCK_TOT',header=None,usecols='A,C',skiprows=[0])) # usecols='A:B' for MESSAGE data, usecols='A,C' for old data
+#        self.veh_stck_tot = self._process_series(self.veh_stck_tot)
+        self.veh_stck_tot = self._process_df_to_series(self.veh_stck_tot)
+        
+        # "Functional unit" # TODO: this is redund
+        # Eurostat road_tf_veh [vkm]
+        # Eurostat road_tf_vehage [vkm, cohort] NB: very limited geographic spectrum
+        # Eurostat road_pa_mov [pkm]
+        # http://www.odyssee-mure.eu/publications/efficiency-by-sector/transport/distance-travelled-by-car.html
+        self.occupancy_rate = occupancy_rate or 1.643 #convert to time-dependent parameter #None # vkm -> pkm conversion
+        self.all_pkm_scenarios = pd.DataFrame(pd.read_excel(self.import_fp, sheet_name = 'pkm',header = [0],index_col = [0])).T
+        self.passenger_demand = self.all_pkm_scenarios[pkm_scenario] # retrieve pkm demand from selected scenario
+        self.passenger_demand.reset_index()
+#        self.passenger_demand = pd.DataFrame(pd.read_excel(self.import_fp,sheet_name='VEH_STCK_TOT',header=None,usecols='A,G',skiprows=[0])) #hardcoded retrieval of pkm demand
+#        self.passenger_demand = self._process_df_to_series(self.passenger_demand)
+        self.passenger_demand = self.passenger_demand*1e9
+        self.passenger_demand.name = ''
+        self.passenger_demand.index = self.veh_stck_tot.index
+        self.fleet_vkm = self.passenger_demand/self.occupancy_rate
+#        self.veh_oper_dist = self.fleet_vkm/self.veh_stck_tot
+        self.veh_oper_dist = pd.Series([10000 for i in range(0,len(self.fleet_vkm))], index=[str(i) for i in range(2000,2081)])
+                
+#        self.veh_oper_dist = pd.Series([-97.052*i+207474 for i in range(2000,2051)],index=[str(i) for i in range(2000,2051)]) 
+        self.veh_oper_dist.index.name='year'
+        # [years] driving distance each year # TODO: rename?
+            
+        self.veh_stck_int_seg = veh_stck_int_seg or [0.08, 0.21, 0.27, 0.08, 0.03, 0.34]  # Shares from 2017, ICCT report
+        self.veh_stck_int_seg= pd.Series(self.veh_stck_int_seg,index=self.seg)
+        
+        self.seg_batt_caps = pd.Series(seg_batt_caps,index = self.seg) # For battery manufacturing capacity constraint
+        self.eur_batt_share = eur_batt_share or 0.5
+
+        ################ Life cycle intensities ################
+#        """These factors are usually calculated using the general logistic function"""
+#        self.veh_prod_cint_csnt = pd.DataFrame(pd.read_excel(self.import_fp,sheet_name='VEH_PROD_CINT_CSNT',header=None,usecols='A:D',skiprows=[0]))
+#        self.veh_prod_cint_csnt = self._process_df_to_series(self.veh_prod_cint_csnt)
+
+#        self.veh_prod_eint = pd.DataFrame(pd.read_excel(self.import_fp,sheet_name='VEH_PROD_EINT',header=None,usecols='A:D',skiprows=[0]))
+#        self.veh_prod_eint = self._process_df_to_series(self.veh_prod_eint)
+
+#        self.veh_prod_cint = pd.DataFrame(pd.read_excel('GAMS_input_new.xls',sheet_name='VEH_PROD_CINT',header=None,usecols='A:D',skiprows=[0]))  # [tecs, cohort]
+#        self.veh_prod_cint = self._process_df_to_series(self.veh_prod_cint)
+#        
+#        self.veh_oper_eint = pd.DataFrame(pd.read_excel(self.import_fp,sheet_name='VEH_OPER_EINT',header=None,usecols='A:D',skiprows=[0]))  # [[tecs, enr], cohort]
+#        self.veh_oper_eint = self._process_df_to_series(self.veh_oper_eint)
+#        pd.read_excel(self.import_fp,sheet_name='fuel economy', usecols='A:G',skiprows=23,index_col=[0],nrows=14)
+#        self.veh_oper_cint = pd.DataFrame(pd.read_excel('GAMS_input_new.xls',sheet_name='VEH_OPER_CINT',header=None,usecols='A:E',skiprows=[0]))  # [[tecs, enr], cohort]
+#        self.veh_oper_cint = self._process_df_to_series(self.veh_oper_cint)
+#        
+        """Trial for calculating general logistic function in-code""" 
+        """self.veh_partab = pd.DataFrame(pd.read_excel(self.import_fp,sheet_name='VEH_PARTAB',header=None,usecols='A:D',skiprows=[0]))
+        self.veh_partab = self._process_df_to_series(self.veh_partab)
+        print(self.veh_partab)
+        self.trial_oper_eint = self.veh_partab['OPER_EINT']
+        self.oper_eint = self.trial_oper_eint['A']+(trial_oper_eint['B']-trial_oper_eint['A'])/(1+exp(-trial_oper_eint['r']*(self.year-trial_oper_eint['u'])))
+        #A, B, r, u"""
 #
-#        """ static input data.....hardcoded and/or read in from Excel? """
-#        self.battery_specs = pd.DataFrame() # possible battery_sizes (and acceptable segment assignments, CO2 production emissions, critical material content, mass)
-#        self.fuelcell_specs = pd.DataFrame() # possible fuel cell powers (and acceptable segment assignments, CO2 production emissions, critical material content, fuel efficiency(?), mass)
-#        self.lightweighting = pd.DataFrame() # lightweighting data table - lightweightable materials and coefficients for corresponding lightweighting material(s)
-#        
-#        if data_from_message is not None:
-#            self.el_intensity = data_from_message # regional el-mix intensities as time series from MESSAGE
-#            self.trsp_dem = data_from_message # EUR transport demand as time series from MESSAGE
-#        """ boundary conditions for constraints, e.g., electricity market supply constraints, crit. material reserves? could possibly belong in experiment specifications as well..."""
-#        
-#        """ GAMS-relevant attributes"""
-#        #  --------------- GAMS sets / domains -------------------------------
-#        self.tecs = ['ICE', 'BEV']                               # drivetrain technologies; can include e.g., alternative battery chemistries
-#        self.modelyear = [str((2000)+i) for i in range(81)]
-#        self.inityear=[str(2000+i) for i in range(21)]          # reduce to one/five year(s)? Originally 2000-2020
-#        self.cohort = [str((2000-28)+i) for i in range(81+28)]  # vehicle cohorts (production year)
-#        self.optyear = [str(2020+i) for i in range(61)]
-#        self.age = [str(i) for i in range(28)]                  # vehicle age, up to 27 years old
-##        self.age = [str(i) for i in range(11)]
-#        self.enr = ['ELC', 'FOS']                                # fuel types; later include H2, 
-#        self.seg = ['A', 'B', 'C', 'D', 'E', 'F']                    # From ACEA: Small, lower medium, upper medium, executive
-#        self.reg = ['HIGH', 'LOW', 'PROD']#['1', '2', '3', '4', '5', '6'] # study regions
-#        self.demeq= ['STCK_TOT', 'OPER_DIST', 'OCUP']             # definition of 
-#        self.dstvar=['mean', 'stdv']
-#        self.enreq=['CINT']
-#        self.grdeq=['IND', 'ALL']
-#        self.veheq = ['PROD_EINT', 'PROD_CINT_CSNT', 'OPER_EINT', 'EOLT_CINT']
-#        self.lfteq = ['LFT_DISTR', 'AGE_DISTR']
-#        self.sigvar = ['A', 'B', 'r', 'u']                         # S-curve terms
-#        self.critmats = ['Cu', 'Li', 'Co', 'Pt', '', '']             # critical elements to count for; to incorporate later
-#        self.age_int = list(map(int,self.age))
-#        
-#        # --------------- GAMS Parameters -------------------------------------
-#
-#        """needs to be made in terms of tec as well??"""
-#        """Currently uses generalized logistic growth curve"""
-#        
-#        """ Currently uses smoothed total vehicle stock instead of stock from MESSAGE-Transport, which swings widely """
-#        self.veh_stck_tot = pd.DataFrame(pd.read_excel(self.import_fp,sheet_name='VEH_STCK_TOT',header=None,usecols='A,C',skiprows=[0])) # usecols='A:B' for MESSAGE data, usecols='A,C' for old data
-##        self.veh_stck_tot = self._process_series(self.veh_stck_tot)
-#        self.veh_stck_tot = self._process_df_to_series(self.veh_stck_tot)
-#        
-#        # "Functional unit" # TODO: this is redund
-#        # Eurostat road_tf_veh [vkm]
-#        # Eurostat road_tf_vehage [vkm, cohort] NB: very limited geographic spectrum
-#        # Eurostat road_pa_mov [pkm]
-#        # http://www.odyssee-mure.eu/publications/efficiency-by-sector/transport/distance-travelled-by-car.html
-#        self.occupancy_rate = occupancy_rate or 1.643 #convert to time-dependent parameter #None # vkm -> pkm conversion
-#        self.all_pkm_scenarios = pd.DataFrame(pd.read_excel(self.import_fp, sheet_name = 'pkm',header = [0],index_col = [0])).T
-#        self.passenger_demand = self.all_pkm_scenarios[pkm_scenario] # retrieve pkm demand from selected scenario
-#        self.passenger_demand.reset_index()
-##        self.passenger_demand = pd.DataFrame(pd.read_excel(self.import_fp,sheet_name='VEH_STCK_TOT',header=None,usecols='A,G',skiprows=[0])) #hardcoded retrieval of pkm demand
-##        self.passenger_demand = self._process_df_to_series(self.passenger_demand)
-#        self.passenger_demand = self.passenger_demand*1e9
-#        self.passenger_demand.name = ''
-#        self.passenger_demand.index = self.veh_stck_tot.index
-#        self.fleet_vkm = self.passenger_demand/self.occupancy_rate
-##        self.veh_oper_dist = self.fleet_vkm/self.veh_stck_tot
-#        self.veh_oper_dist = pd.Series([10000 for i in range(0,len(self.fleet_vkm))], index=[str(i) for i in range(2000,2081)])
-#                
-##        self.veh_oper_dist = pd.Series([-97.052*i+207474 for i in range(2000,2051)],index=[str(i) for i in range(2000,2051)]) 
-#        self.veh_oper_dist.index.name='year'
-#        # [years] driving distance each year # TODO: rename?
-#            
-#        self.veh_stck_int_seg = veh_stck_int_seg or [0.08, 0.21, 0.27, 0.08, 0.03, 0.34]  # Shares from 2017, ICCT report
-#        self.veh_stck_int_seg= pd.Series(self.veh_stck_int_seg,index=self.seg)
-#        
-#        self.seg_batt_caps = pd.Series(seg_batt_caps,index = self.seg) # For battery manufacturing capacity constraint
-#        self.eur_batt_share = eur_batt_share or 0.5
-#
-#        ################ Life cycle intensities ################
-##        """These factors are usually calculated using the general logistic function"""
-##        self.veh_prod_cint_csnt = pd.DataFrame(pd.read_excel(self.import_fp,sheet_name='VEH_PROD_CINT_CSNT',header=None,usecols='A:D',skiprows=[0]))
-##        self.veh_prod_cint_csnt = self._process_df_to_series(self.veh_prod_cint_csnt)
-#
-##        self.veh_prod_eint = pd.DataFrame(pd.read_excel(self.import_fp,sheet_name='VEH_PROD_EINT',header=None,usecols='A:D',skiprows=[0]))
-##        self.veh_prod_eint = self._process_df_to_series(self.veh_prod_eint)
-#
-##        self.veh_prod_cint = pd.DataFrame(pd.read_excel('GAMS_input_new.xls',sheet_name='VEH_PROD_CINT',header=None,usecols='A:D',skiprows=[0]))  # [tecs, cohort]
-##        self.veh_prod_cint = self._process_df_to_series(self.veh_prod_cint)
-##        
-##        self.veh_oper_eint = pd.DataFrame(pd.read_excel(self.import_fp,sheet_name='VEH_OPER_EINT',header=None,usecols='A:D',skiprows=[0]))  # [[tecs, enr], cohort]
-##        self.veh_oper_eint = self._process_df_to_series(self.veh_oper_eint)
-##        pd.read_excel(self.import_fp,sheet_name='fuel economy', usecols='A:G',skiprows=23,index_col=[0],nrows=14)
-##        self.veh_oper_cint = pd.DataFrame(pd.read_excel('GAMS_input_new.xls',sheet_name='VEH_OPER_CINT',header=None,usecols='A:E',skiprows=[0]))  # [[tecs, enr], cohort]
-##        self.veh_oper_cint = self._process_df_to_series(self.veh_oper_cint)
-##        
-#        """Trial for calculating general logistic function in-code""" 
-#        """self.veh_partab = pd.DataFrame(pd.read_excel(self.import_fp,sheet_name='VEH_PARTAB',header=None,usecols='A:D',skiprows=[0]))
-#        self.veh_partab = self._process_df_to_series(self.veh_partab)
-#        print(self.veh_partab)
-#        self.trial_oper_eint = self.veh_partab['OPER_EINT']
-#        self.oper_eint = self.trial_oper_eint['A']+(trial_oper_eint['B']-trial_oper_eint['A'])/(1+exp(-trial_oper_eint['r']*(self.year-trial_oper_eint['u'])))
-#        #A, B, r, u"""
-##
-##        self.veh_eolt_cint = pd.DataFrame(pd.read_excel(self.import_fp,sheet_name='VEH_EOLT_CINT',header=None,usecols='A:D',skiprows=[0]))  # [[tecs, enr], cohort]
-##        self.veh_eolt_cint = self._process_df_to_series(self.veh_eolt_cint)  # [tecs, cohort]
-#
-#        ################ Fleet dynamics ################
-#        """VEH_LIFT_CDF(age) = cdfnormal(AGE_PAR(age),LFT_PARTAB('mean'),LFT_PARTAB('stdv'));
-#        VEH_LIFT_AGE(age) = (1 - VEH_LIFT_CDF(age))/sum(agej, VEH_LIFT_CDF(agej)) ;
-#        VEH_LIFT_MOR(age)$(ord(age)< 20) = 1 - VEH_LIFT_AGE(age+1)/VEH_LIFT_AGE(age);
-#        VEH_LIFT_MOR(age)$(ord(age)= 20) = 1"""
-#        self.avg_age = 11.1 # From ACEA 2019-2020 report
-#        self.std_dev_age = 2.21
-##        self.avg_age = 11
-##        self.std_dev_age = 0
-#        self.veh_lift_cdf = pd.Series(norm.cdf(self.age_int,self.avg_age,self.std_dev_age),index=self.age)#pd.Series(pd.read_pickle(self.import_fp+'input.pkl'))#pd.DataFrame()  # [age] TODO Is it this one we feed to gams?
-#        self.veh_lift_cdf.index = self.veh_lift_cdf.index.astype('str')
-#        
-#        self.veh_lift_age = pd.Series(1-self.veh_lift_cdf)     # [age] # probability of car of age x to die in current year
-#        
-#        #lifetime = [1-self.veh_lift_age[i+1]/self.veh_lift_age[i] for i in range(len(self.age)-1)]
-#        self.veh_lift_pdf = pd.Series(calc_steadystate_vehicle_age_distributions(self.age_int,self.avg_age,self.std_dev_age), index = self.age)   # idealized age PDF given avg fleet age and std dev
-#        self.veh_lift_pdf.index = self.veh_lift_pdf.index.astype('str')
-#        
-#        self.veh_lift_mor = pd.Series(calc_probability_of_vehicle_retirement(self.age_int,self.veh_lift_pdf), index = self.age)
-#        self.veh_lift_mor.index = self.veh_lift_mor.index.astype('str')
-#
-#        
-#        # Initial stocks
-#        """# Eurostat road_eqs_carpda[tec]
-#        # Eurostat road_eqs_carage [age - <2, 2-5, 5-10, 10-20]; 
-#        # ACEA [age in year divisions up to 10 years]
-#        # Also check pb2018-section2016.xls for more cohesive, EU28++ data"""
-#        self.veh_stck_int = pd.DataFrame(pd.read_excel('GAMS_input_new.xls',sheet_name='VEH_STCK_INT',header=None,usecols='A:D',skiprows=[0]))  # [tec, age]
-#        self.veh_stck_int = self._process_df_to_series(self.veh_stck_int)
-#        
-#        BEV_int_shr = 0.0018 # from Eurostat; assume remaining is ICE
-#        self.veh_stck_int_tec = pd.Series([1-BEV_int_shr, BEV_int_shr],index=['ICE', 'BEV'])
-#
-#        ################ filters and parameter aliases ################
-#        self.enr_veh = pd.DataFrame(pd.read_excel(self.import_fp,sheet_name='ENR_VEH',header=None,usecols='A:C',skiprows=[0]))            # [enr, tec]
-#        self.enr_veh = self._process_df_to_series(self.enr_veh)
-#
-#        self.veh_pay = pd.DataFrame(pd.read_excel(self.import_fp,sheet_name='VEH_PAY',header=None,usecols='A:D',skiprows=[0]))            # [cohort, age, year]
-#        self.veh_pay = self._process_df_to_series(self.veh_pay)
-#        
-#        self.age_par = pd.Series([float(i) for i in self.age])
-#        self.age_par.index = self.age_par.index.astype('str')
-#        
-#        self.year_par = pd.Series([float(i) for i in self.cohort],index = self.cohort)
-#        self.year_par.index = self.year_par.index.astype('str')
-#        
-#        self.prodyear_par = pd.Series([int(i) for i in self.cohort],index = self.cohort)
-#        self.prodyear_par.index = self.prodyear_par.index.astype('str')
-#        
-#        # Temporary introduction of seg-specific VEH_PARTAB from Excel; will later be read in from YAML
-##        self.veh_partab = pd.DataFrame(pd.read_excel(self.import_fp,sheet_name = 'genlogfunc',usecols='A:G',index_col=[0,1,2],skipfooter=6)).stack()
-#        self.veh_partab = self.build_veh_partab(B_term_prod,B_term_oper_EOL,r_term_factors,u_term_factors)#.stack()
-#        """" if modify_b_ice or modify_b_bev:
-#                self.veh_partab.loc[:, 'ICE',:, 'B']=self.veh_partab.loc[:, 'ICE',:, 'A'].values*modify_b_ice
-#                self.veh_partab.loc[:, 'BEV',:, 'B'] = self.veh_partab.loc[:, 'BEV',:, 'A'].values*modify_b_bev"""
-#                
-#        """"if BEV_batt ==30:
-#            self.veh_partab.loc['PROD_EINT', 'BEV',:,:]=pd.DataFrame(array, index=['A', 'B', 'r', 'u'])
-#            self.veh_partab.loc['PROD_CINT_CSNT', 'BEV',:,:]=pd.DataFrame(array, index=['A', 'B', 'r', 'u'])"""
-##        self.veh_partab.index = self.veh_partab.index.astype('str')
-##        self.veh_partab = self._process_df_to_series(self.veh_partab)       
-#        """# ACEA.be has segment division for Western Europe
-#        # https://www.acea.be/statistics/tag/category/segments-body-country
-#        # More detailed age distribution (https://www.acea.be/uploads/statistic_documents/ACEA_Report_Vehicles_in_use-Europe_2018.pdf)"""
-#
-#        self.tec_add_gradient = tec_add_gradient or 0.2
-#        
-#        self.growth_constraint = 0#growth_constraint
-#        self.gro_cnstrnt = [self.growth_constraint for i in range(len(self.modelyear))]
-#        self.gro_cnstrnt = pd.Series(self.gro_cnstrnt, index=self.modelyear)
-#        self.gro_cnstrnt.index = self.gro_cnstrnt.index.astype('str')
-#        
-#        self.manuf_cnstrnt = pd.read_excel(self.import_fp,sheet_name='MANUF_CONSTR',header=None,usecols='A,B',skiprows=[0]) # Assumes stabilized manufacturing capacity post-2030ish
-##        self.manuf_cnstrnt = pd.read_excel(self.import_fp,sheet_name='MANUF_CONSTR',header=None,usecols='A,C',skiprows=[0]) # Assumes continued (linear) growth in manufacturing capacity until end of model period
-##        self.manuf_cnstrnt = pd.read_excel(self.import_fp,sheet_name='MANUF_CONSTR',header=None,usecols='A,D',skiprows=[0]) # Assumes continued (linear) growth in manufacturing capacity until 2050
-# 
-#        self.manuf_cnstrnt = self._process_df_to_series(self.manuf_cnstrnt)
-##        self.manuf_cnstrnt.index = self.manuf_cnstrnt.index.astype('str')
-#        self.manuf_cnstrnt = self.manuf_cnstrnt * self.eur_batt_share
-#        self.enr_partab = pd.read_excel(self.import_fp,sheet_name='ENR_PARTAB',usecols='A:F',index_col=[0,1]).stack()
-#
-#        # --------------- Expected GAMS Outputs ------------------------------
-#
-#        self.totc = 0
-#        self.BEV_fraction = pd.DataFrame()
-#        self.ICEV_fraction = pd.DataFrame()
-#        self.BEV_ADD_blaaaah = pd.DataFrame()
-#        self.VEH_STCK = pd.DataFrame()
-#        
-#        """ experiment specifications """
-#        self.recycling_losses = pd.DataFrame() # vector of material-specific recycling loss factors
-#        self.fossil_scenario = pd.DataFrame() # adoption of unconventional sources for fossil fuel chain
-#        self.hydrogen_scenario = pd.DataFrame()
-#        
-#        self.battery_density = None # time series of battery energy densities
-#        self.lightweighting_scenario = None # lightweighting scenario - yes/no (or gradient, e.g., none/mild/aggressive?)
-#
-#        """ Optimization Initialization """
-#        """self.ws = gams.GamsWorkspace(working_directory=self.current_path,debug=2)
-#        self.db = self.ws.add_database()#database_name='pyGAMSdb')
-#        self.opt = self.ws.add_options()
-##        self.opt.DumpParms = 2
-#        self.opt.ForceWork = 1"""
-##        self.opt.SysOut = 1
+#        self.veh_eolt_cint = pd.DataFrame(pd.read_excel(self.import_fp,sheet_name='VEH_EOLT_CINT',header=None,usecols='A:D',skiprows=[0]))  # [[tecs, enr], cohort]
+#        self.veh_eolt_cint = self._process_df_to_series(self.veh_eolt_cint)  # [tecs, cohort]
+
+        ################ Fleet dynamics ################
+        """VEH_LIFT_CDF(age) = cdfnormal(AGE_PAR(age),LFT_PARTAB('mean'),LFT_PARTAB('stdv'));
+        VEH_LIFT_AGE(age) = (1 - VEH_LIFT_CDF(age))/sum(agej, VEH_LIFT_CDF(agej)) ;
+        VEH_LIFT_MOR(age)$(ord(age)< 20) = 1 - VEH_LIFT_AGE(age+1)/VEH_LIFT_AGE(age);
+        VEH_LIFT_MOR(age)$(ord(age)= 20) = 1"""
+        self.avg_age = 11.1 # From ACEA 2019-2020 report
+        self.std_dev_age = 2.21
+#        self.avg_age = 11
+#        self.std_dev_age = 0
+        self.veh_lift_cdf = pd.Series(norm.cdf(self.age_int,self.avg_age,self.std_dev_age),index=self.age)#pd.Series(pd.read_pickle(self.import_fp+'input.pkl'))#pd.DataFrame()  # [age] TODO Is it this one we feed to gams?
+        self.veh_lift_cdf.index = self.veh_lift_cdf.index.astype('str')
+        
+        self.veh_lift_age = pd.Series(1-self.veh_lift_cdf)     # [age] # probability of car of age x to die in current year
+        
+        #lifetime = [1-self.veh_lift_age[i+1]/self.veh_lift_age[i] for i in range(len(self.age)-1)]
+        self.veh_lift_pdf = pd.Series(calc_steadystate_vehicle_age_distributions(self.age_int,self.avg_age,self.std_dev_age), index = self.age)   # idealized age PDF given avg fleet age and std dev
+        self.veh_lift_pdf.index = self.veh_lift_pdf.index.astype('str')
+        
+        self.veh_lift_mor = pd.Series(calc_probability_of_vehicle_retirement(self.age_int,self.veh_lift_pdf), index = self.age)
+        self.veh_lift_mor.index = self.veh_lift_mor.index.astype('str')
+
+        
+        # Initial stocks
+        """# Eurostat road_eqs_carpda[tec]
+        # Eurostat road_eqs_carage [age - <2, 2-5, 5-10, 10-20]; 
+        # ACEA [age in year divisions up to 10 years]
+        # Also check pb2018-section2016.xls for more cohesive, EU28++ data"""
+        self.veh_stck_int = pd.DataFrame(pd.read_excel(self.import_fp,sheet_name='VEH_STCK_INT',header=None,usecols='A:D',skiprows=[0]))  # [tec, age]
+        self.veh_stck_int = self._process_df_to_series(self.veh_stck_int)
+        
+        BEV_int_shr = 0.0018 # from Eurostat; assume remaining is ICE
+        self.veh_stck_int_tec = pd.Series([1-BEV_int_shr, BEV_int_shr],index=['ICE', 'BEV'])
+
+        ################ filters and parameter aliases ################
+        self.enr_veh = pd.DataFrame(pd.read_excel(self.import_fp,sheet_name='ENR_VEH',header=None,usecols='A:C',skiprows=[0]))            # [enr, tec]
+        self.enr_veh = self._process_df_to_series(self.enr_veh)
+
+        self.veh_pay = pd.DataFrame(pd.read_excel(self.import_fp,sheet_name='VEH_PAY',header=None,usecols='A:D',skiprows=[0]))            # [cohort, age, year]
+        self.veh_pay = self._process_df_to_series(self.veh_pay)
+        
+        self.age_par = pd.Series([float(i) for i in self.age])
+        self.age_par.index = self.age_par.index.astype('str')
+        
+        self.year_par = pd.Series([float(i) for i in self.cohort],index = self.cohort)
+        self.year_par.index = self.year_par.index.astype('str')
+        
+        self.prodyear_par = pd.Series([int(i) for i in self.cohort],index = self.cohort)
+        self.prodyear_par.index = self.prodyear_par.index.astype('str')
+        
+        # Temporary introduction of seg-specific VEH_PARTAB from Excel; will later be read in from YAML
+#        self.veh_partab = pd.DataFrame(pd.read_excel(self.import_fp,sheet_name = 'genlogfunc',usecols='A:G',index_col=[0,1,2],skipfooter=6)).stack()
+        self.veh_partab = self.build_veh_partab(B_term_prod,B_term_oper_EOL,r_term_factors,u_term_factors)#.stack()
+        """" if modify_b_ice or modify_b_bev:
+                self.veh_partab.loc[:, 'ICE',:, 'B']=self.veh_partab.loc[:, 'ICE',:, 'A'].values*modify_b_ice
+                self.veh_partab.loc[:, 'BEV',:, 'B'] = self.veh_partab.loc[:, 'BEV',:, 'A'].values*modify_b_bev"""
+                
+        """"if BEV_batt ==30:
+            self.veh_partab.loc['PROD_EINT', 'BEV',:,:]=pd.DataFrame(array, index=['A', 'B', 'r', 'u'])
+            self.veh_partab.loc['PROD_CINT_CSNT', 'BEV',:,:]=pd.DataFrame(array, index=['A', 'B', 'r', 'u'])"""
+#        self.veh_partab.index = self.veh_partab.index.astype('str')
+#        self.veh_partab = self._process_df_to_series(self.veh_partab)       
+        """# ACEA.be has segment division for Western Europe
+        # https://www.acea.be/statistics/tag/category/segments-body-country
+        # More detailed age distribution (https://www.acea.be/uploads/statistic_documents/ACEA_Report_Vehicles_in_use-Europe_2018.pdf)"""
+
+        self.tec_add_gradient = tec_add_gradient or 0.2
+        
+        self.growth_constraint = 0#growth_constraint
+        self.gro_cnstrnt = [self.growth_constraint for i in range(len(self.modelyear))]
+        self.gro_cnstrnt = pd.Series(self.gro_cnstrnt, index=self.modelyear)
+        self.gro_cnstrnt.index = self.gro_cnstrnt.index.astype('str')
+        
+        self.manuf_cnstrnt = pd.read_excel(self.import_fp,sheet_name='MANUF_CONSTR',header=None,usecols='A,B',skiprows=[0]) # Assumes stabilized manufacturing capacity post-2030ish
+#        self.manuf_cnstrnt = pd.read_excel(self.import_fp,sheet_name='MANUF_CONSTR',header=None,usecols='A,C',skiprows=[0]) # Assumes continued (linear) growth in manufacturing capacity until end of model period
+#        self.manuf_cnstrnt = pd.read_excel(self.import_fp,sheet_name='MANUF_CONSTR',header=None,usecols='A,D',skiprows=[0]) # Assumes continued (linear) growth in manufacturing capacity until 2050
+ 
+        self.manuf_cnstrnt = self._process_df_to_series(self.manuf_cnstrnt)
+#        self.manuf_cnstrnt.index = self.manuf_cnstrnt.index.astype('str')
+        self.manuf_cnstrnt = self.manuf_cnstrnt * self.eur_batt_share
+        self.enr_partab = pd.read_excel(self.import_fp,sheet_name='ENR_PARTAB',usecols='A:F',index_col=[0,1]).stack()
+
+        # --------------- Expected GAMS Outputs ------------------------------
+
+        self.totc = 0
+        self.BEV_fraction = pd.DataFrame()
+        self.ICEV_fraction = pd.DataFrame()
+        self.BEV_ADD_blaaaah = pd.DataFrame()
+        self.VEH_STCK = pd.DataFrame()
+        
+        """ experiment specifications """
+        self.recycling_losses = pd.DataFrame() # vector of material-specific recycling loss factors
+        self.fossil_scenario = pd.DataFrame() # adoption of unconventional sources for fossil fuel chain
+        self.hydrogen_scenario = pd.DataFrame()
+        
+        self.battery_density = None # time series of battery energy densities
+        self.lightweighting_scenario = None # lightweighting scenario - yes/no (or gradient, e.g., none/mild/aggressive?)
+
+        """ Optimization Initialization """
+        """self.ws = gams.GamsWorkspace(working_directory=self.current_path,debug=2)
+        self.db = self.ws.add_database()#database_name='pyGAMSdb')
+        self.opt = self.ws.add_options()
+#        self.opt.DumpParms = 2
+        self.opt.ForceWork = 1"""
+#        self.opt.SysOut = 1
     
     def _from_gdx(self, gdx_file):
         # Build fleet object from gdx file (contains model inputs and outputs)
@@ -451,6 +468,7 @@ class FleetModel:
         
         """--- Import post-processing parameters ---"""
         self.veh_oper_cohort = self._p_dict['VEH_OPER_COHORT']
+        self.veh_oper_cohort.index.rename(['tec', 'seg', 'reg', 'prodyear', 'modelyear'], inplace=True)
         self.veh_stock_cohort = self._p_dict['VEH_STCK_CHRT']
         
         """--- Import model results ---"""
@@ -460,7 +478,10 @@ class FleetModel:
         self.veh_stck = self._v_dict['VEH_STCK']
         self.veh_totc = self._v_dict['VEH_TOTC']
         self.annual_totc = self.veh_totc.sum(axis=0)#self.veh_totc.unstack('year').sum()
-
+        
+#        self.totc = self._v_dict['TOTC']
+        self.totc_opt = self._v_dict['TOTC_OPT']
+        
         self.veh_prod_totc = self._v_dict['VEH_PROD_TOTC']
         self.veh_oper_totc = self._v_dict['VEH_OPER_TOTC']
         self.total_op_emissions = self.veh_oper_totc.sum(axis=0)#.unstack('year').sum()
@@ -510,6 +531,8 @@ class FleetModel:
         self.enr_cint = self._p_dict['ENR_CINT']
         self.enr_cint = self.enr_cint.stack()
         self.enr_cint.index.rename(['enr', 'reg', 'year'], inplace=True)
+        
+        print('\n Finished importing results from GAMS run')
 
     def build_BEV(self):
         """ Specify battery size for each segment and calculate resulting production emissions"""
@@ -864,16 +887,20 @@ class FleetModel:
     def import_from_MESSAGE(self):
         pass
     def figure_calculations(self):
-        """--- DEPRECATED ---"""
-        operation_em = self.veh_oper_cohort.sum(level=['prodyear', 'tec', 'seg'])
+        """--- Used by main.py to aggregate key indicators across experiments ---"""
+        # Attempt to calculate average operating intensity by using total lifetime operating emissions by cohort, divided by original stock of the cohort
+        
+        # Calculate operating emissions by cohort (i.e., prodyear)
+        operation_em = self.veh_oper_cohort.sum(level=['prodyear', 'reg', 'tec', 'seg']).sum(axis=1)
         operation_em.sort_index(axis=0, level=0, inplace=True)
         op = operation_em.loc['2000':'2050']
         
-        init_stock = self.veh_stck_add.replace(0, np.nan)
+        # Calculate stock 
+        init_stock = self.veh_stck_add.loc(axis=1)[0]
+        init_stock.replace(0, np.nan)
         init_stock.dropna(axis=0, inplace=True)
-        init_stock = init_stock.droplevel('age')
-        init_stock.index.rename('prodyear', level=2, inplace=True)
-        init_stock.index = init_stock.index.reorder_levels([2, 0, 1])
+#        init_stock.index.rename('prodyear', level=3, inplace=True)
+        init_stock.index = init_stock.index.reorder_levels([3, 2, 0, 1])
         init_stock.sort_index(inplace=True)
         
         self.op_intensity = op/init_stock
@@ -881,13 +908,14 @@ class FleetModel:
         temp_prod = self.veh_prod_cint.copy(deep=True)
         temp_prod.index = temp_prod.index.reorder_levels([2, 0, 1])
         temp_prod.sort_index(inplace=True)
+        
         self.op_intensity.sort_index(inplace=True)
 #        self.LC_intensity - self.op_intensity.add(temp_prod,axis='index')
         
     def vis_GAMS(self, fp, filename, param_values, export_png, export_pdf=True, max_year=50, cropx=True, suppress_vis=False):
         """ visualize key GAMS parameters for quality checks"""
         """To do: split into input/output visualization; add plotting of CO2 and stocks together"""
-        """To do: split into input/output visualization; add plotting of CO2 and stocks together"""
+        """To do: """
 
         os.chdir(fp)
         pp = PdfPages('output_vis_' + filename + '.pdf')
@@ -1182,13 +1210,12 @@ class FleetModel:
         except TypeError:
             print('No ICEVs!')"""
             
-         """--- Plot addition to stocks by segment, technology and region ---"""
-#        tec_cm = LinearSegmentedColormap.from_list('tec',['xkcd:dark grey blue', 'xkcd:grey blue'])
+        """--- Plot addition to stocks by segment, technology and region ---"""
 #        tec_cm = LinearSegmentedColormap.from_list('tec',['xkcd:aubergine', 'lavender'])
         tec_cm = LinearSegmentedColormap.from_list('tec', ['xkcd:burgundy', 'xkcd:light mauve'])
         tec_cm4 = LinearSegmentedColormap.from_list('tec', ['xkcd:burgundy', 'xkcd:light mauve', 'xkcd:dark grey blue', 'xkcd:light grey blue'])
         plot_stock_add = self.stock_add.sum(level=['tec', 'reg', 'prodyear']).unstack(['tec', 'reg']).droplevel(axis=1, level=0).drop(columns='PROD', level=1)
-        print(plot_stock_add)
+        
         ax = plot_stock_add.plot(kind='area', cmap=tec_cm4, title='Stock additions by technology and region')
         
         fix_age_legend(ax, 'Vehicle technology and region') 
@@ -1212,8 +1239,8 @@ class FleetModel:
         pp.savefig()
         
         """--- Plot total stocks by segment, technology and region ---"""
-        plot_stock = self.veh_stck.sum(level=['tec', 'reg', 'prodyear']).unstack(['tec', 'reg']).droplevel(axis=1, level=0).drop(columns='PROD', level=1)
-        ax = plot_stock.plot(kind='area', cmap=tec_cm4, title='Stock additions by technology and region')
+        plot_stock = self.veh_stck.sum(axis=1).unstack(['tec', 'reg']).sum(level=['year']).drop(columns='PROD', level=1)
+        ax = plot_stock.plot(kind='area', cmap=tec_cm4, title='Total stock by technology and region')
         
         fix_age_legend(ax, 'Vehicle technology and region') 
         plt.xlabel('year')

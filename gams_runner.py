@@ -180,8 +180,8 @@ class GAMSRunner:
             print('\n' + f'Completed export of solution database to {self.export_model}')
             
             """ Fetch model outputs"""
-            fleet.totc = self.get_output_from_GAMS(gams_db,'TOTC')
-            fleet.totc_opt = self.get_output_from_GAMS(gams_db,'TOTC_OPT')
+#            fleet.totc = self.get_output_from_GAMS(gams_db,'TOTC')
+#            fleet.totc_opt = self.get_output_from_GAMS(gams_db,'TOTC_OPT')
             
         except:
             print('\n' + f'ERROR in running model {fleet.gms_file}')
@@ -191,154 +191,39 @@ class GAMSRunner:
             except:
                 print(exceptions) 
         
-        fleet.import_model_results(fleet, gams_db)
-#        self.import_model_results(fleet, gams_db)
-                
-#    def import_model_results(self, fleet, gams_db):
-#                
-#        def reorder_age_headers(df_unordered):
-#            temp = df_unordered
-#            temp.columns = temp.columns.astype(int)
-#            temp.sort_index(inplace=True,axis=1)
-#            return temp
-#        
-#        fleet.veh_stck_delta = self.get_output_from_GAMS(gams_db,'VEH_STCK_DELTA')
-#        fleet.veh_stck_add = self.get_output_from_GAMS(gams_db,'VEH_STCK_ADD')
-#        fleet.veh_stck_rem = self.get_output_from_GAMS(gams_db, 'VEH_STCK_REM')
-#        fleet.veh_stck = self.get_output_from_GAMS(gams_db,'VEH_STCK')
-#        fleet.veh_totc = self.get_output_from_GAMS(gams_db,'VEH_TOTC')
-#        fleet.annual_totc = fleet.veh_totc.unstack('year').sum()
-#
-#        fleet.veh_prod_totc = self.get_output_from_GAMS(gams_db,'VEH_PROD_TOTC')
-#        fleet.veh_oper_totc = self.get_output_from_GAMS(gams_db,'VEH_OPER_TOTC')
-#        fleet.total_op_emissions = fleet.veh_oper_totc.unstack('year').sum()
-#        fleet.veh_eolt_totc = self.get_output_from_GAMS(gams_db,'VEH_EOLT_TOTC')
-#        
-#        fleet.veh_oper_cohort = self.get_output_from_GAMS(gams_db,'VEH_OPER_COHORT')
-#        fleet.veh_stock_cohort = self.get_output_from_GAMS(gams_db,'VEH_STCK_CHRT')
-#                
-#        fleet.emissions = fleet.veh_prod_totc.join(fleet.veh_oper_totc,rsuffix='op').join(fleet.veh_eolt_totc,rsuffix='eolt')
-#        fleet.emissions.columns = ['Production','Operation','End-of-life']
-#        fleet.emissions = fleet.emissions.unstack(['tec','year']).sum().unstack([None,'tec'])
-#        
-#        
-#        """ Fetch variable and stock compositions"""
-#        sets = gmspy.ls(gdx_filepath=self.export_model, entity='Set')
-#        parameters = gmspy.ls(gdx_filepath=self.export_model,entity='Parameter')
-#        variables = gmspy.ls(gdx_filepath=self.export_model,entity='Variable')
-#        equations = gmspy.ls(gdx_filepath=self.export_model, entity='Equation')
-#        years = gmspy.set2list(sets[0], gdx_filepath=self.export_model)
-#            
-#        # Export parameters
-#        p_dict = {}
-#        for p in parameters:
-#            try:
-##                print(p)
-#                p_dict[p] = gmspy.param2df(p,gdx_filepath=self.export_model)
-#            except ValueError:
-#                try:
-##                    print('param2series')
-#                    p_dict[p] = gmspy.param2series(p,gdx_filepath=self.export_model)
-#                except:
-#                    print(f'Warning!: p_dict ValueError in {p}!')
-#                    pass
-#            except AttributeError:
-#                print(f'Warning!: p_dict AttributeError in {p}!')
-#                pass
-#            
-#        # Export variables
-#        v_dict = {}
-#        for v in variables:
-#            try:
-#                v_dict[v] = gmspy.var2df(v,gdx_filepath=self.export_model)
-#            except ValueError:
-#                try:
-#                    v_dict[v] = gmspy.var2series(v,gdx_filepath=self.export_model)
-#                except:
-#                    print(f'Warning!: v_dict ValueError in {v}!')
-#                    pass
-#            except TypeError: # This is specifically for seg_add
-#                print(f'Warning! v-dict TypeError in {v}!')
-#                pass
-#        
-#        e_dict={}
-#        for e in equations:
-#            try:
-#                e_dict[e] = gmspy.eq2series(e, gdx_filepath=self.export_model)
-#            except:
-#                print(f'Warning!: Error in {e}')
-#                pass
-#        
-#        # Prepare model output dataframes for visualization
-#        fleet.stock_df = v_dict['VEH_STCK']
-#        fleet.stock_df = reorder_age_headers(fleet.stock_df)
-#        fleet.stock_add = v_dict['VEH_STCK_ADD']
-#        fleet.stock_add = reorder_age_headers(fleet.stock_add)
-#        fleet.stock_add = fleet.stock_add.dropna(axis=1,how='any')
-#        fleet.stock_add.index.rename(['tec','seg','prodyear'],inplace=True)
-#        fleet.stock_df_plot = fleet.stock_df.stack().unstack('age')  
-#        fleet.stock_df_plot = reorder_age_headers(fleet.stock_df_plot)
-#
-#        fleet.stock_df_plot_grouped = fleet.stock_df_plot.groupby(['tec','seg'])
-#        
-#        fleet.stock_cohort = v_dict['VEH_STCK_CHRT']
-#        fleet.stock_cohort = fleet.stock_cohort.droplevel(level='age',axis=0)
-#        fleet.stock_cohort = fleet.stock_cohort.stack().unstack('prodyear').sum(axis=0,level=['tec','modelyear'])
-#        
-#        fleet.veh_prod_cint = p_dict['VEH_PROD_CINT']
-#        fleet.veh_prod_cint = fleet.veh_prod_cint.stack()
-#        fleet.veh_prod_cint.index.rename(['tec','seg','prodyear'],inplace=True)
-#        
-#        fleet.veh_oper_eint = p_dict['VEH_OPER_EINT']
-#        fleet.veh_oper_eint = fleet.veh_oper_eint.stack()
-#        fleet.veh_oper_eint.index.rename(['tec','seg','year'],inplace=True)
-#        
-#        fleet.veh_oper_cint = p_dict['VEH_OPER_CINT']
-#        fleet.veh_oper_cint = fleet.veh_oper_cint.stack()
-#        fleet.veh_oper_cint.index.names = ['tec','enr','seg','age','modelyear','prodyear']
-#        
-#        fleet.veh_oper_dist.index = fleet.veh_oper_dist.index.get_level_values(0) # recast MultiIndex as single index
-#        
-#        fleet.full_oper_dist = fleet.veh_oper_dist.reindex(fleet.veh_oper_cint.index, level=4)
-#        fleet.op_emissions = fleet.veh_oper_cint.multiply(fleet.full_oper_dist)
-#        fleet.op_emissions.index = fleet.op_emissions.index.droplevel(level=['enr','age']) # these columns are unncessary/redundant
-#        fleet.op_emissions = fleet.op_emissions.drop_duplicates()
-#        fleet.op_emissions = fleet.op_emissions.sum(level=['tec','seg','prodyear']) # sum the operating emissions over all model years
-#        fleet.op_emissions = fleet.op_emissions.reorder_levels(order=['tec','seg','prodyear']) # reorder MultiIndex to add production emissions
-#  
-#        fleet.LC_emissions = fleet.op_emissions.add(fleet.veh_prod_cint) 
-        
+        fleet.read_gams_db(gams_db)
+        fleet.import_model_results()
                 
         
         """" Test calculation for average lifetime vehicle (~12 years)"""
         def quality_check(age=12):
-            fleet.veh_oper_cint_avg = fleet.veh_oper_cint.index.levels[3].astype(int)
-            drr = fleet.veh_oper_cint.index
-            fleet.veh_oper_cint.index.set_levels(drr.levels[3].astype(int),level=3,inplace=True) #set ages as int
+            fleet.veh_oper_cint_avg = fleet.veh_oper_cint.index.levels[4].astype(int)
+            ind = fleet.veh_oper_cint.index
+            fleet.veh_oper_cint.index.set_levels(ind.levels[4].astype(int),level=4,inplace=True) #set ages as int
             fleet.veh_oper_cint.sort_index(level='age', inplace=True)
             fleet.veh_oper_cint.sort_index(level='age', inplace=True)
             fleet.veh_oper_cint_avg = fleet.veh_oper_cint.reset_index(level='age')
             fleet.veh_oper_cint_avg = fleet.veh_oper_cint_avg[fleet.veh_oper_cint_avg.age<=age] # then, drop ages over lifetime 
             fleet.veh_oper_cint_avg = fleet.veh_oper_cint_avg.set_index([fleet.veh_oper_cint_avg.index, fleet.veh_oper_cint_avg.age])
             fleet.veh_oper_cint_avg.drop(columns='age', inplace=True)
-            fleet.veh_oper_cint_avg = fleet.veh_oper_cint_avg.reorder_levels(['tec','enr','seg','age','modelyear','prodyear'])
+            fleet.veh_oper_cint_avg = fleet.veh_oper_cint_avg.reorder_levels(['tec','enr','seg','reg','age','modelyear','prodyear'])
     
             fleet.avg_oper_dist = fleet.full_oper_dist.reset_index(level='age') 
             fleet.avg_oper_dist = fleet.avg_oper_dist[fleet.avg_oper_dist.age <= age]  # again, drop ages over lifetime 
             fleet.avg_oper_dist = fleet.avg_oper_dist.set_index([fleet.avg_oper_dist.index, fleet.avg_oper_dist.age]) # make same index for joining with fleet.veh_oper_cint_avg
             fleet.avg_oper_dist.drop(columns='age', inplace=True)
-            fleet.avg_oper_dist = fleet.avg_oper_dist.reorder_levels(['tec','enr','seg','age','modelyear','prodyear'])
+            fleet.avg_oper_dist = fleet.avg_oper_dist.reorder_levels(['tec','enr','seg','reg','age','modelyear','prodyear'])
     #        fleet.op_emissions_avg = fleet.veh_oper_cint_avg.multiply(fleet.avg_oper_dist)
             fleet.d = fleet.avg_oper_dist.join(fleet.veh_oper_cint_avg, lsuffix='_dist')
             fleet.d.columns=['dist','intensity']
             fleet.op_emissions_avg = fleet.d.dist * fleet.d.intensity
             fleet.op_emissions_avg.index = fleet.op_emissions_avg.index.droplevel(level=['enr']) # these columns are unncessary/redundant
             fleet.op_emissions_avg.to_csv('op_emiss_avg_with_duplicates.csv')
-            fleet.op_emissions_avg = fleet.op_emissions_avg.reset_index().drop_duplicates().set_index(['tec','seg','age','modelyear','prodyear'])
+            fleet.op_emissions_avg = fleet.op_emissions_avg.reset_index().drop_duplicates().set_index(['tec','seg','reg','age','modelyear','prodyear'])
             fleet.op_emissions_avg.to_csv('op_emiss_avg_without_duplicates.csv')
 #            fleet.op_emissions_avg = fleet.op_emissions_avg.drop_duplicates() # replaced by reset_index/drop_duplicates/set_index above
-            fleet.op_emissions_avg = fleet.op_emissions_avg.sum(level=['tec','seg','prodyear']) # sum the operating emissions over all model years
-            fleet.op_emissions_avg = fleet.op_emissions_avg.reorder_levels(order=['tec','seg','prodyear']) # reorder MultiIndex to add production emissions
+            fleet.op_emissions_avg = fleet.op_emissions_avg.sum(level=['tec','seg','reg','prodyear']) # sum the operating emissions over all model years
+            fleet.op_emissions_avg = fleet.op_emissions_avg.reorder_levels(order=['tec','seg','reg','prodyear']) # reorder MultiIndex to add production emissions
             fleet.op_emissions_avg.columns = ['']
             return fleet.op_emissions_avg.add(fleet.veh_prod_cint, axis=0) 
         
@@ -352,24 +237,25 @@ class GAMSRunner:
 #            fleet.veh_prod_cint.to_excel(writer,sheet_name='veh_prod_cint')
 #            fleet.LC_emissions.to_excel(writer,sheet_name='LC_emissions')
 
-        fleet.enr_cint = p_dict['ENR_CINT'].stack()
-        fleet.enr_cint.index.rename(['enr', 'year'], inplace=True)
+#        fleet.enr_cint = fleet._p_dict['ENR_CINT'].stack()
+#        fleet.enr_cint.index.rename(['enr', 'reg', 'year'], inplace=True)
         
         add_gpby = fleet.stock_add.sum(axis=1).unstack('seg').unstack('tec')
         fleet.add_share = add_gpby.div(add_gpby.sum(axis=1), axis=0)
-        
+        fleet.add_share.dropna(how='all', axis=0, inplace=True) # drop production country (no fleet)
         """ Export technology shares in 2030 to evaluate speed of uptake"""
-        fleet.shares_2030 = fleet.add_share.loc['2030']#.to_string()
-        fleet.shares_2050 = fleet.add_share.loc['2050']
+        fleet.shares_2030 = fleet.add_share.loc(axis=0)[:,'2030']#.to_string()
+        fleet.shares_2050 = fleet.add_share.loc(axis=0)[:,'2050']
         
         try:
-            fleet.eq = e_dict['EQ_STCK_GRD']
+            fleet.eq = fleet._e_dict['EQ_STCK_GRD']
         except:
             print('No equation EQ_STCK_GRD')
             
         """ Export first year of 100% BEV market share """
-        tec_shares = fleet.add_share.stack().stack().sum(level=['prodyear', 'tec'])
-        fleet.full_BEV_year = int((tec_shares.loc[:, 'BEV']==1).idxmax()) - 1
-        if fleet.full_BEV_year == 1999:
-            fleet.full_BEV_year = np.nan
+        tec_shares = fleet.add_share.stack().stack().sum(level=['prodyear', 'tec','reg'])
+        temp_full_year = ((tec_shares.unstack('reg').loc(axis=0)[:, 'BEV']==1).idxmax()).tolist()
+        fleet.full_BEV_year = [int(i[0]) if int(i[0])>1999 else np.nan for i in temp_full_year]
+#        if fleet.full_BEV_year == 1999:
+#            fleet.full_BEV_year = np.nan
         temp = fleet.veh_stck.unstack(['year', 'tec']).sum()
