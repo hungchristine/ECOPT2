@@ -143,6 +143,7 @@ for i in np.arange(num_clusters):
 
 #%%
 # Plot maps by clusters
+"""
 fig, ax = plt.subplots(1, 1, figsize=(12, 11), dpi=600)
 
 # europe_shapes.plot(column='Cluster', ax=ax, cmap='Dark2', legend=True)
@@ -161,13 +162,14 @@ plt.xlim((-12, 34))
 plt.ylim((32, 75))
 plt.yticks([])
 plt.xticks([])
+"""
 
 #%%
 
 message_fp = import_fp = os.path.join(os.path.curdir, 'Data', 'MESSAGE_SSP2_electricity pathways.xlsx')
 message_el = pd.read_excel(message_fp, index_col=[0, 1, 2], header=[0], usecols='C:P', skipfooter=2)
 
-#%%
+#%% Calculate electricity pathways from MESSAGE normalized to 2020 values
 message_el.index.rename(['reg', 'MESSAGE tec', 'units'], inplace=True)
 
 message_el_shares = pd.DataFrame()
@@ -179,6 +181,7 @@ for reg in message_el.index.unique(level=0):
 message_el_shares.index = message_el_shares.index.droplevel(-1)  # drop 'units' column of index
 
 #%%
+"""
 fig, axes = plt.subplots(1, 2, sharey=True, figsize=(12, 5), gridspec_kw={'wspace': 0.05}, dpi=600)
 
 
@@ -206,7 +209,7 @@ labels = [re.split(r'\|', label, maxsplit=2)[-1] for label in labels]  # reforma
 plt.legend(handles, labels, bbox_to_anchor=(1, 1))
 
 axes[0].set_ylabel('Share of electricity technology, \n normalized to 2020 shares')
-
+"""
 #%%
 
 """ Load electricity mixes, regionalized LCA/hybrid LCA factors from BEV footprints """
@@ -219,12 +222,12 @@ trades_df = pd.read_csv(trades_fp, index_col=[0], na_values='-')  # 2019 product
 tec_int_df = pd.read_csv(tec_int_fp, index_col=[0], na_values='-')
 
 iso_a2 = europe_shapes[europe_shapes['Consumption mix intensity'].notna()].ISO_A2
-
+iso_a2.rename('country', inplace=True)
 
 def reformat_el_df(df):
     df.replace('-', np.nan, inplace=True)
     try:
-        if df.columns == df.index:
+        if df.columns.tolist() == df.index.tolist():
             # special case for trade matrix, where labels for both columns and indices are replaced
             df = df.reindex(index=iso_a2, columns=iso_a2)
     except ValueError:
@@ -262,7 +265,16 @@ AL = {'Hydro Water Reservoir': 4.525}  # unconfirmed hydro PP type...
 
 proxy_prod_mix = pd.DataFrame([LU, HR, AL], index=['LU', 'HR', 'AL'], columns=mix_df.columns)
 # proxy_prod_mix = pd.concat([proxy_prod_mix], keys=[2020], names=['year', 'technology'], axis=1)
-mix_df.update(proxy_prod_mix)
+mix_df = mix_df.append(proxy_prod_mix, sort=True)
+
+# Add placeholders for mixxing countries
+""" todo: make better proxies """
+mix_df = mix_df.append(pd.DataFrame(index=['XK', 'LI', 'AD', 'MC']))
+mix_df.loc['XK'] = mix_df.loc['PL']
+mix_df.loc['LI'] = mix_df.loc['NO']
+mix_df.loc['AD'] = mix_df.loc['ES']
+mix_df.loc['MC'] = mix_df.loc['FR']
+
 
 #%%
 
@@ -367,6 +379,7 @@ match_tec_dict = {'Biomass': 'Secondary Energy|Electricity|Biomass|w/o CCS',
 # Introduce WEU/EEU regions to multiindex in prodshares for applying MESSAGE transformation pathways
 
 reg_mi = pd.MultiIndex.from_tuples([(reg_dict[country], country) for country in mix_df.index.tolist()], names=['reg', 'country'])
+reg_mi = reg_mi.sort_values()
 mix_df = mix_df.reindex(reg_mi, level=1)
 mix_df = mix_df.stack('technology')
 
@@ -376,18 +389,170 @@ mix_df.set_index(['MESSAGE tec'], append=True, inplace=True)
 
 #%% Populate future production mixes using MESSAGE transformation pathways (factors normalized by 2020 production)
 
-prod_df = pd.DataFrame(index=mix_df.index, columns = mix_df.columns)
+prod_df = pd.DataFrame(index=mix_df.index, columns=mix_df.columns)
 for ind, row in mix_df.iterrows():
     reg = ind[0]
     msg_tec = ind[3]
-    prod_df.loc[ind] = (message_el_shares.loc[(reg,msg_tec), 2020:])*(mix_df.loc[ind][2020])
+    prod_df.loc[ind] = (message_el_shares.loc[(reg, msg_tec), 2020:]) * (mix_df.loc[ind][2020])
 
 #%% Adjust trade matrix to match growth in electricity production
 
 ann_growth = prod_df.groupby(['reg']).sum()
 ann_growth_norm = ann_growth.div(ann_growth[2020], axis=0)  # increase in electricity production normalized to 2020
 
-trades_df = pd.concat([trades_df], keys=[2020], names=['year', 'country'], axis=1)
-trades_df = pd.concat([trades_df], keys=[2020], names=['year', 'country'], axis=0)
-trades_mi = pd.MultiIndex.from_product([message_el.loc(axis=1)[2020:].columns, trades_df.columns], names=['year', 'country'])
-trades_df = trades_df.reindex(index=trades_mi, columns=trades_mi)
+""" Temporary approximation: use overall growth across region to calculate increase in trade flows"""
+""" todo: find way to divide to regions?"""
+ann_growth_norm_temp = prod_df.sum().div(prod_df.sum()[2020])
+
+trades_df = trades_df.reindex(reg_mi, level=1)
+trades_df = trades_df.reindex(reg_mi, level=1, axis=1)
+trades_df = pd.concat([trades_df], keys=[2020], names=['year', 'reg','country'], axis=1)
+
+# Add the remaining years in the study period
+df = pd.DataFrame(columns=message_el.loc(axis=1)[2020:].columns, index=reg_mi)
+trades_mi = df.stack(dropna=False).index.reorder_levels([2,0,1])
+trades_mi.rename(names='year', level=0, inplace=True)
+trades_mi = trades_mi.sortlevel('year')[0]
+trades_df = trades_df.reindex(columns=trades_mi)
+
+for year in ann_growth_norm_temp.index.tolist():
+    trades_df[year] = trades_df[2020] * ann_growth_norm_temp[year]
+
+imports = trades_df.sum(axis=0).unstack('year')
+exports = trades_df.groupby(['year'], axis=1).sum()
+
+imports = imports.reindex(reg_mi, level=1)  # reindex to include MESSAGE region mappings
+exports = exports.reindex(reg_mi, level=1)  # reindex to include MESSAGE region mappings
+cons_df = (prod_df.sum(level='country')).add(imports).subtract(exports)
+
+#%% Calculate new consumption mix intensities
+
+def calculate_impact_factors(production, consumption, trades, import_el, export_el):
+
+    g = production.sum(level='country')  # Vector of total electricity production (by hour)
+    g = g.reindex(reg_mi, level=1)
+
+    q = g + import_el  # vector of total consumption
+    q.replace(np.nan, 0, inplace=True)
+
+    y = consumption  # final demand (consumption) of electricity
+
+    y.replace(np.nan, 0, inplace=True)
+    trades.replace(np.nan, 0, inplace=True)
+    # ### Generate regionalized tech generation matrix [tec x countries]
+    C = tec_int_df
+    C = C.reindex(reg_mi, level=1)
+    C = C.reindex(tec_mapping.set_index('MESSAGE tec', append=True).index, level=0, axis=1)
+
+    # # Calculate technology characterization factors including transmission and distribution losses
+
+    # # Start electricity calculations
+    # ### Calculate production and consumption mixes
+    i = consumption.size  # Number of European regions
+
+    # ### Make Leontief production functions (normalize columns of A)
+    # normalized trade matrix quadrant
+    Atmx = pd.DataFrame(np.matmul(trades, np.linalg.pinv(np.diag(q))))
+
+    # "Trade" Leontief inverse
+    # Total imports from region i to j per unit demand on j
+    ltmx = np.linalg.pinv(np.identity(i) - Atmx)
+    Ltmx = pd.DataFrame(np.linalg.pinv(np.identity(i) - Atmx), trades.columns, trades.index)
+
+   # normalized production matrix quadrant
+    Agen = pd.DataFrame(np.diag(g) * np.linalg.pinv(np.diag(q)), index=g.index, columns=g.index)  # coefficient matrix, generation
+
+    # Ltmx = Ltmx.reindex(reg_mi, level=1)
+    # Agen = Agen.reindex(reg_mi, level=1)
+
+    # Production in country i for trade to country j
+    # Total generation in i (rows) per unit demand j
+    Lgen = pd.DataFrame(np.matmul(Agen, Ltmx), index=Agen.index, columns=Ltmx.columns)
+
+    y_diag = pd.DataFrame(np.diag(y), index=g.index, columns=g.index)
+
+    # total imports for given demand (in TWh/h)
+    Xtmx = pd.DataFrame(np.matmul(np.linalg.pinv(np.identity(i) - Atmx), y_diag))
+
+    # Total generation to satisfy demand (consumption) (in TWh/h)
+    Xgen = np.matmul(np.matmul(Agen, Ltmx), y_diag)
+    Xgen.sum(axis=0)
+    Xgen_df = pd.DataFrame(Xgen, index=Agen.index, columns=y_diag.columns)
+
+    # ### Check electricity generated matches demand
+    totgen = Xgen.sum(axis=1)
+    r_gendem = totgen / g #y  # All countries should be 1
+
+    totcons = Xgen.sum(axis=0)
+    r_condem = totcons / y  # All countries should be 1
+
+    prod_by_tec = production/g
+    prod_by_tec = prod_by_tec.unstack(['technology', 'MESSAGE tec'])
+    # prod_by_tec = prod_by_tec.stack()
+    # prod_by_tec.index = prod_by_tec.index.swaplevel(0,1)
+    # prod_by_tec.sort_index(inplace=True)
+
+    # ### Generation technology matrix
+
+    # TC is a country-by-generation technology matrix - normalized to share of total domestic generation, i.e., normalized generation/production mix
+    # technology generation, kWh/ kWh domestic generated electricity
+    prod = production.unstack(['technology', 'MESSAGE tec'])
+    prod = prod.T.reset_index(level='MESSAGE tec').T  #set MESSAGE classifications for columns so we can do the sort
+    prod.sort_index(axis=1, inplace=True)
+    prod = ((prod.T).set_index(['MESSAGE tec'], append=True)).T
+    prod.fillna(0, inplace=True)
+
+    # TC = pd.DataFrame(np.matmul(np.linalg.pinv(np.diag(g)), production.unstack(['technology', 'MESSAGE tec'])))#, index=g.index)#, columns=production.unstack(['technology', 'MESSAGE tec']).columns)
+    TC = pd.DataFrame(np.matmul(np.linalg.pinv(np.diag(g)), prod))#, index=g.index)#, columns=production.unstack(['technology', 'MESSAGE tec']).columns)
+    TCsum = TC.sum(axis=1)  # Quality assurance - each country should sum to 1
+
+    # # Calculate technology generation mix in GWh based on production in each region
+    TGP = pd.DataFrame(np.matmul(TC.transpose(), np.diag(g)))#, index=TC.columns, columns=g.index)  # .== production
+
+    # # Carbon intensity of production mix
+    CFPI_no_TD = pd.DataFrame(prod.multiply(C).sum(axis=1) / prod.sum(axis=1), columns=['Production mix intensity'])  # production mix intensity without losses
+    CFPI_no_TD.fillna(0, inplace=True)
+
+    # # Carbon intensity of consumption mix
+    CFCI_no_TD = pd.DataFrame(np.matmul(CFPI_no_TD.T, Lgen).T)
+    CFCI_no_TD.columns = ['Consumption mix intensity']
+
+    CF = pd.DataFrame()
+    # # Transpose added after removing country aggregation as data pre-treatment
+    # if include_TD_losses:
+    #     CFPI_TD_losses = CFPI_no_TD.multiply(TD_losses, axis=0).dropna(how='any', axis=0)  # apply transmission and distribution losses to production mix intensity
+    #     CFCI_TD_losses = CFCI_no_TD.multiply(TD_losses, axis=0).dropna(how='any', axis=0)
+
+    #     # CF = CFPI_TD_losses.join(CFCI_TD_losses)
+    #     CF_prod = CFPI_TD_losses
+    #     CF_cons = CFCI_TD_losses
+
+    # else:
+    #     CF_prod = CFPI_no_TD
+    #     CF_cons = CFCI_no_TD
+
+    CF_prod = CFPI_no_TD
+    CF_cons = CFCI_no_TD
+    return Xgen_df, prod_by_tec, CF_prod, CF_cons
+
+
+#%%
+Xgen_df = pd.DataFrame(index=reg_mi, columns=trades_mi)
+Xgen_tecs = pd.DataFrame(index=reg_mi, columns=prod_df.stack().index)
+
+carbon_footprints_prod = pd.DataFrame(index=reg_mi, columns=message_el_shares[2020:].columns)
+carbon_footprints_cons = pd.DataFrame(index=reg_mi, columns=message_el_shares[2020:].columns)
+
+#%%
+for year in cons_df.columns:
+    ann_gen, prod_by_tec, cf_prod, cf_cons = calculate_impact_factors(prod_df[year], cons_df[year], trades_df[year], imports[year], exports[year])
+
+    # update the dataframes with calculations from this hour
+    Xgen_df[year].update(ann_gen)  # [country x (yearxcountry)]
+
+    # temp_df = ann_gen.reindex(index=prod_by_tec.index, level=[0,1])
+    # for country, col in temp_df.iteritems():
+    #     temp_df[country] = col.multiply(prod_by_tec)
+    # Xgen_tecs.loc(axis=1)[year].update(temp_df)  # [(hourxcountryxtec) x country]
+    carbon_footprints_prod[year] = cf_prod
+    carbon_footprints_cons[year] = cf_cons
