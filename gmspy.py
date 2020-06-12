@@ -148,6 +148,7 @@ def set2list(name, db=None, ws=None, gdx_filepath=None):
 
 
 def param2series(name, db=None, ws=None, gdx_filepath=None):
+    """--- DEPRECATED ---"""
     """
     Read in a parameter from a GAMS database or gdx file
 
@@ -198,18 +199,35 @@ def param2df(name, db=None, ws=None, gdx_filepath=None):
 
     # Read in data and recast as Pandas Series
 #    print(name)
+
     ds = pd.Series(dict((tuple(rec.keys), rec.value) for rec in db[name]))
-    df = ds.unstack()
 
-    # Ensure that the unstacked columns are ordered as in Data Series
-    ix_len = len(ds.index.levels[-1])
-    cols = ds.index.get_level_values(-1)[:ix_len]
-    df = df.reindex(columns=cols)
-
+    if ds.index.nlevels >1:
+        df = ds.unstack()
+#        if name=='VEH_STCK_CHRT':
+##            print(ds)
+##            print(df)
+#            print(ds.count())
+#            print(df.count().sum())
+#            print(df.shape)
+        # Ensure that the unstacked columns are ordered as in Data Series
+        ix_len = len(ds.index.levels[-1])
+        cols = ds.index.get_level_values(-1)[:ix_len]
+        
+        if len(cols) == len(ds):
+            df = df.reindex(columns=cols)        
+#        if name=='VEH_STCK_CHRT':
+##            print(df)
+#            print(df.count().sum())
+#            print(df.shape)
+    else:
+        df = ds.to_frame(0)    
     return df
 
 
 def var2series(name, db=None, ws=None, gdx_filepath=None):
+    """--- DEPRECATED ---"""
+    
     """
     Read in a variable from a GAMS database or gdx file
 
@@ -269,7 +287,11 @@ def var2df(name, db=None, ws=None, gdx_filepath=None):
     data = dict((tuple(rec.keys), rec.level) for rec in db[name])
     df = pd.Series(data)
     df.index.rename(db[name].domains_as_strings,inplace=True)
-    df = df.unstack()
+    
+    if df.index.nlevels >1:
+        df = df.unstack()
+    else:
+        df = df.to_frame(0)
     return df
 
 def eq2series(name, db=None, ws=None, gdx_filepath=None):
@@ -296,14 +318,16 @@ def eq2series(name, db=None, ws=None, gdx_filepath=None):
     --------
     var2series
     """
+    
     # Sort out database access or file reading
     db = _iwantitall(db, ws, gdx_filepath)
         
     # Read in data and recast as Pandas Series
     data = dict((tuple(rec.keys), rec.marginal) for rec in db[name])
     df = pd.Series(data)
-    df.index.rename(db[name].domains_as_strings,inplace=True)
-    df = df.unstack()
+    df.index.rename(db[name].domains_as_strings, inplace=True)
+#    if df.index.nlevels > 1:
+#        df = df.unstack()
     return df
 
 def _iwantitall(db, ws, gdx_filepath):

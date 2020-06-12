@@ -37,13 +37,15 @@ function cdfnormal     /stolib.cdfnormal     /;
 
 
 SETS
-year            total span of years, including production before intialization period
+*$ontext
+year            total span of years - including production before intialization period
 modelyear(year) model years (2000-2050)
 optyear(year)   years for optimization (2020-2050)
 inityear(year)  years for initialization (2000-2020)
-age             age
+age             age of vehicle
 tec             technology
-enr             energy
+enr             energy carrier
+reg             region or country group
 seg             segment or size class
 sigvar          variables for sigmoid equations
 dstvar          variables for statistical distributions
@@ -51,40 +53,56 @@ enreq           equations for energy (electricity and fuels) system
 veheq           equations for vehicle parameters
 demeq           equations for demand parameters
 lfteq           equations for fleet lifetime parameters
-grdeq           parameters for gradient of change (fleet additions) - individual (IND) for each tech or related to all tech (ALL)\
+grdeq           parameters for gradient of change (fleet additions) - individual (IND) for each tech or related to all tech (ALL)
+*$offtext
 
-*year           year /2000*2050/
-*optyear(year)  years for optimization /2020*2050/
-*inityear(year) years for initialization /2000*2020/
-*age            age /0*20/
-*tec            techlogy /ICE,BEV/
-*enr            energy /ELC,FOS/
-*sigvar         variables for sigmoid equations /A,B,r,t,u/
-*dstvar         variables for statistical distributions /mean,stdv/
-*enreq          equations for energy (electricity and fuels) system /CINT/
-*veheq          equations for vehicle parameters /PROD_EINT, PROD_CINT_CSNT, OPER_EINT, EOLT_CINT/
-*demeq          equations for demand parameters /STCK_TOT, OPER_DIST, OCUP/
-*lfteq          equations for fleet lifetime parameters /LIFT_DISTR, AGE_DISTR/
-*grdeq          parameters for gradient of change (fleet additions) - individual (IND) for each tech or related to all tech (ALL) /IND,ALL/
-
+$ontext
+* Used for debugging and running directly in GAMS
+year           year /2000*2050/
+optyear(year)  years for optimization /2020*2050/
+inityear(year) years for initialization /2000*2020/
+age            age /0*20/
+tec            techlogy /ICE,BEV/
+enr            energy /ELC,FOS/
+sigvar         variables for sigmoid equations /A,B,r,t,u/
+dstvar         variables for statistical distributions /mean,stdv/
+enreq          equations for energy (electricity and fuels) system /CINT/
+veheq          equations for vehicle parameters /PROD_EINT, PROD_CINT_CSNT, OPER_EINT, EOLT_CINT/
+demeq          equations for demand parameters /STCK_TOT, OPER_DIST, OCUP/
+lfteq          equations for fleet lifetime parameters /LIFT_DISTR, AGE_DISTR/
+grdeq          parameters for gradient of change (fleet additions) - individual (IND) for each tech or related to all tech (ALL) /IND,ALL/
+$offtext
+;
 *---- ABBREIVATIONS USED *-----------------------------------------------------------------------------------
 * PROD = Production
 * OPER = Operation
 * ENIT = Enerqy intensity
 * CINT = CO2-eq intensity
 * CNST = b in y = ax + b
-;
 
 ** Load sets defined in Python class
-* These lines must be uncommented if specific input .gdx is not specified, e.g., $gdxin <filepath>_index.gdx
-$if not set gdxincname $abort 'no include file name for data file provided'
-$gdxin %gdxincname%
+* These lines must be uncommented if specific input .gdx is not specified, e.g., $gdxin <filepath>_input.gdx
+* Comment out these two lines if running directly in GAMS:
+*$if not set gdxincname $abort 'no include file name for data file provided'
+*$gdxin %gdxincname%
 
-*$gdxin C:\Users\chrishun\Box Sync\YSSP_temp\run_slow_baseline_def_def_def_def_iTEM2_Base2019-09-24T12_50_input.gdx
-*$gdxin C:\Users\chrishun\Box Sync\YSSP_temp\run_def_baseline_def_def_def_def_iTEM2-Base2019-10-04T18_47_input.gdx
-*$gdxin C:\Users\chrishun\Box Sync\YSSP_temp\run_def_baseline_def_def_def_def_def_iTEM2-Base2019-10-25T18_50_input.gdx
+*$ontext
+*$gdxin C:\Users\chrishun\Box Sync\YSSP_temp\model run data\run_slow_baseline_def_def_def_def_iTEM2_Base2019-09-24T12_50_input.gdx
+*$offtext
 
-* This .gdx is for troubleshooting unwanted behaviour
+$ontext
+$gdxin C:\Users\chrishun\Box Sync\YSSP_temp\run_def_baseline_def_def_def_def_iTEM2-Base2019-10-04T18_47_input.gdx
+$offtext
+
+$ontext
+$gdxin C:\Users\chrishun\Box Sync\YSSP_temp\run_def_baseline_def_def_def_def_def_iTEM2-Base2019-10-25T18_50_input.gdx
+$offtext
+
+*$gdxin C:\Users\chrishun\Box Sync\YSSP_temp\Cleanup April 2020\run_def_baseline_def_def_def_def_aggr_iTEM2-Base2019-10-23T07_40_input.gdx
+
+$gdxin C:\Users\chrishun\Box Sync\YSSP_temp\pyGAMS_input.gdx
+
+* This .gdx is for troubleshooting
 *$GDXIN 'troubleshooting_params'
 $LOAD year
 $LOAD modelyear
@@ -93,6 +111,7 @@ $LOAD inityear
 $LOAD age
 $LOAD tec
 $LOAD enr
+$LOAD reg
 $LOAD seg
 
 $LOAD sigvar
@@ -102,7 +121,7 @@ $LOAD veheq
 $LOAD demeq
 $LOAD lfteq
 $LOAD grdeq
-*
+
 $GDXIN
 
 * alias call for prodyear = production year is identical set to year
@@ -143,11 +162,11 @@ YEAR_PAR(year)                   year
 *VEH_PARTAB(tec,veheq,sigvar)     variables for each tech and veh equation
 VEH_PARTAB(veheq,tec,seg,sigvar)     variables for each tech and veh equation
 * DEM_PARTAB(demeq,sigvar)         variables for demand equations
-ENR_PARTAB(enr,enreq,sigvar)     variables for each energy (fos or elc) equation
+ENR_PARTAB(enr,reg,enreq,sigvar)     variables for each energy (fos or elc) equation
 *LFT_PARTAB(dstvar)               variables for fleet lifetime equations
 
 ***ENERGY (ELECTRICITY GENERATION and FUEL) ------------------------------------------
-ENR_CINT(enr,year)               CO2 intensity of the energy                            [kg CO2-eq pr kwh]
+ENR_CINT(enr,reg,year)               CO2 intensity of the regional energy mixes            [kg CO2-eq pr kwh]
 
 ***ENERGY and VEHICLE TECHONLOGY COMBINATIONS ----------------------------------------
 ENR_VEH(enr,tec)                 feasible combinations of vehicle technology and energy (fuel).
@@ -156,32 +175,34 @@ ENR_VEH(enr,tec)                 feasible combinations of vehicle technology and
 ***All VEHICLES ----------------------------------------------------------------------
 
 **PRODUCTION
-VEH_PROD_EINT(tec,seg,prodyear)        Electricity intensity of vehicle prod            [kwh el required per vehicle produced]
-VEH_PROD_CINT_CSNT(tec,seg,prodyear)   Constant term for CO2 int. of vehicle production [t CO2-eq per vehicle produced]
-VEH_PROD_CINT(tec,seg,prodyear)        CO2 intensity of vehicle production              [t CO2-eq per vehicle produced]
+VEH_PROD_EINT(tec,seg,prodyear)        Electricity intensity of vehicle prod                [kwh el required per vehicle produced]
+VEH_PROD_CINT_CSNT(tec,seg,prodyear)   Constant term for CO2 int. of vehicle production     [t CO2-eq per vehicle produced]
+VEH_PROD_CINT(tec,seg,prodyear)        CO2 intensity of vehicle production                  [t CO2-eq per vehicle produced]
 
 **OPERATION
-VEH_OPER_EINT(tec,seg,prodyear)        Energy intensity of vehicle operation            [kwh per km]
-VEH_OPER_CINT(tec,enr,seg,age,modelyear,prodyear)    CO2 intensity of vehicle operation               [t CO2 per km]
+VEH_OPER_EINT(tec,seg,prodyear)                     Energy intensity of vehicle operation   [kwh per km]
+VEH_OPER_CINT(tec,enr,seg,reg,age,modelyear,prodyear)    CO2 intensity of vehicle operation     [t CO2 per km]
 *VEH_OPER_CINT2(tec,enr,seg,prodyear,age,modelyear)
 OPER_TRIAL(tec,enr,seg,prodyear,age,modelyear)
 **EOL
-VEH_EOLT_CINT(tec,seg,year)            CO2 intensity of ICE vehicle EOL                 [t CO2-eq per vehicle in EOL treatment]
+VEH_EOLT_CINT(tec,seg,year)            CO2 intensity of ICE vehicle EOL                     [t CO2-eq per vehicle in EOL treatment]
 COHORT_OPER_EMISSIONS(tec,enr,seg,modelyear)
-VEH_LC_EMISS(tec,seg,prodyear)         Lifecycle emissions for each tec-seg-vintage cohort
+*VEH_LC_EMISS(tec,seg,prodyear)         Lifecycle emissions for each tec-seg-vintage cohort
 
 ** FLEET -------------------------------------------------------------------------------
 ** INITIAL STOCK ------------
+$ontext
 INIT_SEG(seg)
 INIT_TEC(tec)
 INIT_AGE(age)
 SEG_TEC(seg,tec)
 SEG_TEC_AGE(seg,tec,age)
+$offtext
 BEV_CAPAC(seg)                  Correspondence of battery capacities used in each segment[in kWh]
 
 **DEMAND --------------------
 
-VEH_STCK_TOT(year)               Number of vehicles - #
+VEH_STCK_TOT(year,reg)           Number of vehicles - #
 VEH_OPER_DIST(year)              Annual driving distance per vehicles                   [km]
 *VEH_OCUP(year)                                  Load factor for vehicles                                                               [passengers per vehicle]
 
@@ -197,18 +218,29 @@ VEH_LIFT_MOR(age)                Age distribution = 1 - CDF
 VEH_PAY(prodyear,age,year)       Correspondence between a vehicle production year and its age (up to 20) in a given year
 VEH_STCK_INT_TEC(tec)            Initial share of vehicles in stock tech
 VEH_STCK_INT_SEG(seg)            Initial stock distribution by segment
-VEH_STCK_INT(tec,seg,age)        Initial size of stock of vehicles by age cohort and segment
+VEH_STCK_INT(tec,seg,reg,age)    Initial size of stock of vehicles by age cohort and segment
 
 ** CONSTRAINTS -------
 VEH_ADD_GRD(grdeq,tec)           Parameter for gradient of change constraint (fleet additions) - individual (IND) for each tech or related to all tech (ALL)
 *VEH_SEG_SHR(seg)                 Parameter for segment share minimums in fleet
 GRO_CNSTRNT(year)                Segment growth rate constraint relative to stock additions
 MANUF_CNSTRNT(year)             Annual manufacturing capacity (for batteries destined for Europe), in MWh
+
+
+** POST-PROCESSING --------
+TOT_BATT_MANUF(year)            Total battery capacity required by year
+VEH_STCK_TOT_CHECK(modelyear)
+*POS_STOCK(tec,seg,reg,modelyear,agej)
+VEH_STCK_CHRT(tec,seg,reg,prodyear,age,modelyear)       Total stock by technology segment region and cohort
+VEH_OPER_COHORT(tec,seg,reg,prodyear,modelyear,agej)    Total fleet operating emissions by technology segment region and cohort
+VEH_EOLT_COHORT(tec,seg,reg,prodyear,modelyear,agej)    Total end-of-life emissions by technology segment region and cohort
+*VEH_LC_EMISS(tec,seg,reg,prodyear)
+ANN_TOTC(modelyear)                     Total CO2 emissions from LDVs by year                              [t CO2-eq]
+VEH_TOT_ADD(reg, year)                       Total vehicles added by region
+VEH_TOT_REM(reg, year)
 ;
 
-
 * Here, A = mini; B=small, C = lower medium; D = medium; E = upper medium F = luxury, SUV, sport, vans and others
-
 
 *$call ="c:\gams\win64\26.1\xls2gms.exe" I="C:\Users\chrishun\Box Sync\YSSP_temp\GAMS_input.xls" *O="VEH_OPER_DIST.inc" R="Sheet2!A2:B52"
 *PARAMETER VEH_OPER_DIST(year)
@@ -225,24 +257,31 @@ MANUF_CNSTRNT(year)             Annual manufacturing capacity (for batteries des
 
 
 * Load in parameter values from .gdx file [dummy data]
-$ONMULTI
-$GDXIN 'EVD4EUR_input'
+*$ONMULTI
+*$GDXIN 'EVD4EUR_input'
 *$LOAD DEM_PARTAB
 * Vehicle load rate not required due to calculations performed in python
 *$LOAD VEH_OCUP
-$GDXIN
+*$GDXIN
 
 * Load in parameter values defined in Python class
 *$gdxin C:\Users\chrishun\Box Sync\YSSP_temp\run_def_baseline_def_def_def_def_iTEM2-Base2019-10-04T18_47_input.gdx
 *$gdxin C:\Users\chrishun\Box Sync\YSSP_temp\run_slow_baseline_def_def_def_def_iTEM2_Base2019-09-24T12_50_input.gdx
-$gdxin C:\Users\chrishun\Box Sync\YSSP_temp\GAMS_input.gdx
+*$gdxin C:\Users\chrishun\Box Sync\YSSP_temp\GAMS_input.gdx
 
-*$gdxin %gdxincname%
+* Default input .gdx output from Python
+$gdxin C:\Users\chrishun\Box Sync\YSSP_temp\pyGAMS_input.gdx 
+
+* Sample input GDX as trial for introducing the region set
+*$gdxin C:\Users\chrishun\Box Sync\YSSP_temp\Cleanup April 2020\run_def_baseline_def_def_def_def_aggr_iTEM2-Base2019-10-23T07_40_input.gdx
+
+* Comment out these lines if running directly in GAMS
 *$if not set gdxincname $abort 'no include file name for data file provided'
-*
+*$gdxin %gdxincname%
+
 $LOAD YEAR_PAR
 $LOAD VEH_PARTAB
-$LOAD ENR_PARTAB
+*$LOAD ENR_PARTAB # declared manually below
 
 *$LOAD VEH_PROD_CINT_CSNT
 *$LOAD VEH_PROD_EINT
@@ -250,6 +289,7 @@ $LOAD ENR_PARTAB
 *$LOAD VEH_EOLT_CINT
 
 $LOAD ENR_VEH
+$LOAD ENR_CINT
 
 $LOAD VEH_STCK_TOT
 $LOAD VEH_OPER_DIST
@@ -263,7 +303,7 @@ $LOAD VEH_PAY
 $LOAD VEH_STCK_INT_TEC
 $LOAD VEH_STCK_INT_SEG
 
-$LOAD VEH_STCK_INT
+*$LOAD VEH_STCK_INT
 $LOAD BEV_CAPAC
 $LOAD VEH_ADD_GRD
 *$LOAD VEH_SEG_SHR
@@ -273,6 +313,188 @@ $OFFMULTI
 $GDXIN
 ;
 
+*TABLE ENR_PARTAB(enr,reg,enreq,sigvar)
+*                    A       B       r         u
+*ELC .PROD .CINT     0.7     0.7     0.7     2030
+*FOS .HIGH .CINT     0.3     0.25    0.2     2035
+*FOS .II  .CINT      0.3     0.25    0.2     2035
+*FOS .MID .CINT      0.3     0.25    0.2     2035
+*FOS .IV  .CINT      0.3     0.25    0.2     2035
+*FOS .LOW  .CINT     0.3     0.25    0.2     2035
+*;
+* Below is replaced by the electricity pathways from MESSAGE
+*ELC .HIGH .CINT     1       0.275   0.16    2030
+*ELC .LOW  .CINT     .5      0.1     0.2     2030
+*
+
+
+
+*
+*PARAMETER VEH_STCK_TOT(year, reg)
+*/
+*2000	.HIGH	=       500000
+*2001	.HIGH	=       500000
+*2002	.HIGH	=       500000
+*2003	.HIGH	=       500000
+*2004	.HIGH	=       500000
+*2005	.HIGH	=       500000
+*2006	.HIGH	=       500000
+*2007	.HIGH	=       500000
+*2008	.HIGH	=       500000
+*2009	.HIGH	=       500000
+*2010	.HIGH	=       500000
+*2011	.HIGH	=       500000
+*2012	.HIGH	=       500000
+*2013	.HIGH	=       500000
+*2014	.HIGH	=       500000
+*2015	.HIGH	=       500000
+*2016	.HIGH	=       500000
+*2017	.HIGH	=       500000
+*2018	.HIGH	=       500000
+*2019	.HIGH	=       500000
+*2020	.HIGH	=       509677.4194
+*2021	.HIGH	=       519354.8387
+*2022	.HIGH	=	529032.2581
+*2023	.HIGH	=	538709.6774
+*2024	.HIGH	=	548387.0968
+*2025	.HIGH	=	558064.5161
+*2026	.HIGH	=	567741.9355
+*2027	.HIGH	=	577419.3548
+*2028	.HIGH	=	587096.7742
+*2029	.HIGH	=	596774.1935
+*2030	.HIGH	=	606451.6129
+*2031	.HIGH	=	616129.0323
+*2032	.HIGH	=	625806.4516
+*2033	.HIGH	=	635483.871
+*2034	.HIGH	=	645161.2903
+*2035	.HIGH	=	654838.7097
+*2036	.HIGH	=	664516.129
+*2037	.HIGH	=	674193.5484
+*2038	.HIGH	=	683870.9677
+*2039	.HIGH	=	693548.3871
+*2040	.HIGH	=	703225.8065
+*2041	.HIGH	=	712903.2258
+*2042	.HIGH	=	722580.6452
+*2043	.HIGH	=	732258.0645
+*2044	.HIGH	=	741935.4839
+*2045	.HIGH	=	751612.9032
+*2046	.HIGH	=	761290.3226
+*2047	.HIGH	=	770967.7419
+*2048	.HIGH	=	780645.1613
+*2049	.HIGH	=	790322.5806
+*2050	.HIGH	=	800000
+*2051	.HIGH	=	800000
+*2052	.HIGH	=	800000
+*2053	.HIGH	=	800000
+*2054	.HIGH	=	800000
+*2055	.HIGH	=	800000
+*2056	.HIGH	=	800000
+*2057	.HIGH	=	800000
+*2058	.HIGH	=	800000
+*2059	.HIGH	=	800000
+*2060	.HIGH	=	800000
+*2061	.HIGH	=	800000
+*2062	.HIGH	=	800000
+*2063	.HIGH	=	800000
+*2064	.HIGH	=	800000
+*2065	.HIGH	=	800000
+*2066	.HIGH	=	800000
+*2067	.HIGH	=	800000
+*2068	.HIGH	=	800000
+*2069	.HIGH	=	800000
+*2070    .HIGH   =       800000
+*2071	.HIGH	=	800000
+*2072	.HIGH	=	800000
+*2073	.HIGH	=	800000
+*2074	.HIGH	=	800000
+*2075	.HIGH	=	800000
+*2076	.HIGH	=	800000
+*2077	.HIGH	=	800000
+*2078	.HIGH	=	800000
+*2079	.HIGH	=	800000
+*2080    .HIGH   =       800000
+*2000	.LOW	=	200000
+*2001	.LOW	=       200000
+*2002	.LOW	=       200000
+*2003	.LOW	=       200000
+*2004	.LOW	=       200000
+*2005	.LOW	=       200000
+*2006	.LOW	=       200000
+*2007	.LOW	=       200000
+*2008	.LOW	=       200000
+*2009	.LOW	=       200000
+*2010	.LOW	=       200000
+*2011	.LOW	=       200000
+*2012	.LOW	=       200000
+*2013	.LOW	=       200000
+*2014	.LOW	=       200000
+*2015	.LOW	=       200000
+*2016	.LOW	=       200000
+*2017	.LOW	=       200000
+*2018	.LOW	=       200000
+*2019	.LOW	=	200000
+*2020	.LOW	=	203225.8065
+*2021	.LOW	=	206451.6129
+*2022	.LOW	=	209677.4194
+*2023	.LOW	=	212903.2258
+*2024	.LOW	=	216129.0323
+*2025	.LOW	=	219354.8387
+*2026	.LOW	=	222580.6452
+*2027	.LOW	=	225806.4516
+*2028	.LOW	=	229032.2581
+*2029	.LOW	=	232258.0645
+*2030	.LOW	=	235483.871
+*2031	.LOW	=	238709.6774
+*2032	.LOW	=	241935.4839
+*2033	.LOW	=	245161.2903
+*2034	.LOW	=	248387.0968
+*2035	.LOW	=	251612.9032
+*2036	.LOW	=	254838.7097
+*2037	.LOW	=	258064.5161
+*2038	.LOW	=	261290.3226
+*2039	.LOW	=	264516.129
+*2040	.LOW	=	267741.9355
+*2041	.LOW	=	270967.7419
+*2042	.LOW	=	274193.5484
+*2043	.LOW	=	277419.3548
+*2044	.LOW	=	280645.1613
+*2045	.LOW	=	283870.9677
+*2046	.LOW	=	287096.7742
+*2047	.LOW	=	290322.5806
+*2048	.LOW	=	293548.3871
+*2049	.LOW	=	296774.1935
+*2050	.LOW	=	300000
+*2051	.LOW	=	300000
+*2052	.LOW	=	300000
+*2053	.LOW	=	300000
+*2054	.LOW	=	300000
+*2055	.LOW	=	300000
+*2056	.LOW	=	300000
+*2057	.LOW	=	300000
+*2058	.LOW	=	300000
+*2059	.LOW	=	300000
+*2060	.LOW	=	300000
+*2061	.LOW	=	300000
+*2062	.LOW	=	300000
+*2063	.LOW	=	300000
+*2064	.LOW	=	300000
+*2065	.LOW	=	300000
+*2066	.LOW	=	300000
+*2067	.LOW	=	300000
+*2068	.LOW	=	300000
+*2069	.LOW	=	300000
+*2070	.LOW	=	300000
+*2071	.LOW	=	300000
+*2072	.LOW	=	300000
+*2073	.LOW	=	300000
+*2074	.LOW	=	300000
+*2075	.LOW	=	300000
+*2076	.LOW	=	300000
+*2077	.LOW	=	300000
+*2078	.LOW	=	300000
+*2079	.LOW	=	300000
+*2080	.LOW	=	300000
+*/;
 
 * temporary definition; to introduce for all inityears
 *PARAMETER VEH_STCK_INT_SEG(seg)
@@ -393,21 +615,24 @@ $GDXIN
 *26=0.962962963
 *27=1
 */;
+
 *
-ENR_CINT(enr,modelyear) =  genlogfnc(ENR_PARTAB(enr,'CINT','A'),ENR_PARTAB(enr,'CINT','B'),ENR_PARTAB(enr,'CINT','r'),YEAR_PAR(modelyear),ENR_PARTAB(enr,'CINT','u'));
+*ENR_CINT(FOS, reg, modelyear) =  genlogfnc(ENR_PARTAB(enr,reg,'CINT','A'),ENR_PARTAB(enr,reg,'CINT','B'),ENR_PARTAB(enr,reg,'CINT','r'),YEAR_PAR(modelyear),ENR_PARTAB(enr,reg,'CINT','u'));
 
 *----- Production-related emissions
+* Assume constant for all regions for now
 VEH_PROD_EINT(tec,seg,prodyear) = genlogfnc(VEH_PARTAB('PROD_EINT',tec,seg,'A'),VEH_PARTAB('PROD_EINT',tec,seg,'B'),VEH_PARTAB('PROD_EINT',tec,seg,'r'),YEAR_PAR(prodyear),VEH_PARTAB('PROD_EINT',tec,seg,'u'));
 
 VEH_PROD_CINT_CSNT(tec,seg,prodyear) = genlogfnc(VEH_PARTAB('PROD_CINT_CSNT',tec,seg,'A'),VEH_PARTAB('PROD_CINT_CSNT',tec,seg,'B'),VEH_PARTAB('PROD_CINT_CSNT',tec,seg,'r'),YEAR_PAR(prodyear),VEH_PARTAB('PROD_CINT_CSNT',tec,seg,'u'));
 
-VEH_PROD_CINT(tec,seg,prodyear)$(ord(prodyear)>28) = VEH_PROD_CINT_CSNT(tec,seg,prodyear) + VEH_PROD_EINT(tec,seg,prodyear)*ENR_CINT('elc',prodyear)/1000;
+VEH_PROD_CINT(tec,seg,prodyear)$(ord(prodyear)>28) = VEH_PROD_CINT_CSNT(tec,seg,prodyear) + VEH_PROD_EINT(tec,seg,prodyear)*ENR_CINT('elc','prod',prodyear)/1000;
 * only production emissions from 2000 onwards are relevant despite cohorts going back to 1972
 
 *----- Operation phase emissions
+* Assume constant for all regions for now
 VEH_OPER_EINT(tec,seg,prodyear) = genlogfnc(VEH_PARTAB('OPER_EINT',tec,seg,'A'),VEH_PARTAB('OPER_EINT',tec,seg,'B'),VEH_PARTAB('OPER_EINT',tec,seg,'r'),YEAR_PAR(prodyear),VEH_PARTAB('OPER_EINT',tec,seg,'u'));
 
-VEH_OPER_CINT(tec,enr,seg,age,modelyear,prodyear)$(ENR_VEH(enr,tec)) = VEH_OPER_EINT(tec,seg,prodyear)*VEH_PAY(prodyear,age,modelyear)*(ENR_CINT(enr,modelyear)/1000);
+VEH_OPER_CINT(tec,enr,seg,reg,age,modelyear,prodyear)$(ENR_VEH(enr,tec)) = VEH_OPER_EINT(tec,seg,prodyear)*VEH_PAY(prodyear,age,modelyear)*(ENR_CINT(enr,reg,modelyear)/1000);
 *VEH_OPER_CINT(tec,enr,seg,prodyear,modelyear)$(ENR_VEH(enr,tec) and prodyear <=modelyear) = VEH_OPER_EINT(tec,seg,prodyear)*(ENR_CINT(enr,modelyear)/1000);
 *OPER_TRIAL(tec,enr,seg,'2030',age,modelyear)$(modelyear>=prodyear and modelyear<=(prodyear+11))= VEH_OPER_EINT(tec,seg,prodyear)*VEH_PAY(prodyear,age,modelyear)*(ENR_CINT(enr,modelyear)/1000)*VEH_OPER_DIST(modelyear);
 *OPER_TRIAL(tec,enr,seg,'2030',age,modelyear)$(modelyear>=2030 and modelyear<=(2030+11))= VEH_OPER_CINT(tec,enr,seg,'2030',age,modelyear);
@@ -418,6 +643,7 @@ VEH_OPER_CINT(tec,enr,seg,age,modelyear,prodyear)$(ENR_VEH(enr,tec)) = VEH_OPER_
 
 *----- End-of-life phase emissions
 *10.10.2019:  Used to prodyear, rather than modelyear
+* Assume constant for all regions for now
 VEH_EOLT_CINT(tec,seg,modelyear) = genlogfnc(VEH_PARTAB('EOLT_CINT',tec,seg,'A'),VEH_PARTAB('EOLT_CINT',tec,seg,'B'),VEH_PARTAB('EOLT_CINT',tec,seg,'r'),YEAR_PAR(modelyear),VEH_PARTAB('EOLT_CINT',tec,seg,'u'));
 
 *----- Calculate lifecycle emissions for each vehicle technology and segment for quality check
@@ -428,13 +654,16 @@ VEH_EOLT_CINT(tec,seg,modelyear) = genlogfnc(VEH_PARTAB('EOLT_CINT',tec,seg,'A')
 *VEH_LC_EMISS(tec,enr,seg,prodyear) = VEH_PROD_CINT(tec,seg,prodyear) + COHORT_OPER_EMISSIONS(tec,enr,seg,prodyear) + VEH_EOLT_CINT(tec,seg,prodyear+11);
 
 *----- Initialization of vehicle stock
+*These are not used elsewhere
+$ontext
 INIT_SEG(seg) = VEH_STCK_INT_SEG(seg)*VEH_STCK_TOT('2000');
 INIT_TEC(tec) = VEH_STCK_INT_TEC(tec)*VEH_STCK_TOT('2000');
 INIT_AGE(age) = VEH_LIFT_PDF(age)*VEH_STCK_TOT('2000');
 SEG_TEC(seg,tec) = (VEH_STCK_INT_TEC(tec))*(VEH_STCK_INT_SEG(seg));
 SEG_TEC_AGE(seg,tec,age) = (VEH_STCK_INT_TEC(tec)*VEH_STCK_INT_SEG(seg))*VEH_LIFT_PDF(age);
+$offtext
 
-*VEH_STCK_INT(tec,seg,age) = (VEH_STCK_INT_TEC(tec)*VEH_LIFT_PDF(age)*VEH_STCK_INT_SEG(seg))*VEH_STCK_TOT('2000');
+VEH_STCK_INT(tec,seg,reg,age) = (VEH_STCK_INT_TEC(tec)*VEH_LIFT_PDF(age)*VEH_STCK_INT_SEG(seg))*VEH_STCK_TOT('2000',reg);
 
 
 *-----------------------------------------------------------------------------------
@@ -449,37 +678,25 @@ SEG_TEC_AGE(seg,tec,age) = (VEH_STCK_INT_TEC(tec)*VEH_STCK_INT_SEG(seg))*VEH_LIF
 
 
 FREE VARIABLES
-TOTC                                    Total CO2 emissions for the whole system over the whole period
-TOTC_OPT                                Total CO2 emissions for the whole system over optimization period
-VEH_STCK_DELTA(year)                    Delta stock from one year to the next
-*slack_VEH_ADD(seg,year,age)
+TOTC                                        Total CO2 emissions for the whole system over the whole period
+TOTC_OPT                                    Total CO2 emissions for the whole system over optimization period
+VEH_STCK_DELTA(year,reg)                    Net change in stock from one year to the next
+*slack_VEH_ADD(seg,year,age)                Slack variable for additions to stock
 ;
 
 POSITIVE VARIABLES
-VEH_STCK(tec,seg,year,age)              Number of vehicles of a given age in a given year
-VEH_STCK_REM(tec,seg,year,age)          Number of vehicles of a given age retired in a given year
-VEH_STCK_TOT_CHECK(year)                Check on number of vehicles
-VEH_STCK_ADD(tec,seg,year,age)          Stock additions (new car sales)
-VEH_TOT_ADD(year)                       Total vehicles added
-VEH_TOTC(tec,seg,year)                  Total CO2 emissions of vehicles per year, by technology             [t CO2-eq]
-VEH_STCK_ADD_OPTYEAR1(tec,seg,year,age)
+VEH_STCK(tec,seg,reg,year,age)              Number of vehicles of a given age in a given year
+VEH_STCK_REM(tec,seg,reg,year,age)          Number of vehicles of a given age retired in a given year
+VEH_STCK_ADD(tec,seg,reg,year,age)          Stock additions (new car sales)
+VEH_TOTC(tec,seg,reg,year)                  Total CO2 emissions of vehicles per year by technology             [t CO2-eq]
+VEH_STCK_ADD_OPTYEAR1(tec,seg,reg,year,age)
 
-VEH_PROD_TOTC(tec,seg,year)             Total CO2 emissions from production of vehicles per year            [t CO2-eq]
-VEH_OPER_TOTC(tec,seg,year)             Total CO2 emissions from operations of vehicles per year            [t CO2-eq]
-VEH_EOLT_TOTC(tec,seg,year)             Total CO2 emissions from vehicle end of life treatment per year     [t CO2-eq]
-check_add_tot(year)
-VEH_TOT_REM(year)
-ANN_TOTC(year)                          Total CO2 emissions from LDVs, by year                              [t CO2-eq]
-VEH_STCK_CHRT(tec,seg,prodyear,age,modelyear)
-VEH_OPER_COHORT(tec,seg,prodyear,modelyear,agej)
-*OPER(tec,seg,year,prodyear)
-*VEH_LC_EMISS(tec,seg,prodyear)
+VEH_PROD_TOTC(tec,seg,reg,year)             Total CO2 emissions from production of vehicles per year            [t CO2-eq]
+VEH_OPER_TOTC(tec,seg,reg,year)             Total CO2 emissions from operations of vehicles per year            [t CO2-eq]
+VEH_EOLT_TOTC(tec,seg,reg,year)             Total CO2 emissions from vehicle end of life treatment per year     [t CO2-eq]
 
 *TOTAL_NEW_CAP(year)                     Total battery capacity added to fleet                               [MWh]
-
-
 ;
-
 
 *-----------------------------------------------------------------------------------
 *
@@ -495,7 +712,10 @@ EQUATIONS
 EQ_STCK_REM_T1
 *stock additions
 EQ_STCK_ADD_T1
+$ontext
 EQ_STCK_ADD_T11
+$offtext
+
 *stock
 EQ_STCK_BAL_T1
 EQ_STCK_DELTA_T1
@@ -513,7 +733,7 @@ EQ_STCK_BAL
 *summing the number of vehicles added and in stock for check.
 *EQ_TOT_ADD
 *EQ_TOT_REM
-EQ_STCK_CHK
+*EQ_STCK_CHK
 
 *** Constraint equations
 * For technology-related additions
@@ -531,8 +751,9 @@ EQ_NEW_BATT_CAP
 
 **EMISSION and ENERGY MODELS incl OBJ. FUNCTION --------------------------------------
 
-* Objective function
+* Objective function; total fleet lifecycle CO2 over optimization period
 EQ_TOTC_OPT
+
 * Calculation of emissions from all vehicle classes per year
 EQ_VEH_TOTC
 *producton emissions
@@ -541,13 +762,6 @@ EQ_VEH_PROD_TOTC
 EQ_VEH_OPER_TOTC
 *eolt emissions
 EQ_VEH_EOLT_TOTC
-EQ_TOTC
-EQ_ANN_TOTC
-*EQ_CHECK_ADD
-*EQ_OPER
-EQ_STCK_COHORT
-EQ_VEH_OPER_COHORT
-*EQ_VEH_LC_EMISSIONS
 ;
 
 *-----------------------------------------------------------------------------------
@@ -561,37 +775,43 @@ EQ_VEH_OPER_COHORT
 
 ***  Initiate stock in first year ----------------------------
 
-*removals
-EQ_STCK_REM_T1(tec,seg,inityear,age)..                VEH_STCK_REM(tec,seg,inityear,age) =e=  VEH_STCK(tec,seg,inityear-1,age-1)  * VEH_LIFT_MOR(age-1);
+* calculate stock removals as per survival curves
+EQ_STCK_REM_T1(tec,seg,reg,inityear,age)..                VEH_STCK_REM(tec,seg,reg,inityear,age) =e=  VEH_STCK(tec,seg,reg,inityear-1,age-1)  * VEH_LIFT_MOR(age-1);
 * VEH_STCK_INT_SEG(seg)* VEH_LIFT_PDF(age)  * VEH_STCK_INT_TEC(tec)
-*stock additions
+
+* calculate stock additions as sum of stock removals from the same year and increase in total fleet (net stock growth)
 *-- Makes assumption that retired segments are replaced by the same segment
 *EQ_STCK_ADD_T1(seg,inityear,age)$(ord(age)=1)..         sum(tec, VEH_STCK_ADD(tec,seg,inityear,age)) =e=  sum((tec,agej), VEH_STCK_REM(tec,seg,inityear,agej));
-EQ_STCK_ADD_T1(seg,inityear,'0')..                    sum(tec, VEH_STCK_ADD(tec,seg,inityear,'0')) =e=  sum((tec,agej), VEH_STCK_REM(tec,seg,inityear,agej))+ (VEH_STCK_DELTA(inityear)*VEH_STCK_INT_SEG(seg));
+EQ_STCK_ADD_T1(seg,reg,inityear,'0')..                    sum(tec, VEH_STCK_ADD(tec,seg,reg,inityear,'0')) =e=  sum((tec,agej), VEH_STCK_REM(tec,seg,reg,inityear,agej))+ (VEH_STCK_DELTA(inityear,reg)*VEH_STCK_INT_SEG(seg));
 
+$ontext
 EQ_STCK_ADD_T11('2000')..                             VEH_STCK_DELTA('2000') =e= 3637119.13333321;
+$offtext
 
 *EQ_STCK_ADD_T11(seg,'2000',age)$(ord(age)=1)..              sum(tec,VEH_STCK_ADD(tec,seg,'2000',age)) =e= sum((tec,agej),VEH_STCK_REM(tec,seg,'2000',agej))+3637119.13333321;
 
-*stock
-EQ_STCK_BAL_T1(tec,seg,inityear,age)..                VEH_STCK(tec,seg,inityear,age) =e=  VEH_STCK_TOT(inityear) * (VEH_STCK_INT_TEC(tec) * VEH_LIFT_PDF(age) * VEH_STCK_INT_SEG(seg));
+* calculate total stock per cohort, segement and technology
+EQ_STCK_BAL_T1(tec,seg,reg,inityear,age)..                VEH_STCK(tec,seg,reg,inityear,age) =e=  VEH_STCK_TOT(inityear,reg) * (VEH_STCK_INT_TEC(tec) * VEH_LIFT_PDF(age) * VEH_STCK_INT_SEG(seg));
 
-EQ_STCK_DELTA_T1(inityear)$(ord(inityear)>1)..        VEH_STCK_DELTA(inityear)  =e=  VEH_STCK_TOT(inityear) - VEH_STCK_TOT(inityear-1);
+* calculate total increase (or change) of total fleet (net stock growth)
+EQ_STCK_DELTA_T1(inityear,reg)$(ord(inityear)>1)..        VEH_STCK_DELTA(inityear,reg)  =e=  VEH_STCK_TOT(inityear,reg) - VEH_STCK_TOT(inityear-1,reg);
 
 
 ***  Main Model -----------------------------------------------
 
-*removals
-*assumes equal removal across technologies and segments
+* calculate stock removals as per survival curves
+* assumes equal removal across technologies and segments
 *EQ_STCK_REM(tec,seg,optyear,age)$(ord(optyear)>1)..    VEH_STCK_REM(tec,seg,optyear,age) =e= VEH_STCK(tec,seg,optyear,age)*VEH_LIFT_MOR(age);
-EQ_STCK_REM(tec,seg,optyear,age)$(ord(optyear)>1)..    VEH_STCK_REM(tec,seg,optyear,age) =e= VEH_STCK(tec,seg,optyear-1,age-1)*VEH_LIFT_MOR(age-1);
+EQ_STCK_REM(tec,seg,reg,optyear,age)$(ord(optyear)>1)..    VEH_STCK_REM(tec,seg,reg,optyear,age) =e= VEH_STCK(tec,seg,reg,optyear-1,age-1)*VEH_LIFT_MOR(age-1);
 
-*stock additions
+* calculate stock additions as sum of stock removals from the same year and increase in total fleet (net stock growth)
+* assumes removed vehicles are replaced with like segment and technology
 *EQ_STCK_ADD(optyear,age)$(ord(optyear)>1 and ord(age)=1)..             sum((tec,seg), VEH_STCK_ADD(tec,seg,optyear,age) - sum(agej, VEH_STCK_REM(tec,seg,optyear,agej))) =e= VEH_STCK_DELTA(optyear);
-EQ_STCK_ADD(optyear,age)$(ord(optyear)>1)..             sum((tec,seg), (VEH_STCK_ADD(tec,seg,optyear,'0') - sum(agej, VEH_STCK_REM(tec,seg,optyear,agej)))) =e= VEH_STCK_DELTA(optyear);
+EQ_STCK_ADD(optyear,age,reg)$(ord(optyear)>1)..             sum((tec,seg), (VEH_STCK_ADD(tec,seg,reg,optyear,'0') - sum(agej, VEH_STCK_REM(tec,seg,reg,optyear,agej)))) =e= VEH_STCK_DELTA(optyear,reg);
 *EQ_STCK_ADD(seg,optyear,age)$(ord(optyear)>1)..             sum((tec), VEH_STCK_ADD(tec,seg,optyear,'0') - sum(agej, VEH_STCK_REM(tec,seg,optyear,agej))) =e= VEH_STCK_DELTA(optyear)*VEH_STCK_INT_SEG(seg);
 
-EQ_STCK_DELTA(optyear)$(ord(optyear)>1)..             VEH_STCK_DELTA(optyear)  =e=  VEH_STCK_TOT(optyear) - VEH_STCK_TOT(optyear-1);
+* calculate total increase (or change) of total fleet (net stock growth)
+EQ_STCK_DELTA(optyear,reg)$(ord(optyear)>1)..             VEH_STCK_DELTA(optyear,reg)  =e=  VEH_STCK_TOT(optyear,reg) - VEH_STCK_TOT(optyear-1,reg);
 
 *EQ_STCK_BAL(tec,seg,optyear,age)..                     VEH_STCK(tec,seg,optyear,age) =e=  VEH_STCK(tec,seg,optyear-1,age-1) * (VEH_STCK_INT_TEC(tec) * VEH_LIFT_PDF(age) * VEH_STCK_INT_SEG(seg));
 
@@ -609,7 +829,7 @@ EQ_STCK_DELTA(optyear)$(ord(optyear)>1)..             VEH_STCK_DELTA(optyear)  =
 
 *EQ_STCK_BAL2(tec,seg,optyear,age)$(ord(optyear)>1 and ord(age)>1)..      VEH_STCK(tec,seg,optyear,age)  =e=  VEH_STCK(tec,seg,optyear-1,age-1) - VEH_STCK_REM(tec,seg,optyear,age);
 
-EQ_STCK_BAL(tec,seg,optyear,age)$(ord(optyear)>1)..      VEH_STCK(tec,seg,optyear,age)  =e=  VEH_STCK(tec,seg,optyear-1,age-1) + VEH_STCK_ADD(tec,seg,optyear,age) - VEH_STCK_REM(tec,seg,optyear,age);
+EQ_STCK_BAL(tec,seg,reg,optyear,age)$(ord(optyear)>1)..      VEH_STCK(tec,seg,reg,optyear,age)  =e=  VEH_STCK(tec,seg,reg,optyear-1,age-1) + VEH_STCK_ADD(tec,seg,reg,optyear,age) - VEH_STCK_REM(tec,seg,reg,optyear,age);
 
 
 *-----calculate segment market shares-----
@@ -620,86 +840,51 @@ EQ_STCK_BAL(tec,seg,optyear,age)$(ord(optyear)>1)..      VEH_STCK(tec,seg,optyea
 * Calculate total addition to stock independent of technology and segment,
 *EQ_TOT_ADD(year)..                                    VEH_TOT_ADD(year) =e= sum((tec,seg,age), VEH_STCK_ADD(tec,seg,year,age));
 *EQ_TOT_REM(year)..                                                      VEH_TOT_REM(year) =e= sum((tec,seg,age),VEH_STCK_REM(tec,seg,year,age));
-* summing the number of vehicles in fleet as check.
-EQ_STCK_CHK(modelyear)..                                                    VEH_STCK_TOT_CHECK(modelyear) =e= sum((tec,seg,age), VEH_STCK(tec,seg,modelyear,age));
+                                                 
 
 *** Constraints -----------------------------------------------------------------------
 
 * stock additions by technology; consumer uptake constraint
-EQ_STCK_ADD0(tec,seg,'2019','0')..                                 VEH_STCK_ADD_OPTYEAR1('BEV',seg,'2019','0') =e= 0;
-EQ_STCK_GRD0(tec,seg,'2020','0')..                                 VEH_STCK_ADD(tec,seg,'2020','0') =l= ((1 + VEH_ADD_GRD('IND',tec)) * VEH_STCK_ADD_OPTYEAR1(tec,seg,'2019','0')) + 5e4;
+* sets uptake of BEVs in 2019 to 0
+EQ_STCK_ADD0(tec,seg,reg,'2019','0')..                                 VEH_STCK_ADD_OPTYEAR1('BEV',seg,reg,'2019','0') =e= 0;
+
+* restrict addition to stock based on previous year's uptake
+EQ_STCK_GRD0(tec,seg,reg,'2020','0')..                                 VEH_STCK_ADD(tec,seg,reg,'2020','0') =l= ((1 + VEH_ADD_GRD('IND',tec)) * VEH_STCK_ADD_OPTYEAR1(tec,seg,reg,'2019','0')) + 5e4;
 
 *EQ_STCK_GRD(tec,seg,optyear,age)$(ord(optyear)>1 and ord(age)=1)..     VEH_STCK_ADD(tec,seg,optyear,age) =l= ((1 + VEH_ADD_GRD('IND',tec)) * VEH_STCK_ADD(tec,seg,optyear-1,age)) + 5e4;
-EQ_STCK_GRD(tec,seg,optyear)$(ord(optyear)>1)..     VEH_STCK_ADD(tec,seg,optyear,'0') =l= ((1 + VEH_ADD_GRD('IND',tec)) * VEH_STCK_ADD(tec,seg,optyear-1,'0')) + 5e4;
+EQ_STCK_GRD(tec,seg,reg,optyear)$(ord(optyear)>1)..     VEH_STCK_ADD(tec,seg,reg,optyear,'0') =l= ((1 + VEH_ADD_GRD('IND',tec)) * VEH_STCK_ADD(tec,seg,reg,optyear-1,'0')) + 5e4;
 
 * Segment share constraint (segments kept constant)
-EQ_SEG_GRD(seg,optyear,'0')$(ord(optyear)>1)..          sum(tec,VEH_STCK_ADD(tec,seg,optyear,'0')) =l= VEH_STCK_INT_SEG(seg) * sum((tec,segj), VEH_STCK_ADD(tec,segj,optyear,'0'));
+* try to remove - allow for ICEV smart cars (e.g.,) to be replaced by a BEV Model X...
+EQ_SEG_GRD(seg,reg,optyear,'0')$(ord(optyear)>1)..          sum(tec,VEH_STCK_ADD(tec,seg,reg,optyear,'0')) =l= VEH_STCK_INT_SEG(seg) * sum((tec,segj), VEH_STCK_ADD(tec,segj,reg,optyear,'0'));
 
 
 *------ Battery manufacturing constraint;
-* calculate total new capacity of batteries in BEVs added to stock each year
-*EQ_NEW_BATT_CAP(optyear)..                              TOTAL_NEW_CAP(optyear) =e= sum((seg),VEH_STCK_ADD('BEV',seg,optyear,'0')*BEV_CAPAC(seg))/1000;
-*
-*EQ_ADD_CAP(optyear)..                                   TOTAL_NEW_CAP(optyear) =l= MANUF_CNSTRNT(optyear)*1000;
 
-EQ_NEW_BATT_CAP(optyear)..                              MANUF_CNSTRNT(optyear)*1000 =g= sum((seg),VEH_STCK_ADD('BEV',seg,optyear,'0')*BEV_CAPAC(seg))/1000;
+* total capacity added per year must be less than the battery manufacturing capacity
+* dummy manufacturing constraint to trigger on dummy fleet...
+EQ_NEW_BATT_CAP(optyear)..                              MANUF_CNSTRNT(optyear)*10 =g= sum((seg, reg),VEH_STCK_ADD('BEV',seg,reg,optyear,'0')*BEV_CAPAC(seg))/1000;
+*EQ_NEW_BATT_CAP(optyear)..                              MANUF_CNSTRNT(optyear)*1000 =g= sum((seg, reg),VEH_STCK_ADD('BEV',seg,reg,optyear,'0')*BEV_CAPAC(seg))/1000;
 
-*EQ_BATT_MANU_CONSTRNT(optyear)..                    MANUF_CNSTRNT(optyear)*1000 =l= sum((tec,seg,age),VEH_STCK_ADD('BEV',seg,optyear,'0')*BEV_CAPAC(seg))/1000;
-
-
-* lithium refining constraint;
-
-
-
-* Segment share constraint (keep segment shares constant over analysis period)
-*** This works and I have no idea why. (EQ_TOT_ADD must be removed for this to work)
-*EQ_SEG_GRD(seg,optyear,age)$(ord(optyear)>1 and ord(age)=1)..          sum(tec,VEH_STCK_ADD(tec,seg,optyear,age)) =e= VEH_STCK_INT_SEG(seg)* VEH_TOT_ADD(optyear,age);
-
-*EQ_CHECK_ADD(year)..                                                    check_add_tot(year) =e= sum((tec,seg,age),VEH_STCK_ADD(tec,seg,year,age));
-
-*** This causes infeasibility in the solution (but otherwise works, i.e., keeps segment shares constant).
-*EQ_SEG_GRD(seg,optyear,age)$(ord(optyear)>1 and ord(age)=1)..          sum(tec,VEH_STCK_ADD(tec,seg,optyear,age)) + slack_VEH_ADD(seg,optyear,age) =e= VEH_STCK_INT_SEG(seg) * sum((tec,segj), VEH_STCK_ADD(tec,segj,optyear,age));
-
-*EQ_SEG_GRD(seg,optyear,age)$(ord(optyear)>1 and ord(age)=1)..          sum(tec,VEH_STCK_ADD(tec,seg,optyear,age)) =e= VEH_SEG_SHR(seg) * sum((tec,segj), VEH_STCK_ADD(tec,segj,optyear,age));
-
-*EQ_SEG_GRD(seg,optyear)$(ord(optyear)>1)..                          sum((tec,age), VEH_STCK(tec,seg,optyear,age)) =e= VEH_STCK_INT_SEG(seg)*sum((tec,segj,age), VEH_STCK(tec,segj,optyear,age));
-
-*EQ_SEG_GRD(seg,optyear,age)$(ord(optyear)>1 and ord(age)=1)..          sum(tec,VEH_STCK_ADD(tec,seg,optyear,age)) =l= 1.2*sum((tec,segj),VEH_STCK_ADD(tec,segj,optyear-1,age));
-
-
-
-
+* to-do: add lithium refining constraint;
 
 
 *** EMISSION and ENERGY MODELS incl OBJ. FUNCTION ------------------------------------
 * Objective function
-EQ_TOTC_OPT..                                TOTC_OPT =e= SUM((tec,seg,optyear), VEH_TOTC(tec,seg,optyear));
+EQ_TOTC_OPT..                                TOTC_OPT =e= sum((tec,seg,reg,optyear), VEH_TOTC(tec,seg,reg,optyear));
+
 * Calculation of emissions from all vehicle classes per year
-EQ_VEH_TOTC(tec,seg,modelyear)..                  VEH_TOTC(tec,seg,modelyear) =e= VEH_PROD_TOTC(tec,seg,modelyear) + VEH_OPER_TOTC(tec,seg,modelyear) + VEH_EOLT_TOTC(tec,seg,modelyear);
-EQ_ANN_TOTC(modelyear)..                          ANN_TOTC(modelyear) =e= sum((tec,seg),VEH_TOTC(tec,seg,modelyear));
-*int_tec
+EQ_VEH_TOTC(tec,seg,reg,modelyear)..                  VEH_TOTC(tec,seg,reg,modelyear) =e= VEH_PROD_TOTC(tec,seg,reg,modelyear) + VEH_OPER_TOTC(tec,seg,reg,modelyear) + VEH_EOLT_TOTC(tec,seg,reg,modelyear);
 
 *** to do: change production emissions to scale across lifetime
 *EQ_VEH_PROD_TOTC(tec,seg,modelyear)..             VEH_PROD_TOTC(tec,seg,modelyear) =e= sum( (agej)$(ord(agej)=1), VEH_STCK_ADD(tec,seg,modelyear,agej)*VEH_PROD_CINT(tec,seg,modelyear));
 *EQ_VEH_PROD_TOTC(tec,seg,modelyear)..             VEH_PROD_TOTC(tec,seg,modelyear) =e= sum( (agej), VEH_STCK_ADD(tec,seg,modelyear,'0')*VEH_PROD_CINT(tec,seg,modelyear));
 
-EQ_VEH_PROD_TOTC(tec,seg,modelyear)..             VEH_PROD_TOTC(tec,seg,modelyear) =e= VEH_STCK_ADD(tec,seg,modelyear,'0')*VEH_PROD_CINT(tec,seg,modelyear);
+EQ_VEH_PROD_TOTC(tec,seg,reg,modelyear)..             VEH_PROD_TOTC(tec,seg,reg,modelyear) =e= VEH_STCK_ADD(tec,seg,reg,modelyear,'0')*VEH_PROD_CINT(tec,seg,modelyear);
 
-*EQ_VEH_OPER_TOTC(tec,seg,modelyear)..             VEH_OPER_TOTC(tec,seg,modelyear) =e= sum( (agej,enr,prodyear), VEH_STCK(tec,seg,modelyear,agej) * VEH_OPER_CINT(tec,enr,seg,prodyear,modelyear) * ENR_VEH(enr,tec)*VEH_PAY(prodyear,agej,modelyear) * VEH_OPER_DIST(modelyear));
-EQ_VEH_OPER_TOTC(tec,seg,modelyear)..             VEH_OPER_TOTC(tec,seg,modelyear) =e= sum( (agej,enr,prodyear), VEH_STCK(tec,seg,modelyear,agej) *VEH_PAY(prodyear,agej,modelyear)* VEH_OPER_CINT(tec,enr,seg,agej,modelyear,prodyear) *  VEH_OPER_DIST(modelyear));
+EQ_VEH_OPER_TOTC(tec,seg,reg,modelyear)..             VEH_OPER_TOTC(tec,seg,reg,modelyear) =e= sum( (agej,enr,prodyear), VEH_STCK(tec,seg,reg,modelyear,agej) *VEH_PAY(prodyear,agej,modelyear)* VEH_OPER_CINT(tec,enr,seg,reg,agej,modelyear,prodyear) *  VEH_OPER_DIST(modelyear));
 
-* Init phase operation emissions are 0 because we don't account for non-new cars in 2000! (i.e., prodyear is >=2000)
-*EQ_OPER(tec,seg,year,prodyear)..                      OPER(tec,seg,year,prodyear) =e= sum((agej,enr),VEH_STCK(tec,seg,year,agej) * VEH_OPER_CINT(tec,enr,seg,prodyear) * ENR_VEH(enr,tec)*VEH_PAY(prodyear,agej,year) * VEH_OPER_DIST(year));
-EQ_VEH_EOLT_TOTC(tec,seg,modelyear)..             VEH_EOLT_TOTC(tec,seg,modelyear) =e= sum( (agej), VEH_STCK_REM(tec,seg,modelyear,agej))*VEH_EOLT_CINT(tec,seg,modelyear);
-
-EQ_TOTC..                                    TOTC =e= SUM((tec,seg,modelyear), VEH_TOTC(tec,seg,modelyear));
-
-
-*** Convert VEH_STCK to include cohort for clearer figures ------------------------------------------
-EQ_STCK_COHORT(tec,seg,prodyear,agej,modelyear)$VEH_PAY(prodyear,agej,modelyear)..    VEH_STCK_CHRT(tec,seg,prodyear,agej,modelyear) =e= (VEH_STCK(tec,seg,modelyear,agej)*VEH_PAY(prodyear,agej,modelyear)) ;
-*EQ_VEH_LC_EMISSIONS(tec,seg,prodyear)..     VEH_LC_EMISS(tec,seg,prodyear) =e= VEH_PROD_CINT(tec,seg,prodyear) +  sum( (agej,enr,modelyear), VEH_STCK(tec,seg,modelyear,agej) *VEH_PAY(prodyear,agej,modelyear)* VEH_OPER_CINT(tec,enr,seg,prodyear,agej,modelyear) *  VEH_OPER_DIST(modelyear));
-EQ_VEH_OPER_COHORT(tec,seg,prodyear,modelyear,agej)$VEH_PAY(prodyear,agej,modelyear)..   VEH_OPER_COHORT(tec,seg,prodyear,modelyear,agej) =e= sum((enr), VEH_STCK(tec,seg,modelyear,agej) *VEH_PAY(prodyear,agej,modelyear)* VEH_OPER_CINT(tec,enr,seg,agej,modelyear,prodyear) *  VEH_OPER_DIST(modelyear));
-*EQ_VEH_LC_EMISSIONS(tec,seg,prodyear)..     VEH_LC_EMISS(tec,seg,prodyear) =e= VEH_PROD_CINT(tec,seg,prodyear) + sum((modelyear,agej), VEH_OPER_COHORT(tec,seg,prodyear,modelyear,agej)/VEH_STCK(tec,seg,modelyear,agej)*VEH_PAY(prodyear,agej,modelyear));
+EQ_VEH_EOLT_TOTC(tec,seg,reg,modelyear)..             VEH_EOLT_TOTC(tec,seg,reg,modelyear) =e= sum( (agej), VEH_STCK_REM(tec,seg,reg,modelyear,agej))*VEH_EOLT_CINT(tec,seg,modelyear);
 
 *-----------------------------------------------------------------------------------
 *
@@ -713,8 +898,9 @@ MODEL EVD4EUR_Basic "default model, run in normal mode" /ALL/
       seg_test "model without segment constraint" /EVD4EUR_Basic - EQ_SEG_GRD/
       unit_test "model without growth constraint" /EVD4EUR_Basic - EQ_STCK_GRD/
       unit_test2 "model without growth or manufacturing constraint" /unit_test - EQ_NEW_BATT_CAP/
-      no_contr "model no constraints at all" /unit_test2 - EQ_STCK_ADD0 - EQ_STCK_GRD0/
+      neq_stcko_contr "model no constraints at all" /unit_test2 - EQ_STCK_ADD0 - EQ_STCK_GRD0/
 ;
+
 * Defining model run options and solver
 
 *OPTION RESLIM = 2000000;
@@ -733,13 +919,32 @@ MODEL EVD4EUR_Basic "default model, run in normal mode" /ALL/
 *-----------------------------------------------------------------------------------
 
 *EVD4EUR_Basic.optfile = 1;
-*SOLVE EVD4EUR_Basic USING LP MINIMIZING TOTC_OPT;
+SOLVE EVD4EUR_Basic USING LP MINIMIZING TOTC_OPT;
 *SOLVE unit_test USING LP MINIMIZING TOTC_OPT;
 *SOLVE unit_test2 USING LP MINIMIZING TOTC_OPT;
-SOLVE no_contr USING LP MINIMIZING TOTC_OPT;
+*SOLVE no_contr USING LP MINIMIZING TOTC_OPT;
 
-*DISPLAY VEH_STCK_TOT
-*DISPLAY VEH_STCK_TOT_CHECK.l
+*-----------------------------------------------------------------------------------
+*
+* Post-processing calculations
+*
+*-----------------------------------------------------------------------------------
+* total capacity of batteries added by year
+TOT_BATT_MANUF(optyear) = sum((seg, reg),VEH_STCK_ADD.l('BEV',seg,reg,optyear,'0')*BEV_CAPAC(seg))/1000;
 
+* summing the number of vehicles in fleet as check.
+VEH_STCK_TOT_CHECK(modelyear) = sum((tec,seg,reg,age), VEH_STCK.l(tec,seg,reg,modelyear,age));
+VEH_STCK_CHRT(tec,seg,reg,prodyear,agej,modelyear) $ VEH_PAY(prodyear,agej,modelyear) = (VEH_STCK.l(tec,seg,reg,modelyear,agej)*VEH_PAY(prodyear,agej,modelyear));
 
-execute_unload 'EVD4EUR_test.gdx'
+* total operation emissions by cohort and model year
+VEH_OPER_COHORT(tec, seg, reg, prodyear, modelyear ,agej) = sum((enr), VEH_STCK.l(tec,seg,reg,modelyear,agej) * VEH_PAY(prodyear,agej,modelyear)* VEH_OPER_CINT(tec,enr,seg,reg,agej,modelyear,prodyear) * VEH_OPER_DIST(modelyear));
+VEH_EOLT_COHORT(tec,seg,reg,prodyear,modelyear,agej) = (VEH_STCK_REM.l(tec,seg,reg,modelyear,agej)* VEH_PAY(prodyear,agej,modelyear)) * VEH_EOLT_CINT(tec,seg,modelyear);
+
+* average lifecycle emissions by cohort; doesn't work, perform in Python
+*POS_STOCK(tec,seg,reg,modelyear,agej) = VEH_STCK.l(tec,seg,reg,modelyear,agej)$(VEH_STCK.l(tec,seg,reg,modelyear,agej)>10);
+*VEH_LC_EMISS(tec,seg,reg,prodyear) = VEH_PROD_CINT(tec,seg,prodyear) +
+*sum((modelyear,agej), VEH_OPER_COHORT(tec,seg,reg,prodyear,modelyear,agej)/POS_STOCK(tec,seg,reg,modelyear,agej)) + sum((modelyear,agej), VEH_EOLT_COHORT(tec,seg,reg,prodyear,modelyear,agej)/POS_STOCK(tec,seg,reg,modelyear,agej))
+*VEH_LC_EMISS(tec,seg,reg,prodyear) = VEH_PROD_CINT(tec,seg,prodyear) + sum((modelyear,agej), VEH_OPER_COHORT(tec,seg,reg,prodyear,modelyear,agej)/VEH_STCK.l(tec,seg,reg,modelyear,agej)$(VEH_STCK.l(tec,seg,reg,modelyear,agej)<>0)) + sum((modelyear,agej), VEH_EOLT_COHORT(tec,seg,reg,prodyear,modelyear,agej)/VEH_STCK.l(tec,seg,reg,modelyear,agej)$(VEH_STCK.l(tec,seg,reg,modelyear,agej)<>0))
+*(VEH_STCK.l(tec,seg,reg,modelyear,agej)>0);
+
+execute_unload 'EVD4EUR_addset.gdx'
