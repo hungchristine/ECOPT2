@@ -79,7 +79,13 @@ except:
     print("cannot make folder!")
         
 def run_experiment():
-    # Load parameter values from YAML
+    """--- Read YAML for key parameter values for each experiment,
+    create a GAMSRunner object, and loop through each experiment
+    
+    
+    
+    ---"""
+    # Load parameter values for each experiment from YAML
     # r'C:\Users\chrishun\Box Sync\YSSP_temp\temp_input.yaml'
     # r'C:\Users\chrishun\Box Sync\YSSP_temp\temp_input_presubmission.yaml'
 #    with open(r'C:\Users\chrishun\Box Sync\YSSP_temp\GAMS_input.yaml', 'r') as stream:

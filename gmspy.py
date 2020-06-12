@@ -148,6 +148,7 @@ def set2list(name, db=None, ws=None, gdx_filepath=None):
 
 
 def param2series(name, db=None, ws=None, gdx_filepath=None):
+    """--- DEPRECATED ---"""
     """
     Read in a parameter from a GAMS database or gdx file
 
@@ -225,6 +226,8 @@ def param2df(name, db=None, ws=None, gdx_filepath=None):
 
 
 def var2series(name, db=None, ws=None, gdx_filepath=None):
+    """--- DEPRECATED ---"""
+    
     """
     Read in a variable from a GAMS database or gdx file
 
@@ -284,6 +287,7 @@ def var2df(name, db=None, ws=None, gdx_filepath=None):
     data = dict((tuple(rec.keys), rec.level) for rec in db[name])
     df = pd.Series(data)
     df.index.rename(db[name].domains_as_strings,inplace=True)
+    
     if df.index.nlevels >1:
         df = df.unstack()
     else:
@@ -314,6 +318,7 @@ def eq2series(name, db=None, ws=None, gdx_filepath=None):
     --------
     var2series
     """
+    
     # Sort out database access or file reading
     db = _iwantitall(db, ws, gdx_filepath)
         
