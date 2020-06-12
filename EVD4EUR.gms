@@ -38,14 +38,14 @@ function cdfnormal     /stolib.cdfnormal     /;
 
 SETS
 *$ontext
-year            total span of years, including production before intialization period
+year            total span of years - including production before intialization period
 modelyear(year) model years (2000-2050)
 optyear(year)   years for optimization (2020-2050)
 inityear(year)  years for initialization (2000-2020)
 age             age of vehicle
 tec             technology
 enr             energy carrier
-reg             region or country group /HIGH, LOW, PROD/
+reg             region or country group
 seg             segment or size class
 sigvar          variables for sigmoid equations
 dstvar          variables for statistical distributions
@@ -57,6 +57,7 @@ grdeq           parameters for gradient of change (fleet additions) - individual
 *$offtext
 
 $ontext
+* Used for debugging and running directly in GAMS
 year           year /2000*2050/
 optyear(year)  years for optimization /2020*2050/
 inityear(year) years for initialization /2000*2020/
@@ -81,10 +82,9 @@ $offtext
 
 ** Load sets defined in Python class
 * These lines must be uncommented if specific input .gdx is not specified, e.g., $gdxin <filepath>_input.gdx
-$ontext
-$if not set gdxincname $abort 'no include file name for data file provided'
-$gdxin %gdxincname%
-$offtext
+* Comment out these two lines if running directly in GAMS:
+*$if not set gdxincname $abort 'no include file name for data file provided'
+*$gdxin %gdxincname%
 
 *$ontext
 *$gdxin C:\Users\chrishun\Box Sync\YSSP_temp\model run data\run_slow_baseline_def_def_def_def_iTEM2_Base2019-09-24T12_50_input.gdx
@@ -98,11 +98,11 @@ $ontext
 $gdxin C:\Users\chrishun\Box Sync\YSSP_temp\run_def_baseline_def_def_def_def_def_iTEM2-Base2019-10-25T18_50_input.gdx
 $offtext
 
-$gdxin C:\Users\chrishun\Box Sync\YSSP_temp\Cleanup April 2020\run_def_baseline_def_def_def_def_aggr_iTEM2-Base2019-10-23T07_40_input.gdx
+*$gdxin C:\Users\chrishun\Box Sync\YSSP_temp\Cleanup April 2020\run_def_baseline_def_def_def_def_aggr_iTEM2-Base2019-10-23T07_40_input.gdx
 
-*$gdxin C:\Users\chrishun\Box Sync\YSSP_temp\pyGAMS_input.gdx
+$gdxin C:\Users\chrishun\Box Sync\YSSP_temp\pyGAMS_input.gdx
 
-* This .gdx is for troubleshooting unwa
+* This .gdx is for troubleshooting
 *$GDXIN 'troubleshooting_params'
 $LOAD year
 $LOAD modelyear
@@ -111,6 +111,7 @@ $LOAD inityear
 $LOAD age
 $LOAD tec
 $LOAD enr
+$LOAD reg
 $LOAD seg
 
 $LOAD sigvar
@@ -234,11 +235,10 @@ VEH_STCK_CHRT(tec,seg,reg,prodyear,age,modelyear)       Total stock by technolog
 VEH_OPER_COHORT(tec,seg,reg,prodyear,modelyear,agej)    Total fleet operating emissions by technology segment region and cohort
 VEH_EOLT_COHORT(tec,seg,reg,prodyear,modelyear,agej)    Total end-of-life emissions by technology segment region and cohort
 *VEH_LC_EMISS(tec,seg,reg,prodyear)
-ANN_TOTC(modelyear)                     Total CO2 emissions from LDVs, by year                              [t CO2-eq]
+ANN_TOTC(modelyear)                     Total CO2 emissions from LDVs by year                              [t CO2-eq]
 VEH_TOT_ADD(reg, year)                       Total vehicles added by region
 VEH_TOT_REM(reg, year)
 ;
-
 
 * Here, A = mini; B=small, C = lower medium; D = medium; E = upper medium F = luxury, SUV, sport, vans and others
 
@@ -268,10 +268,14 @@ VEH_TOT_REM(reg, year)
 *$gdxin C:\Users\chrishun\Box Sync\YSSP_temp\run_def_baseline_def_def_def_def_iTEM2-Base2019-10-04T18_47_input.gdx
 *$gdxin C:\Users\chrishun\Box Sync\YSSP_temp\run_slow_baseline_def_def_def_def_iTEM2_Base2019-09-24T12_50_input.gdx
 *$gdxin C:\Users\chrishun\Box Sync\YSSP_temp\GAMS_input.gdx
-*$gdxin C:\Users\chrishun\Box Sync\YSSP_temp\pyGAMS_input.gdx
 
-$gdxin C:\Users\chrishun\Box Sync\YSSP_temp\Cleanup April 2020\run_def_baseline_def_def_def_def_aggr_iTEM2-Base2019-10-23T07_40_input.gdx
+* Default input .gdx output from Python
+$gdxin C:\Users\chrishun\Box Sync\YSSP_temp\pyGAMS_input.gdx 
 
+* Sample input GDX as trial for introducing the region set
+*$gdxin C:\Users\chrishun\Box Sync\YSSP_temp\Cleanup April 2020\run_def_baseline_def_def_def_def_aggr_iTEM2-Base2019-10-23T07_40_input.gdx
+
+* Comment out these lines if running directly in GAMS
 *$if not set gdxincname $abort 'no include file name for data file provided'
 *$gdxin %gdxincname%
 
@@ -285,8 +289,9 @@ $LOAD VEH_PARTAB
 *$LOAD VEH_EOLT_CINT
 
 $LOAD ENR_VEH
+$LOAD ENR_CINT
 
-*$LOAD VEH_STCK_TOT
+$LOAD VEH_STCK_TOT
 $LOAD VEH_OPER_DIST
 
 $LOAD VEH_LIFT_PDF
@@ -308,180 +313,188 @@ $OFFMULTI
 $GDXIN
 ;
 
-TABLE ENR_PARTAB(enr,reg,enreq,sigvar)
-                    A       B       r         u
-ELC .HIGH .CINT     1       0.275   0.16    2030
-ELC .LOW  .CINT     .5      0.1     0.2     2030
-ELC .PROD .CINT     0.7     0.7     0.7     2030
-FOS .HIGH .CINT     0.3     0.25    0.2     2035
-FOS .LOW  .CINT     0.3     0.25    0.2     2035
-;
+*TABLE ENR_PARTAB(enr,reg,enreq,sigvar)
+*                    A       B       r         u
+*ELC .PROD .CINT     0.7     0.7     0.7     2030
+*FOS .HIGH .CINT     0.3     0.25    0.2     2035
+*FOS .II  .CINT      0.3     0.25    0.2     2035
+*FOS .MID .CINT      0.3     0.25    0.2     2035
+*FOS .IV  .CINT      0.3     0.25    0.2     2035
+*FOS .LOW  .CINT     0.3     0.25    0.2     2035
+*;
+* Below is replaced by the electricity pathways from MESSAGE
+*ELC .HIGH .CINT     1       0.275   0.16    2030
+*ELC .LOW  .CINT     .5      0.1     0.2     2030
+*
 
-PARAMETER VEH_STCK_TOT(year, reg)
-/
-2000	.HIGH	=       500000
-2001	.HIGH	=       500000
-2002	.HIGH	=       500000
-2003	.HIGH	=       500000
-2004	.HIGH	=       500000
-2005	.HIGH	=       500000
-2006	.HIGH	=       500000
-2007	.HIGH	=       500000
-2008	.HIGH	=       500000
-2009	.HIGH	=       500000
-2010	.HIGH	=       500000
-2011	.HIGH	=       500000
-2012	.HIGH	=       500000
-2013	.HIGH	=       500000
-2014	.HIGH	=       500000
-2015	.HIGH	=       500000
-2016	.HIGH	=       500000
-2017	.HIGH	=       500000
-2018	.HIGH	=       500000
-2019	.HIGH	=       500000
-2020	.HIGH	=       509677.4194
-2021	.HIGH	=       519354.8387
-2022	.HIGH	=	529032.2581
-2023	.HIGH	=	538709.6774
-2024	.HIGH	=	548387.0968
-2025	.HIGH	=	558064.5161
-2026	.HIGH	=	567741.9355
-2027	.HIGH	=	577419.3548
-2028	.HIGH	=	587096.7742
-2029	.HIGH	=	596774.1935
-2030	.HIGH	=	606451.6129
-2031	.HIGH	=	616129.0323
-2032	.HIGH	=	625806.4516
-2033	.HIGH	=	635483.871
-2034	.HIGH	=	645161.2903
-2035	.HIGH	=	654838.7097
-2036	.HIGH	=	664516.129
-2037	.HIGH	=	674193.5484
-2038	.HIGH	=	683870.9677
-2039	.HIGH	=	693548.3871
-2040	.HIGH	=	703225.8065
-2041	.HIGH	=	712903.2258
-2042	.HIGH	=	722580.6452
-2043	.HIGH	=	732258.0645
-2044	.HIGH	=	741935.4839
-2045	.HIGH	=	751612.9032
-2046	.HIGH	=	761290.3226
-2047	.HIGH	=	770967.7419
-2048	.HIGH	=	780645.1613
-2049	.HIGH	=	790322.5806
-2050	.HIGH	=	800000
-2051	.HIGH	=	800000
-2052	.HIGH	=	800000
-2053	.HIGH	=	800000
-2054	.HIGH	=	800000
-2055	.HIGH	=	800000
-2056	.HIGH	=	800000
-2057	.HIGH	=	800000
-2058	.HIGH	=	800000
-2059	.HIGH	=	800000
-2060	.HIGH	=	800000
-2061	.HIGH	=	800000
-2062	.HIGH	=	800000
-2063	.HIGH	=	800000
-2064	.HIGH	=	800000
-2065	.HIGH	=	800000
-2066	.HIGH	=	800000
-2067	.HIGH	=	800000
-2068	.HIGH	=	800000
-2069	.HIGH	=	800000
-2070    .HIGH   =       800000
-2071	.HIGH	=	800000
-2072	.HIGH	=	800000
-2073	.HIGH	=	800000
-2074	.HIGH	=	800000
-2075	.HIGH	=	800000
-2076	.HIGH	=	800000
-2077	.HIGH	=	800000
-2078	.HIGH	=	800000
-2079	.HIGH	=	800000
-2080    .HIGH   =       800000
-2000	.LOW	=	200000
-2001	.LOW	=       200000
-2002	.LOW	=       200000
-2003	.LOW	=       200000
-2004	.LOW	=       200000
-2005	.LOW	=       200000
-2006	.LOW	=       200000
-2007	.LOW	=       200000
-2008	.LOW	=       200000
-2009	.LOW	=       200000
-2010	.LOW	=       200000
-2011	.LOW	=       200000
-2012	.LOW	=       200000
-2013	.LOW	=       200000
-2014	.LOW	=       200000
-2015	.LOW	=       200000
-2016	.LOW	=       200000
-2017	.LOW	=       200000
-2018	.LOW	=       200000
-2019	.LOW	=	200000
-2020	.LOW	=	203225.8065
-2021	.LOW	=	206451.6129
-2022	.LOW	=	209677.4194
-2023	.LOW	=	212903.2258
-2024	.LOW	=	216129.0323
-2025	.LOW	=	219354.8387
-2026	.LOW	=	222580.6452
-2027	.LOW	=	225806.4516
-2028	.LOW	=	229032.2581
-2029	.LOW	=	232258.0645
-2030	.LOW	=	235483.871
-2031	.LOW	=	238709.6774
-2032	.LOW	=	241935.4839
-2033	.LOW	=	245161.2903
-2034	.LOW	=	248387.0968
-2035	.LOW	=	251612.9032
-2036	.LOW	=	254838.7097
-2037	.LOW	=	258064.5161
-2038	.LOW	=	261290.3226
-2039	.LOW	=	264516.129
-2040	.LOW	=	267741.9355
-2041	.LOW	=	270967.7419
-2042	.LOW	=	274193.5484
-2043	.LOW	=	277419.3548
-2044	.LOW	=	280645.1613
-2045	.LOW	=	283870.9677
-2046	.LOW	=	287096.7742
-2047	.LOW	=	290322.5806
-2048	.LOW	=	293548.3871
-2049	.LOW	=	296774.1935
-2050	.LOW	=	300000
-2051	.LOW	=	300000
-2052	.LOW	=	300000
-2053	.LOW	=	300000
-2054	.LOW	=	300000
-2055	.LOW	=	300000
-2056	.LOW	=	300000
-2057	.LOW	=	300000
-2058	.LOW	=	300000
-2059	.LOW	=	300000
-2060	.LOW	=	300000
-2061	.LOW	=	300000
-2062	.LOW	=	300000
-2063	.LOW	=	300000
-2064	.LOW	=	300000
-2065	.LOW	=	300000
-2066	.LOW	=	300000
-2067	.LOW	=	300000
-2068	.LOW	=	300000
-2069	.LOW	=	300000
-2070	.LOW	=	300000
-2071	.LOW	=	300000
-2072	.LOW	=	300000
-2073	.LOW	=	300000
-2074	.LOW	=	300000
-2075	.LOW	=	300000
-2076	.LOW	=	300000
-2077	.LOW	=	300000
-2078	.LOW	=	300000
-2079	.LOW	=	300000
-2080	.LOW	=	300000
-/;
+
+
+*
+*PARAMETER VEH_STCK_TOT(year, reg)
+*/
+*2000	.HIGH	=       500000
+*2001	.HIGH	=       500000
+*2002	.HIGH	=       500000
+*2003	.HIGH	=       500000
+*2004	.HIGH	=       500000
+*2005	.HIGH	=       500000
+*2006	.HIGH	=       500000
+*2007	.HIGH	=       500000
+*2008	.HIGH	=       500000
+*2009	.HIGH	=       500000
+*2010	.HIGH	=       500000
+*2011	.HIGH	=       500000
+*2012	.HIGH	=       500000
+*2013	.HIGH	=       500000
+*2014	.HIGH	=       500000
+*2015	.HIGH	=       500000
+*2016	.HIGH	=       500000
+*2017	.HIGH	=       500000
+*2018	.HIGH	=       500000
+*2019	.HIGH	=       500000
+*2020	.HIGH	=       509677.4194
+*2021	.HIGH	=       519354.8387
+*2022	.HIGH	=	529032.2581
+*2023	.HIGH	=	538709.6774
+*2024	.HIGH	=	548387.0968
+*2025	.HIGH	=	558064.5161
+*2026	.HIGH	=	567741.9355
+*2027	.HIGH	=	577419.3548
+*2028	.HIGH	=	587096.7742
+*2029	.HIGH	=	596774.1935
+*2030	.HIGH	=	606451.6129
+*2031	.HIGH	=	616129.0323
+*2032	.HIGH	=	625806.4516
+*2033	.HIGH	=	635483.871
+*2034	.HIGH	=	645161.2903
+*2035	.HIGH	=	654838.7097
+*2036	.HIGH	=	664516.129
+*2037	.HIGH	=	674193.5484
+*2038	.HIGH	=	683870.9677
+*2039	.HIGH	=	693548.3871
+*2040	.HIGH	=	703225.8065
+*2041	.HIGH	=	712903.2258
+*2042	.HIGH	=	722580.6452
+*2043	.HIGH	=	732258.0645
+*2044	.HIGH	=	741935.4839
+*2045	.HIGH	=	751612.9032
+*2046	.HIGH	=	761290.3226
+*2047	.HIGH	=	770967.7419
+*2048	.HIGH	=	780645.1613
+*2049	.HIGH	=	790322.5806
+*2050	.HIGH	=	800000
+*2051	.HIGH	=	800000
+*2052	.HIGH	=	800000
+*2053	.HIGH	=	800000
+*2054	.HIGH	=	800000
+*2055	.HIGH	=	800000
+*2056	.HIGH	=	800000
+*2057	.HIGH	=	800000
+*2058	.HIGH	=	800000
+*2059	.HIGH	=	800000
+*2060	.HIGH	=	800000
+*2061	.HIGH	=	800000
+*2062	.HIGH	=	800000
+*2063	.HIGH	=	800000
+*2064	.HIGH	=	800000
+*2065	.HIGH	=	800000
+*2066	.HIGH	=	800000
+*2067	.HIGH	=	800000
+*2068	.HIGH	=	800000
+*2069	.HIGH	=	800000
+*2070    .HIGH   =       800000
+*2071	.HIGH	=	800000
+*2072	.HIGH	=	800000
+*2073	.HIGH	=	800000
+*2074	.HIGH	=	800000
+*2075	.HIGH	=	800000
+*2076	.HIGH	=	800000
+*2077	.HIGH	=	800000
+*2078	.HIGH	=	800000
+*2079	.HIGH	=	800000
+*2080    .HIGH   =       800000
+*2000	.LOW	=	200000
+*2001	.LOW	=       200000
+*2002	.LOW	=       200000
+*2003	.LOW	=       200000
+*2004	.LOW	=       200000
+*2005	.LOW	=       200000
+*2006	.LOW	=       200000
+*2007	.LOW	=       200000
+*2008	.LOW	=       200000
+*2009	.LOW	=       200000
+*2010	.LOW	=       200000
+*2011	.LOW	=       200000
+*2012	.LOW	=       200000
+*2013	.LOW	=       200000
+*2014	.LOW	=       200000
+*2015	.LOW	=       200000
+*2016	.LOW	=       200000
+*2017	.LOW	=       200000
+*2018	.LOW	=       200000
+*2019	.LOW	=	200000
+*2020	.LOW	=	203225.8065
+*2021	.LOW	=	206451.6129
+*2022	.LOW	=	209677.4194
+*2023	.LOW	=	212903.2258
+*2024	.LOW	=	216129.0323
+*2025	.LOW	=	219354.8387
+*2026	.LOW	=	222580.6452
+*2027	.LOW	=	225806.4516
+*2028	.LOW	=	229032.2581
+*2029	.LOW	=	232258.0645
+*2030	.LOW	=	235483.871
+*2031	.LOW	=	238709.6774
+*2032	.LOW	=	241935.4839
+*2033	.LOW	=	245161.2903
+*2034	.LOW	=	248387.0968
+*2035	.LOW	=	251612.9032
+*2036	.LOW	=	254838.7097
+*2037	.LOW	=	258064.5161
+*2038	.LOW	=	261290.3226
+*2039	.LOW	=	264516.129
+*2040	.LOW	=	267741.9355
+*2041	.LOW	=	270967.7419
+*2042	.LOW	=	274193.5484
+*2043	.LOW	=	277419.3548
+*2044	.LOW	=	280645.1613
+*2045	.LOW	=	283870.9677
+*2046	.LOW	=	287096.7742
+*2047	.LOW	=	290322.5806
+*2048	.LOW	=	293548.3871
+*2049	.LOW	=	296774.1935
+*2050	.LOW	=	300000
+*2051	.LOW	=	300000
+*2052	.LOW	=	300000
+*2053	.LOW	=	300000
+*2054	.LOW	=	300000
+*2055	.LOW	=	300000
+*2056	.LOW	=	300000
+*2057	.LOW	=	300000
+*2058	.LOW	=	300000
+*2059	.LOW	=	300000
+*2060	.LOW	=	300000
+*2061	.LOW	=	300000
+*2062	.LOW	=	300000
+*2063	.LOW	=	300000
+*2064	.LOW	=	300000
+*2065	.LOW	=	300000
+*2066	.LOW	=	300000
+*2067	.LOW	=	300000
+*2068	.LOW	=	300000
+*2069	.LOW	=	300000
+*2070	.LOW	=	300000
+*2071	.LOW	=	300000
+*2072	.LOW	=	300000
+*2073	.LOW	=	300000
+*2074	.LOW	=	300000
+*2075	.LOW	=	300000
+*2076	.LOW	=	300000
+*2077	.LOW	=	300000
+*2078	.LOW	=	300000
+*2079	.LOW	=	300000
+*2080	.LOW	=	300000
+*/;
 
 * temporary definition; to introduce for all inityears
 *PARAMETER VEH_STCK_INT_SEG(seg)
@@ -602,8 +615,9 @@ PARAMETER VEH_STCK_TOT(year, reg)
 *26=0.962962963
 *27=1
 */;
+
 *
-ENR_CINT(enr,reg,modelyear) =  genlogfnc(ENR_PARTAB(enr,reg,'CINT','A'),ENR_PARTAB(enr,reg,'CINT','B'),ENR_PARTAB(enr,reg,'CINT','r'),YEAR_PAR(modelyear),ENR_PARTAB(enr,reg,'CINT','u'));
+*ENR_CINT(FOS, reg, modelyear) =  genlogfnc(ENR_PARTAB(enr,reg,'CINT','A'),ENR_PARTAB(enr,reg,'CINT','B'),ENR_PARTAB(enr,reg,'CINT','r'),YEAR_PAR(modelyear),ENR_PARTAB(enr,reg,'CINT','u'));
 
 *----- Production-related emissions
 * Assume constant for all regions for now
@@ -849,7 +863,7 @@ EQ_SEG_GRD(seg,reg,optyear,'0')$(ord(optyear)>1)..          sum(tec,VEH_STCK_ADD
 
 * total capacity added per year must be less than the battery manufacturing capacity
 * dummy manufacturing constraint to trigger on dummy fleet...
-EQ_NEW_BATT_CAP(optyear)..                              MANUF_CNSTRNT(optyear)/2 =g= sum((seg, reg),VEH_STCK_ADD('BEV',seg,reg,optyear,'0')*BEV_CAPAC(seg))/1000;
+EQ_NEW_BATT_CAP(optyear)..                              MANUF_CNSTRNT(optyear)*10 =g= sum((seg, reg),VEH_STCK_ADD('BEV',seg,reg,optyear,'0')*BEV_CAPAC(seg))/1000;
 *EQ_NEW_BATT_CAP(optyear)..                              MANUF_CNSTRNT(optyear)*1000 =g= sum((seg, reg),VEH_STCK_ADD('BEV',seg,reg,optyear,'0')*BEV_CAPAC(seg))/1000;
 
 * to-do: add lithium refining constraint;
