@@ -130,7 +130,8 @@ for iso, value in proxy_CI.items():
     europe_shapes.at[ind, 'Consumption mix intensity'] = value
 
 #%%  Perform clustering and add cluster column
-num_clusters = 6
+
+num_clusters = 5
 thresholds = jenkspy.jenks_breaks(europe_shapes['Consumption mix intensity'], nb_class=num_clusters)
 
 # Add column to dataframe with cluster values
@@ -239,7 +240,7 @@ mix_df = reformat_el_df(mix_df)
 trades_df = reformat_el_df(trades_df)
 tec_int_df = reformat_el_df(tec_int_df)
 
-#%%
+#%% Deal with proxy countries to fill gaps from ENTSO-E Transparency Portal
 """ Need proxy regionalized factors for missing countries """
 
 LU = {'Wind Onshore': 0.245,
@@ -275,19 +276,7 @@ mix_df.loc['LI'] = mix_df.loc['NO']
 mix_df.loc['AD'] = mix_df.loc['ES']
 mix_df.loc['MC'] = mix_df.loc['FR']
 
-
-#%%
-
-prod_shares = mix_df.div(mix_df.sum(axis=1), axis=0)
-# col_labels = pd.MultiIndex.from_product([message_el.loc(axis=1)[2020:].columns, prod_shares.columns], names=['year', 'technology'])
-
-# prod_shares = pd.concat([prod_shares], keys=[2020], names=['year', 'technology'], axis=1)
-# prod_shares = prod_shares.reindex(columns=col_labels)
-
-col_labels = pd.MultiIndex.from_product([message_el.loc(axis=1)[2020:].columns, prod_shares.columns], names=['year', 'technology'])
-
-mix_df = pd.concat([mix_df], keys=[2020], names=['year', 'technology'], axis=1)
-mix_df = mix_df.reindex(columns=col_labels)
+# Data for proxy countries to fill gaps from ENTSO-E Transparency Portal
 
 """
 LU: {NG: 3580.3 TJ, oil: 16.2 TJ} #https://statistiques.public.lu/
@@ -320,19 +309,24 @@ proxy_prod_int = {'LU': 505,   # LU/HR from Moro and Lonza
             'MC': df.at['FR', 'Consumption mix intensity']}
 
 #%%
+
+prod_shares = mix_df.div(mix_df.sum(axis=1), axis=0)
+# col_labels = pd.MultiIndex.from_product([message_el.loc(axis=1)[2020:].columns, prod_shares.columns], names=['year', 'technology'])
+
+# prod_shares = pd.concat([prod_shares], keys=[2020], names=['year', 'technology'], axis=1)
+# prod_shares = prod_shares.reindex(columns=col_labels)
+
+col_labels = pd.MultiIndex.from_product([message_el.loc(axis=1)[2020:].columns, prod_shares.columns], names=['year', 'technology'])
+
+mix_df = pd.concat([mix_df], keys=[2020], names=['year', 'technology'], axis=1)
+mix_df = mix_df.reindex(columns=col_labels)
+
+#%%
 """--- Calculate change in technology shares according to MESSAGE ---"""
-#  Make dict that translates MESSAGE technologies to our technologies
+#  Make dict that maps MESSAGE technology groupings to ENTSO-E technology groupings
 
-
-""" for year in years:
-        generate new production mix (change )
-"""
-
-""" Calculate new intensities through time [using constant LCA factors for each technology] --> trading stays the same? """
-
-""" """
 # Match ENTSO-E "technologies to MES"SAGE technologies
-"""match_tec_dict: {'Biomass': ['Secondary Energy|Electricity|Biomass|w/o CCS'],
+"""match_tec_dict= {'Biomass': ['Secondary Energy|Electricity|Biomass|w/o CCS'],
                  'Fossil Brown coal/Lignite': ['Secondary Energy|Electricity|Coal|w/o CCS'],
                  'Fossil Coal-derived gas': ['Secondary Energy|Electricity|Gas|w/o CCS'],
                  'Fossil Gas': ['Secondary Energy|Electricity|Gas|w/o CCS'],
@@ -396,6 +390,8 @@ for ind, row in mix_df.iterrows():
     prod_df.loc[ind] = (message_el_shares.loc[(reg, msg_tec), 2020:]) * (mix_df.loc[ind][2020])
 
 #%% Adjust trade matrix to match growth in electricity production
+
+""" Calculate new intensities through time [using constant LCA factors for each technology] --> trading stays the same? """
 
 ann_growth = prod_df.groupby(['reg']).sum()
 ann_growth_norm = ann_growth.div(ann_growth[2020], axis=0)  # increase in electricity production normalized to 2020
@@ -540,8 +536,8 @@ def calculate_impact_factors(production, consumption, trades, import_el, export_
 Xgen_df = pd.DataFrame(index=reg_mi, columns=trades_mi)
 Xgen_tecs = pd.DataFrame(index=reg_mi, columns=prod_df.stack().index)
 
-carbon_footprints_prod = pd.DataFrame(index=reg_mi, columns=message_el_shares[2020:].columns)
-carbon_footprints_cons = pd.DataFrame(index=reg_mi, columns=message_el_shares[2020:].columns)
+carbon_footprints_prod = pd.DataFrame(index=reg_mi, columns=message_el_shares.loc(axis=1)[2020:].columns)
+carbon_footprints_cons = pd.DataFrame(index=reg_mi, columns=message_el_shares.loc(axis=1)[2020:].columns)
 
 #%%
 for year in cons_df.columns:
@@ -556,3 +552,35 @@ for year in cons_df.columns:
     # Xgen_tecs.loc(axis=1)[year].update(temp_df)  # [(hourxcountryxtec) x country]
     carbon_footprints_prod[year] = cf_prod
     carbon_footprints_cons[year] = cf_cons
+
+#%%
+carbon_footprints_cons = pd.concat([carbon_footprints_cons], keys=['Consumption mix intensity'], axis=1)
+carbon_footprints_cons['Consumption mix intensity'] = np.where(carbon_footprints_cons['Consumption mix intensity']<1e-2, np.nan, carbon_footprints_cons['Consumption mix intensity'])
+"""temporary - removal of countries with no consumption mix"""
+carbon_footprints_cons.dropna(axis=0, how='any', inplace=True)
+el_footprints = carbon_footprints_cons.join(europe_shapes.set_index('ISO_A2')['Cluster'], on='country')
+prod_df = pd.concat([prod_df], keys=['Total production'], axis=1)
+el_footprints = el_footprints.join(prod_df.sum(level='country'), on='country')
+el_footprints.rename({'Cluster':('Cluster','')}, axis=1, inplace=True)
+el_footprints.columns = pd.MultiIndex.from_tuples(el_footprints.columns)
+
+#%%
+clusters = np.unique(el_footprints['Cluster'].values)
+cluster_footprints = pd.DataFrame(index=pd.Index(clusters, name='Cluster'), columns=el_footprints.columns.get_level_values(1).unique())
+#%%
+
+for name, group in el_footprints.groupby(['Cluster']):
+    a = (group['Consumption mix intensity'].mul(group['Total production'])).sum()
+    b = group['Total production'].sum()
+    cluster_footprints.loc[name] = a.div(b)
+
+cluster_footprints.T.plot()
+plt.ylabel('Carbon intensity consumption mix \n (weighted average, g CO2/kWh)')
+plt.show()
+
+cluster_footprints.dropna(axis=1, how='all', inplace=True)
+cluster_footprints.index = ['LOW', 'II', 'MID', 'IV', 'HIGH']
+cluster_footprints[''] = 'ELC'
+cluster_footprints = cluster_footprints.set_index('', append=True)
+cluster_footprints.to_csv(os.path.join(os.path.curdir, 'Data', 'el_footprints_pathways.csv'))
+# el_footprints.to_csv(os.path.join(os.path.curdir, 'Data', 'el_footprints_pathways.csv'))
