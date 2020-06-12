@@ -582,5 +582,6 @@ cluster_footprints.dropna(axis=1, how='all', inplace=True)
 cluster_footprints.index = ['LOW', 'II', 'MID', 'IV', 'HIGH']
 cluster_footprints[''] = 'ELC'
 cluster_footprints = cluster_footprints.set_index('', append=True)
+cluster_footprints = cluster_footprints/1000
 cluster_footprints.to_csv(os.path.join(os.path.curdir, 'Data', 'el_footprints_pathways.csv'))
 # el_footprints.to_csv(os.path.join(os.path.curdir, 'Data', 'el_footprints_pathways.csv'))
