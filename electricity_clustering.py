@@ -39,9 +39,9 @@ EEU = ['Albania',
        'Romania',
        'Slovak Republic',
        'Slovenia',
-       'Serbia', #added
-       'Kosovo', #added
-       'Montenegro', #added
+       'Serbia',  # added (in lieu of Yugoslavia)
+       'Kosovo',  #added (in lieu of Yugoslavia)
+       'Montenegro',  # added (in lieu of Yugoslavia)
        'Yugoslavia']
 
 WEU = ['Andorra',
@@ -104,6 +104,7 @@ europe_shapes = country_shapes.cx[-12:34, 32:75]  # filter to only the countries
 
 
 #%% Find relevant countries missing consumption mix data and add proxies
+
 europe_shapes = europe_shapes.join(df, on='ISO_A2')  # add cluster and consumption mix intensity data to mapping dataframe
 
 # Determine share of total European population from countries that require proxies
@@ -378,7 +379,10 @@ def disagg_entsoe(mix_df, tec_shares):
             match_tec_dict[lvl_name] = tec  # add entry for disaggregated entso tec to dictionary
 
             # update the impact factors for the technology using the dictionary
-            tec_int_df[lvl_name] = tec_int_df[key].mul(new_CFs[lvl_name])
+            if tec == 'Secondary Energy|Electricity|Biomass|w/ CCS':
+                tec_int_df[lvl_name] = tec_int_df[key].mul(0.28).subtract(tec_int_df[key]*0.83*2)  # value chaing emissions ~28% of LC emissions
+            else:
+                tec_int_df[lvl_name] = tec_int_df[key].mul(new_CFs[lvl_name])
         mix_df.drop(columns=[(2020, key)], inplace=True)
         tec_int_df.drop(columns=key, inplace=True)
 
@@ -389,7 +393,7 @@ def disagg_entsoe(mix_df, tec_shares):
 """--- Calculate change in technology shares according to MESSAGE ---"""
 #  Make dict that maps MESSAGE technology groupings to ENTSO-E technology groupings
 
-# Match ENTSO-E "technologies to MESSAGE technologies
+# Match ENTSO-E technologies to MESSAGE technologies
 # NB no oil with CCS
 match_tec_dict.update({'Fossil Oil': 'Secondary Energy|Electricity|Oil|w/o CCS',
                        'Fossil Oil shale': 'Secondary Energy|Electricity|Oil|w/o CCS',
@@ -409,6 +413,15 @@ match_tec_dict.update({'Fossil Oil': 'Secondary Energy|Electricity|Oil|w/o CCS',
 # Disaggregate MESSAGE to country level using shares from ENTSO (by region and technology)
 mix_df, tec_shares = disagg_entsoe(mix_df, tec_shares)
 
+
+#%%
+"""--- fill nas in characterization matrix ---"""
+
+tec_int_df = tec_int_df.reindex(reg_mi, level='country')
+for reg in tec_int_df.index.get_level_values('reg'):
+    tec_int_df.loc[reg].fillna(tec_int_df.loc[reg].mean(), inplace=True)
+tec_int_df.index = tec_int_df.index.droplevel('reg')
+
 #%%
 # Add MESSAGE technology mapping to production matrix from ENTSO-E
 mix_df = mix_df.stack('technology')
@@ -419,7 +432,6 @@ mix_df.set_index(['MESSAGE tec'], append=True, inplace=True)
 
 
 entso = mix_df.copy()
-# entso = message_el[]
 message = message_el.loc(axis=1)[2020:].copy()
 message = message * 277.78  # convert from EJ/year to TWh/year
 
@@ -428,8 +440,19 @@ message = message * 277.78  # convert from EJ/year to TWh/year
 #%% Make test with only MESSAGE mixes (instead of using ENTSO)
 
 message = message.droplevel('units')
+
+
 reg_tec_shares = entso[2020].div(entso[2020].groupby(['reg', 'technology']).sum())
+
+
+""" OBBBBBS"""
+" check the below for whichever is better."
+
+# reg_tec_shares = entso[2020].div(entso[2020].groupby(['reg', 'country', 'technology']).sum())
 reg_tec_shares = reg_tec_shares.div(reg_tec_shares.sum(level=['reg', 'MESSAGE tec']))  # normalize the MESSAGE categories that are aggregated
+
+"""END OBS"""
+
 reg_tec_shares = reg_tec_shares.reorder_levels(['reg', 'country', 'technology', 'MESSAGE tec'])
 geo_mi = pd.MultiIndex.from_product([['EEU'],['BG', 'HR', 'CZ', 'HU', 'PL', 'RO', 'SK'],['Geothermal'], ['Secondary Energy|Electricity|Geothermal']]) #countries from https://www.stjornarradid.is/media/atvinnuvegaraduneyti-media/media/frettir/080119_geothermal_europe_memo_for_ossur.pdf
 geothermal_df = pd.DataFrame([1/len(geo_mi)]*len(geo_mi), index=geo_mi, columns=[2020])
@@ -445,18 +468,16 @@ offshore_wind.set_index(['reg', 'country', 'technology', 'MESSAGE tec'], inplace
 
 # reg_tec_shares = pd.DataFrame(reg_tec_shares).append(offshore_wind)
 reg_tec_shares = reg_tec_shares.append(offshore_wind)
+
+"""---- NEED TO FIX THE OFFSHORE vs ONSHORE ratios -----"""
 # sub_tec_shares = tec_mapping.join(pd.DataFrame([1]*len(tec_mapping), index=tec_mapping.index, columns=[2020])).set_index('MESSAGE tec', append=True)
 # sub_tec_shares = sub_tec_shares.div(sub_tec_shares.sum(level=['MESSAGE tec']))
 # sub_tec_shares = sub_tec_shares[~sub_tec_shares.index.get_level_values(1).duplicated()].droplevel('technology')
 # disagg_message = sub_tec_shares.mul(reg_tec_shares, axis=0) * (message)
 
 disagg_message = (message[2020] * reg_tec_shares[2020]).reorder_levels(['reg', 'country', 'technology', 'MESSAGE tec'])
-# disagg_message = disagg_message[2020]
 check_disagg = disagg_message.sum(level=['reg', 'MESSAGE tec'])  # check sums add up to what is reported by MESSAGE
 
-# country_disagg_message =  (reg_tec_shares * message[2020]).reorder_levels(['reg', 'country', 'technology', 'MESSAGE tec'])
-
-#NEED TO FIND A WAY TO ADD THE OFFSHORE WIND TO ENTSO
 add_ind = disagg_message.index.difference(entso.index, sort=False)
 entso = entso.append(pd.DataFrame(index=add_ind, columns=entso.columns))
 entso[2020] = disagg_message
@@ -538,7 +559,7 @@ message = message.mul(message.div(message.sum(level=['reg', 'MESSAGE tec'])))
 # message = message.append(tmp_message)
 
 
-message = message[(message.T !=0).any()]  # remove country-technology combos that have 0 production through study period
+message = message[(message.T != 0).any()]  # remove country-technology combos that have 0 production through study period
 message.dropna(axis=0, how='all', inplace=True)  # remove irrelevant country-technology combos
 message.replace(np.nan, 0, inplace=True)
 
@@ -577,21 +598,23 @@ for i, year in enumerate(message.columns):
 
 """
 
-
-
 #%% Calculations for future production mixes
 
 """
-
 DO THIS FIRST, THEN SUBDIVIDE ACCORDING TO MESSAGE?
 """
+# Make multiindex with all country-technology combinations (irrelevant combinations removed later)
+complete_mi = []
+for country in reg_mi.to_list():
+    for tec in tec_mi.set_index('technology', append=True).index.to_list():
+        complete_mi.append(country + tec)
 
-new_mixes = pd.DataFrame(index=entso.index, columns = message.columns)  # dataframe to contain calcualted country mixes
-new_mixes[2020] = entso[2020]
-# new_mixes[2020] = country_disagg_message
+complete_mi = pd.MultiIndex.from_tuples(complete_mi, names=['reg', 'country', 'MESSAGE tec', 'technology'])
+complete_mi = complete_mi.reorder_levels(['reg', 'country', 'technology', 'MESSAGE tec'])
 
-# new_mixes.replace(0, np.nan, inplace=True)
-ind = pd.MultiIndex.from_product([new_mixes.index.unique('country'), new_mixes.index.unique('technology')])
+new_mixes = pd.DataFrame(index=complete_mi, columns=message.columns)  # dataframe to contain calcualted country mixes
+new_mixes.update(entso)
+
 reduced_prod = pd.DataFrame()
 
 freed_cap = pd.DataFrame(index=reg_mi, columns=message.columns)
@@ -599,19 +622,17 @@ shares_tec = pd.DataFrame()
 # incr_tecs = pd.DataFrame(index=new_mixes.index)
 null_tecs_df = pd.DataFrame(index=new_mixes.index, columns=message.columns)
 neg_tecs = pd.DataFrame(index=new_mixes.index, columns=message.columns)
-# freed_cap = pd.DataFrame(index=ind.unique(level='reg'), columns=message.columns)
-new_mixes_check = pd.DataFrame(index=pd.MultiIndex.from_product([['EEU', 'WEU'],new_mixes.index.unique('technology')], names=['reg','technology']), columns=message.columns)
-ratio = pd.DataFrame(index=entso.index, columns = message.columns)
-# Calculate new amounts of electricity generated by technologies getting phased out
+ratio = pd.DataFrame(index=entso.index, columns=message.columns)
+
+# prepare dataframes to contain interim calculatinos for quality checks and debugging
+new_mixes_check = pd.DataFrame(index=pd.MultiIndex.from_product([['EEU', 'WEU'], new_mixes.index.unique('technology')], names=['reg','technology']), columns=message.columns)
 incr_prod_df = pd.DataFrame(index=new_mixes.index, columns=message.columns)
 red_prod_df = pd.DataFrame(index=new_mixes.index, columns=message.columns)
 shares_tec_df = pd.DataFrame(index=message.index, columns=message.columns)
 repl_df = pd.DataFrame(index=new_mixes.index, columns=message.columns)
 repl_df2 = pd.DataFrame(index=new_mixes.index, columns=message.columns)
 freed_cap_df = pd.DataFrame(index=reg_mi, columns=message.columns)
-ratio_df = pd.DataFrame(index=new_mixes, columns=message.columns)
 decr_prod = pd.DataFrame(index=new_mixes.index, columns=message.columns)
-check_free_cap = pd.DataFrame(index=['EEU', 'WEU'], columns=message.columns)
 add_prod_df = pd.DataFrame(index=new_mixes.index, columns=message.columns)
 
 for i, year in enumerate(new_mixes.iloc(axis=1)[1:].columns, 1):
@@ -621,11 +642,10 @@ for i, year in enumerate(new_mixes.iloc(axis=1)[1:].columns, 1):
     repl_prod = pd.DataFrame(index=new_mixes.index)
     repl_prod2 = pd.DataFrame(index=new_mixes.index)
 
-
     # Keep values from previous year for technologies with same production as previous period (delta=0)
     null_tec_ind = delta[delta[year] == 0].index
     if not null_tec_ind.empty:
-        null_tecs = (new_mixes[prev_year].copy()).reset_index('country').loc[null_tec_ind].set_index('country', append=True)
+        null_tecs = ((new_mixes[prev_year].copy()).reset_index('country')).loc[null_tec_ind].set_index('country', append=True)
         null_tecs.rename(columns={prev_year: year}, inplace=True)
         null_tecs = null_tecs.reorder_levels(['reg', 'country', 'technology', 'MESSAGE tec'])
         new_mixes.update(null_tecs)
@@ -633,10 +653,8 @@ for i, year in enumerate(new_mixes.iloc(axis=1)[1:].columns, 1):
 
     # Calculate new values for technologies with decreasing production
     # calculate the country distribution for each technology (and region)
-
-    ratio = new_mixes[prev_year].div(new_mixes[prev_year].sum(level=['reg', 'technology']).replace(0, np.nan)) # calculate tec shares by region
+    ratio = new_mixes[prev_year].div(new_mixes[prev_year].sum(level=['reg', 'technology']).replace(0, np.nan))  # calculate tec shares by region
     ratio = ratio.rename(year).reset_index('country')
-    # ratio_df[year] = ratio[year]
     # multiply the country-technology shares by the total amount each technology decreases by region
     # decr_prod[year] = decr_prod.mul(neg_delta)
     ratio[year] = ratio[year].mul(neg_delta)
@@ -649,103 +667,47 @@ for i, year in enumerate(new_mixes.iloc(axis=1)[1:].columns, 1):
     # First, calculate how much 'extra' production needs to be supplied from the
     # phasing out of technologies (i.e., delta < 0)
 
+    # retrieve indices for technologies decreeasing in production
     tmp = new_mixes.reset_index(['country', 'MESSAGE tec']).join(delta, how='outer', lsuffix='_mix', sort=False)  # broadcast delta to country-level resolution
     tmp = tmp.set_index(['country'], append=True).reorder_levels(['reg', 'country', 'technology', 'MESSAGE tec'])  # fix index to match other DFs
     tmp = tmp.filter(regex='[0-9]{4}$', axis=1)  # remove the [year] column inherited from new_mixes
     tmp.columns = tmp.columns.astype(int)
     neg_delt_ind = tmp[tmp[year] < 0].index  # find the indices for technologies that go down in production during the decade
-    # neg_delt_ind = delta[delta[year]<0].index.droplevel(['MESSAGE tec', 'units'])
 
     # find the reduction in country-level production for each technology in the period
-    reduced_prod = new_mixes[prev_year].loc[neg_delt_ind].sum(level=['reg', 'country', 'technology']) - new_mixes[year].loc[neg_delt_ind].sum(level=['reg','country', 'technology'])
+    reduced_prod = new_mixes[prev_year].loc[neg_delt_ind].sum(level=['reg', 'country', 'technology']) - new_mixes[year].loc[neg_delt_ind].sum(level=['reg', 'country', 'technology'])
     reduced_prod.rename(year, inplace=True)
     red_prod_df[year] = reduced_prod
-    # freed_cap[year] = new_mixes[prev_year].sum(level=['reg', 'technology']).sub(new_mixes[year].sum(level=['reg', 'technology'])) # hydro EEU 2030 ==0....
 
-    sum_neg_delta = reduced_prod.sum(level='reg')
-    " sum_neg_delta: reg"
-    " pos_delta: reg, technology, MESSAGE tec"
-    shares_tec = sum_neg_delta * (pos_delta.div(pos_delta.sum(level='reg')))  # distribution of technologies with increased production for 'making up' for reduced production
+    sum_neg_delta = reduced_prod.sum(level='reg')  # total amount of production decrease by region
+    shares_tec = sum_neg_delta * (pos_delta.div(pos_delta.sum(level='reg')))  # mix of technologies with increased production for 'making up' for reduced production
     shares_tec_df[year] = shares_tec
 
     # add region mappings to freed_cap for operations with shares_tec
-    # freed_cap['reg'] = [reg_dict[country] for country in freed_cap.index.get_level_values(0)]
-    freed_cap = reduced_prod.sum(level=['reg','country'])#.reset_index('country')
-    # freed_cap = freed_cap.reset_index(['country']).set_index(['reg'], append=True).reorder_levels(['reg', 'technology'])
+    freed_cap = reduced_prod.sum(level=['reg', 'country'])
     freed_cap_df[year] = freed_cap
-    check_free_cap[year] =( message.loc[neg_delta.index][year] - message.loc[neg_delta.index][prev_year]).sum(level='reg')
 
     # calculate mix of production displacing retired technologies
-    """ tmp = ((freed_cap.div(np.abs(neg_delta.sum(level='reg'))))[year]).reindex(repl_prod.index, method='ffill')"""
-    # tmp2 = freed_cap.div(np.abs(neg_delta.sum(level='reg')), axis=0, level='reg')
-    """print('freed cap')
-    print(neg_delta.sum(level='reg'))
-    tmp2 = freed_cap.div(freed_cap.sum(level='reg'), level='reg')
-    print(tmp2.sum(level='reg'))
-    tmp2 = tmp2.reindex(repl_prod.index)  # ffills at country level
-    # tmp = freed_cap.reindex(repl_prod.index, method='ffill')
-    tmp2.rename(year, inplace=True)
-    tmp_df = tmp2
-    print('test')
-    print(tmp2.mul(shares_tec).sum(level='reg'))
-    # repl_prod = tmp.mul(shares_tec)
-    repl_prod = pd.DataFrame(tmp2).reset_index('country')
-    repl_prod = repl_prod.drop(index=repl_prod.index.difference(shares_tec.index)).sort_index(level=['reg','technology'])  # remove technologies that do not increase in period
-    repl_prod[year] = repl_prod[year].mul(shares_tec)
-    repl_prod = repl_prod.set_index('country', append=True).reorder_levels(['reg', 'country', 'technology', 'MESSAGE tec'])"""
-
-    #### THERE IS SOMETHING WRONG WITH THE TECHNOLOGIES IN SHARED TEC --> check that the tecs in shares_tec, null_tecs and red_prod are mutually exclusive.
     repl_prod = (freed_cap.div(freed_cap.sum(level='reg')).mul(shares_tec))
-    # tmp[year].mul(shares_tec).set_index('country', append=True)
-    # repl_prod = repl_prod.reorder_levels(['reg', 'country', 'technology', 'MESSAGE tec']).sort_index(level=['reg', 'country'])
-    # repl_prod.replace(np.nan, 0, inplace=True)
-    print('replacement production')
-    print(freed_cap.sum(level=['reg']))
-    print(repl_prod.sum(level='reg'))
-
-    # repl_prod2 = tmp.mul(repl_prod2.join(shares_tec.rename(year)).reorder_levels(['reg', 'country', 'technology', 'MESSAGE tec'])[year])
-    # repl_prod2 = repl_prod2.reorder_levels(['reg', 'country', 'technology', 'MESSAGE tec']).sort_index(level=['reg', 'country'])
-    # repl_prod2.replace(np.nan, 0, inplace=True)
-
 
     # calculate mix of production for additional ("surplus") production
     tec_diff = (pos_delta - shares_tec)
     reg_share = (new_mixes[prev_year].sum(level=['reg', 'country']).div(new_mixes[prev_year].sum(level='reg'))).rename(year)
 
-    add_prod = tec_diff.mul(reg_share).reorder_levels(['reg', 'country', 'technology', 'MESSAGE tec']).sort_index(level=['reg','country'])
-    print(add_prod.sum(level='reg'))
-    # total production of technologies that increase in the time period
-    incr_prod = new_mixes[prev_year].rename(year).replace(np.nan, 0).add(repl_prod, fill_value=0).add(add_prod, fill_value=0)
-    # incr_prod = new_mixes[prev_year].rename(year).replace(np.nan, 0) + repl_prod + add_prod # may be problematic drops country-tec combos not originally in new_mixes
-    repl_df[year] = repl_prod.reorder_levels(['reg','country','technology','MESSAGE tec'])
-    # print('surplus production')
+    add_prod = tec_diff.mul(reg_share).reorder_levels(['reg', 'country', 'technology', 'MESSAGE tec']).sort_index(level=['reg', 'country'])
 
-    # repl_df2[year] = repl_prod2
-    add_prod_df[year] = add_prod.sort_index(level=['reg','country'])
-    incr_prod_df[year] = incr_prod
+    # total production of technologies that increase in the time period; sum of previous year's production, 'compensation' for reduced production and growth in production
+    incr_prod = new_mixes[prev_year].rename(year).replace(np.nan, 0) + repl_prod + add_prod # may be problematic drops country-tec combos not originally in new_mixes
+    repl_df[year] = repl_prod.reorder_levels(['reg', 'country', 'technology', 'MESSAGE tec'])
+
+    add_prod_df[year] = add_prod.sort_index(level=['reg', 'country'])  # growth in production
+
     incr_prod.dropna(how='all', axis=0, inplace=True)
-
-    new_mixes = new_mixes.reindex(index=incr_prod.index)
     new_mixes.update(incr_prod, overwrite=False)
 
-    new_mixes_check[year] = new_mixes[year].sum(level=['reg', 'technology'])
-    print((message[year]-message[prev_year]).sum(level='reg'))
-    print(add_prod.sum(level='reg'))
-    # incr_prod = (new_mixes[prev_year].sum(level=['reg','country']).div(new_mixes[prev_year].sum(level='reg')))*
-    # # Second, calculate the mix of technologies that replaces the 'freed-up' production
-    # # shares_tec is the amount of each technlogy where delta>0 increases for each unit of
-    # # energy that is reduced (regardless of technology, but region/country specific)
-    # # shares_tec = (delta[delta[year] > 0][year].div(np.abs(delta[delta[year] < 0][year].sum(level='reg'))))
-    # print('shares_tec')
-    # print(shares_tec)
-    # incr_cap = freed_cap.join(shares_tec.reset_index(['MESSAGE tec', 'units']), lsuffix='_cap').set_index('MESSAGE tec', append=True)
-    # # incr_tecs = new_mixes[prev_year].rename(year) + freed_cap[year].mul(shares_tec.reset_index(['MESSAGE tec', 'units'])[year]) ### problem continued??
-    # incr_tecs[year] = new_mixes[prev_year].rename(year) + incr_cap[str(year)+'_cap'].mul(incr_cap[str(year)])
-    # incr_tecs = incr_tecs.reorder_levels(['reg', 'country', 'technology', 'MESSAGE tec'])
-    # new_mixes.update(incr_tecs, overwrite=False)
-    # print('new_mixes[year]')
-    # print(new_mixes[year])
+    new_mixes_check[year] = new_mixes[year].sum(level=['reg', 'technology'])  # for checking against total production in MESSAGE
 
+new_mixes = new_mixes.dropna(axis=0, how='all')  # drop 'unused' country-technology combinations
 
 #%%
 prod_df = new_mixes.copy()
@@ -777,8 +739,8 @@ trades_df = pd.concat([trades_df], keys=[2020], names=['year', 'reg', 'country']
 
 # Add the remaining years in the study period
 df = pd.DataFrame(columns=message_el.loc(axis=1)[2020:].columns, index=reg_mi)
-df.rename_axis(columns='year',inplace=True)
-trades_mi = df.stack(dropna=False).index.reorder_levels(['year', 'reg', 'country']) #[2, 0, 1])
+df.rename_axis(columns='year', inplace=True)
+trades_mi = df.stack(dropna=False).index.reorder_levels(['year', 'reg', 'country'])  #[2, 0, 1])
 trades_mi.rename(names='year', level=0, inplace=True)
 trades_mi = trades_mi.sortlevel('year')[0]
 trades_df = trades_df.reindex(columns=trades_mi)
@@ -794,6 +756,7 @@ exports = exports.reindex(reg_mi, level=1)  # reindex to include MESSAGE region 
 cons_df = (prod_df.sum(level='country')).add(imports).subtract(exports)
 
 #%% Calculate new consumption mix intensities
+
 
 def calculate_impact_factors(production, consumption, trades, import_el, export_el):
 
@@ -1002,7 +965,7 @@ plt.show()
 
 #%%
 new_mixes = new_mixes.join(europe_shapes.set_index('ISO_A2')['Cluster'], on='country')
-groupby_new_mixes = new_mixes.set_index('Cluster',append=True).groupby(['Cluster', 'technology']).sum()
+groupby_new_mixes = new_mixes.set_index('Cluster', append=True).groupby(['Cluster', 'technology']).sum()
 groupby_new_mixes.to_csv('new_mixes.csv')
 
 #%%
@@ -1011,7 +974,11 @@ cluster_footprints.dropna(axis=1, how='all', inplace=True)
 cluster_footprints.index = ['LOW', 'II', 'MID', 'IV', 'HIGH']
 cluster_footprints[''] = 'ELC'
 cluster_footprints = cluster_footprints.set_index('', append=True)
-cluster_footprints = cluster_footprints/1000
+cluster_footprints = cluster_footprints / 1000
 cluster_footprints.to_csv(os.path.join(os.path.curdir, 'Data', 'el_footprints_pathways.csv'))
 # el_footprints.to_csv(os.path.join(os.path.curdir, 'Data', 'el_footprints_pathways.csv'))
 
+#%%
+
+cluster_classification = europe_shapes.loc(axis=1)['ISO_A2','Cluster']
+cluster_classification.sort_values(by='Cluster', inplace=True)
