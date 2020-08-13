@@ -235,17 +235,56 @@ HR = {'Wind Onshore': 1.204,
 
 AL = {'Hydro Water Reservoir': 4.525}  # unconfirmed hydro PP type...
 
-proxy_prod_mix = pd.DataFrame([LU, HR, AL], index=['LU', 'HR', 'AL'], columns=mix_df.columns)
+TR = {'Fossil Hard coal': 113.249 * (68.2 / (68.2 + 45.1)),
+      'Fossil Brown coal/Lignite': 113.249 * (45.1 / (68.2 + 45.1)),
+      'Fossil Oil': 0.329,
+      'Fossil gas': 92.434,
+      'Hydro Water Reservoir': 59.755,
+      'Geothermal': 6.906,
+      'Biomass': 2.636,
+      'Wind': 19.882,
+      'Solar': 7.477  # PV
+      # waste 23
+      }  # hard coal:lignite ratio from https://euracoal.eu/info/country-profiles/turkey/#:~:text=In%202018%2C%20Turkey%20imported%2038.3,and%20South%20Africa%20(4.2%25).
+
+
+CY = {'Fossil Oil': 4.569,
+      'Biomass': 0.052,
+      'Solar': 0.172,  # PV
+      'Wind': 0.211
+      }  # 2017 https://www.iea.org/data-and-statistics/data-tables?country=CYPRUS&energy=Electricity&year=2017
+
+MT = {'Fossil Oil': 0.193,
+      'Fossil gas': 1.287,
+      'Biomass': 0.010,
+      'Solar': 0.155
+      }  # 2017
+
+IS = {'Fossil Oil': 0.002,
+      'Hydro': 13.814,
+      'Geothermal': 6.010,
+      'Wind': 0.004
+      }
+
+XK = {'Fossil Hard coal': 5726,
+      'Fossil Oil': 12,
+      'Hydro Water Reservoir': 179,
+      'Solar': 1
+      }  # 2017
+
+proxy_prod_mix = pd.DataFrame([LU, HR, AL, TR, CY, MT, IS, XK], index=['LU', 'HR', 'AL', 'TR', 'CY', 'MT', 'IS', 'XK'], columns=mix_df.columns)
 # proxy_prod_mix = pd.concat([proxy_prod_mix], keys=[2020], names=['year', 'technology'], axis=1)
 mix_df = mix_df.append(proxy_prod_mix, sort=True)
 
-# Add placeholders for mixxing countries
-""" todo: make better proxies """
-mix_df = mix_df.append(pd.DataFrame(index=['XK', 'LI', 'AD', 'MC']))
-mix_df.loc['XK'] = mix_df.loc['PL'] * (5.726+0.179+0.012)/(mix_df.loc['PL'].sum()) # scale production to keep shares
-mix_df.loc['LI'] = mix_df.loc['NO'] * (80/1e6)/mix_df.loc['NO'].sum()
-mix_df.loc['AD'] = mix_df.loc['ES'] * (99/1e3)/mix_df.loc['ES'].sum() #https://www.worlddata.info/europe/andorra/energy-consumption.php
-mix_df.loc['MC'] = mix_df.loc['FR'] * (536/1e3)/mix_df.loc['FR'].sum() #https://en.wikipedia.org/wiki/Energy_in_Monaco#:~:text=Monaco%20has%20no%20domestic%20sources,gas%20and%20fuels%20from%20France.&text=In%202018%2C%20the%20country%20used,it%20was%20used%20tertiary%20services.
+# Add placeholders for missing countries
+# TODO: make better proxies for LI, AD, MC
+mix_df = mix_df.append(pd.DataFrame(index=['LI', 'AD', 'MC']))
+# mix_df.loc['XK'] = mix_df.loc['PL'] * (5.726 + 0.179 + 0.012) / (mix_df.loc['PL'].sum()) # scale production to keep shares
+mix_df.loc['LI'] = mix_df.loc['NO'] * (80 / 1e6) / mix_df.loc['NO'].sum()
+mix_df.loc['AD'] = mix_df.loc['ES'] * (99 / 1e3) / mix_df.loc['ES'].sum()  #https://www.worlddata.info/europe/andorra/energy-consumption.php
+mix_df.loc['MC'] = mix_df.loc['FR'] * (536 / 1e3) / mix_df.loc['FR'].sum()  #https://en.wikipedia.org/wiki/Energy_in_Monaco#:~:text=Monaco%20has%20no%20domestic%20sources,gas%20and%20fuels%20from%20France.&text=In%202018%2C%20the%20country%20used,it%20was%20used%20tertiary%20services.
+
+# TODO: Add trades
 
 # Data for proxy countries to fill gaps from ENTSO-E Transparency Portal
 
@@ -269,15 +308,20 @@ AL: {imports: 251, exports: 4} # we have these data from entso-e....
 HR: {imports: 1045, exports: 447} # we have these data from entso-e ... trade with hungary and bosnia and hercegovina
 LU: {imports: 649, exports: -120} #from entsoe....wrong
 LU: {imports: {BE: 386, FR: 1302, DE: 5865}, exports:{BE: 147, DE: 1245}} # in GWh, from https://statistiques.public.lu/
-AD: {imports: 471.3m KWh, exports: 6000 kWh} #wlrdata.info """
+AD: {imports: 471.3m KWh, exports: 6000 kWh} #wlrdata.info
+TR: {imports: 2466, exportS: 3074} # IEA 2018, in GWh
+MT: {imports: 897, exports: 36} #IEA, 2017, in GWh
+XK: {imports: 1242, exports: 880} # IEA, 2017, in GWh
+"""
 
+# no longer necessary as we re-calculate intensities (rather than reusing those calculated in BEV footprints)
 proxy_prod_int = {'LU': 505,   # LU/HR from Moro and Lonza
-            'HR': 465,
-            'AL': df.at['NO', 'Consumption mix intensity'],
-            'XK': df.at['PL', 'Consumption mix intensity'],
-            'LI': df.at['NO', 'Consumption mix intensity'],
-            'AD': df.at['ES', 'Consumption mix intensity'],
-            'MC': df.at['FR', 'Consumption mix intensity']}
+                  'HR': 465,
+                  'AL': df.at['NO', 'Consumption mix intensity'],
+                  'XK': df.at['PL', 'Consumption mix intensity'],
+                  'LI': df.at['NO', 'Consumption mix intensity'],
+                  'AD': df.at['ES', 'Consumption mix intensity'],
+                  'MC': df.at['FR', 'Consumption mix intensity']}
 
 #%%
 
@@ -450,6 +494,7 @@ equalization = mix_df[2020].sum(level='reg') / message[2020].sum(level='reg')
 message = message.droplevel('units')
 
 
+""" WHAT IS REG_TEC_SHARES SUPPOSED TO BE? """
 reg_tec_shares = entso[2020].div(entso[2020].groupby(['reg', 'technology']).sum())
 
 
