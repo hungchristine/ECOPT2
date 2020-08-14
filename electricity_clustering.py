@@ -176,14 +176,109 @@ plt.legend(handles, labels, bbox_to_anchor=(1, 1))
 
 axes[0].set_ylabel('Share of electricity technology, \n normalized to 2020 shares')"""
 
-#%% Import electricity data from ENTSO - to be used as 2020 baseline
+#%% Import electricity data from Eurostat - to be used as 2020 baseline
 
 """ Load electricity mixes, regionalized LCA/hybrid LCA factors from BEV footprints """
-mix_fp = os.path.join(data_fp, 'prod_mixes.csv')  # from ENTSO-E (see extract_bentso.py)
+# mix_fp = os.path.join(data_fp, 'prod_mixes.csv')  # from ENTSO-E (see extract_bentso.py)
+
+mix_fp = os.path.join(data_fp, 'nrg_bal_peh.xls')
+hydro_fp = os.path.join(data_fp, 'nrg_ind_pehnf.xls')
+
 trades_fp = os.path.join(data_fp, 'el_trades.csv')  # from ENTSO-E (see extract_bentso.py)
 tec_int_fp = os.path.join(data_fp, 'tec_intensities.csv')  # hybridized, regionalized LCA factors for electricity generation
 
-mix_df = pd.read_csv(mix_fp, index_col=[0], na_values='-')  # 2019 production mix by technology, in TWh, from ENTSO-E
+mix_df = pd.read_excel(mix_fp, header=0, index_col=[0], skiprows=[0, 1, 2, 3, 4, 5], skipfooter=3, na_values=':')  # 2018 production mix, from Eurostat
+hydro_df = pd.read_excel(hydro_fp, header=0, index_col=[0], usecols='A:G', skiprows=[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11], skipfooter=3, na_values=':')  # 2018 production mix, from Eurostat
+
+#%% perform calculations on hydropower
+
+hydro_df.replace(np.nan, 0, inplace=True)
+hydro_df['Hydro Water Reservoir'] = (hydro_df['Pure hydro power'] - hydro_df['Run-of-river hydro power']) + (hydro_df['Mixed hydro power'] - hydro_df['Mixed hydro power - pumping'])
+hydro_df['Hydro Pumped Storage'] = hydro_df['Mixed hydro power - pumping'] + hydro_df['Pumped hydro power']
+hydro_df['Hydro Run-of-river and poundage'] = hydro_df['Run-of-river hydro power']
+
+hydro_df.drop(columns=['Hydro', 'Pure hydro power', 'Run-of-river hydro power', 'Mixed hydro power', 'Mixed hydro power - pumping', 'Pumped hydro power'], inplace=True)
+mix_df = mix_df.join(hydro_df)
+mix_df.drop(columns=['Hydro'], inplace=True)
+
+"""eurostat_dict = {'Anthracite': 'Fossil Hard coal w/o CCS',
+                 'Coking coal': 'Fossil Hard coal w/o CCS',
+                 'Other bituminous coal': 'Fossil Hard coal w/o CCS',
+                 'Sub-bituminous coal': 'Fossil Hard coal w/o CCS',
+                 'Lignite': 'Fossil Brown coal/Lignite w/o CCS',
+                 'Coke oven coke': 'Fossil Brown coal/Lignite w/o CCS',
+                 'Gas coke': 'Fossil Brown coal/Lignite w/o CCS',
+                 'Patent fuel': 'Fossil Brown coal/Lignite w/o CCS',
+                 'Brown coal briquettes': 'Fossil Brown coal/Lignite w/o CCS',
+                 'Coal tar': 'Fossil Brown coal/Lignite w/o CCS',
+                 'Manufactured gases':'Fossil Coal-derived gas w/o CCS',
+                 'Oil and petroleum products (excluding biofuel portion)': 'Fossil Oil',
+                 'Oil shale and oil sands': 'Fossil Oil shale',
+                 'Peat and peat products': 'Fossil Peat w/o CCS',
+                 'Natural gas': 'Fossil Gas w/o CCS',
+                 'Nuclear heat': 'Nuclear',
+                 'Wind': 'Wind Onshore',
+                 'Solar thermal': 'Solar CSP',
+                 'Solar photovoltaic': 'Solar PV',
+                 'Primary solid biofuels': 'Biomass w/o CCS',
+                 'Charcoal': 'Biomass w/o CCS',
+                 'Pure biogasoline': 'Biomass w/o CCS',
+                 'Blended biogasoline': 'Biomass w/o CCS',
+                 'Pure biodiesels': 'Biomass w/o CCS',
+                 'Blended biodiesels': 'Biomass w/o CCS',
+                 'Pure bio jet kerosene': 'Biomass w/o CCS',
+                 'Blended bio jet kerosene': 'Biomass w/o CCS',
+                 'Other liquid biofuels': 'Biomass w/o CCS',
+                 'Biogases': 'Biomass w/o CCS',
+                 'Geothermal': 'Geothermal',
+                 'Tide, wave, ocean': 'Marine'
+                 }"""
+#%% Replace Eurostat nomenclature with ENTSO
+
+eurostat_dict = {'Fossil Hard coal w/o CCS': ['Anthracite', 'Coking coal',
+                                              'Other bituminous coal', 'Sub-bituminous coal'],
+                 'Fossil Brown coal/Lignite w/o CCS': ['Lignite', 'Coke oven coke', 'Gas coke',
+                                                       'Patent fuel', 'Brown coal briquettes', 'Coal tar'],
+                 'Fossil Coal-derived gas w/o CCS': 'Manufactured gases',
+                 'Fossil Oil': 'Oil and petroleum products (excluding biofuel portion)',
+                 'Fossil Oil shale': 'Oil shale and oil sands',
+                 'Fossil Peat w/o CCS': 'Peat and peat products',
+                 'Fossil Gas w/o CCS': 'Natural gas',
+                 'Nuclear': 'Nuclear heat',
+                 'Wind': 'Wind',
+                 'Solar CSP': 'Solar thermal',
+                 'Solar PV': 'Solar photovoltaic',
+                 'Biomass w/o CCS': ['Primary solid biofuels', 'Charcoal', 'Pure biogasoline',
+                                     'Blended biogasoline', 'Pure biodiesels', 'Blended biodiesels',
+                                     'Pure bio jet kerosene', 'Blended bio jet kerosene', 'Other liquid biofuels', 'Biogases'],
+                 'Geothermal': 'Geothermal',
+                 'Marine': 'Tide, wave, ocean',
+                 'Waste': ['Renewable municipal waste', 'Non-renewable waste']
+                 }
+
+for new_tec, eurostat_tec in eurostat_dict.items():
+    if isinstance(eurostat_tec, list):
+        mix_df[new_tec] = mix_df.loc(axis=1)[eurostat_tec].sum(axis=1)
+        mix_df.drop(columns=eurostat_tec, inplace=True)
+    else:
+        mix_df.rename(columns={eurostat_tec: new_tec}, inplace=True)
+
+drop_tecs = ['Total', 'Solid fossil fuels', 'Coke oven gas', 'Gas works gas', 'Blast furnace gas',
+             'Other recovered gases', 'Peat', 'Peat products', 'Crude oil', 'Natural gas liquids',
+             'Refinery gas', 'Liquefied petroleum gases', 'Naphtha', 'Aviation gasoline',
+             'Motor gasoline (excluding biofuel portion)', 'Gasoline-type jet fuel',
+             'Kerosene-type jet fuel (excluding biofuel portion)', 'Other kerosene',
+             'Gas oil and diesel oil (excluding biofuel portion)', 'Fuel oil',
+             'White spirit and special boiling point industrial spirits', 'Lubricants', 'Paraffin waxes',
+             'Petroleum coke', 'Bitumen', 'Other oil products n.e.c.', 'Renewables and biofuels',
+             'Ambient heat (heat pumps)', 'Non-renewable municipal waste', 'Industrial waste (non-renewable)',
+             'Electricity', 'Heat']
+
+mix_df.drop(columns=drop_tecs, inplace=True)
+
+#%%
+
+# TODO: use eurostat trade data. NB. eurostat's import and export tables do not balance!!!
 trades_df = pd.read_csv(trades_fp, index_col=[0], na_values='-')  # 2019 production, in TWh
 tec_int_df = pd.read_csv(tec_int_fp, index_col=[0], na_values='-')  # regionalized (hybridized) carbon intensity factors of generation (g COw-e/kWh)
 tec_int_df.rename(columns={'other': 'Other', 'other renewable': 'Other renewable'}, inplace=True)
