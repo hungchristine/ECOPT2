@@ -137,6 +137,15 @@ message_fp = import_fp = os.path.join(data_fp, 'MESSAGE_SSP2_400_ppm.xlsx')  # '
 message_el = pd.read_excel(message_fp, index_col=[0, 1, 2], header=[0], usecols='C:P', skipfooter=7)
 message_el.index.rename(['reg', 'MESSAGE tec', 'units'], inplace=True)
 
+# Aggregate onshore and offshore wind
+message_wind = message_el.xs('Secondary Energy|Electricity|Wind|Offshore', level=1) + message_el.xs('Secondary Energy|Electricity|Wind|Onshore', level=1)
+message_wind['MESSAGE tec'] = 'Secondary Energy|Electricity|Wind'
+message_wind.set_index('MESSAGE tec', drop=True, append=True, inplace=True)
+message_wind.index = message_wind.index.swaplevel(-1, -2)
+message_el = message_el.append(message_wind)
+message_el.drop(index=['Secondary Energy|Electricity|Wind|Offshore', 'Secondary Energy|Electricity|Wind|Onshore'], level='MESSAGE tec', inplace=True)
+message_el.sort_index(level=0, inplace=True)
+
 # Plot MESSAGE pathways by region
 fig, axes = plt.subplots(1, 2, sharey=True, figsize=(12, 5), gridspec_kw={'wspace': 0.05}, dpi=600)
 
