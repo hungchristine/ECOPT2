@@ -338,6 +338,27 @@ tec_int_df = reformat_el_df(tec_int_df)
 
 """ Need proxy regionalized factors for missing countries """
 # Data from IEA, for year 2018 and expressed in TWh unless otherwise noted
+
+CH = {'Solar': 1.884,
+      'Wind': 0.121,
+      'Hydro Pumped Storage': 1.554,
+      'Hydro Water Reservoir': 17.20767,
+      'Hydro Run-of-river and poundage': 17.687,
+      'Nuclear': 25.513,
+      'Waste': 2.445,
+      'Biomass': 0.685,
+      'Fossil Gas': 0.729,
+      'Fossil Oil': 0.036
+}
+# NB: hydro from 2018; statistics
+# according to IEA; hydro total is 37.802 TWh (CH stats 36.448 TWh)
+# according to entso-e data from 2019, 55% reservoir, 9% run-of-river and 35.7% pumped
+#CH = 1567 GWh pumped [2015], run-of-river 36 TWh [2015]
+
+proxy_prod_mix = pd.DataFrame([CH], index=['CH'], columns=mix_df.columns)
+# proxy_prod_mix = pd.concat([proxy_prod_mix], keys=[2020], names=['year', 'technology'], axis=1)
+mix_df = mix_df.append(proxy_prod_mix, sort=True)
+
 """
 LU = {'Wind Onshore': 0.245,
       'Hydro Pumped Storage': 1.337,
@@ -401,6 +422,8 @@ proxy_prod_mix = pd.DataFrame([LU, HR, AL, TR, CY, MT, IS, XK], index=['LU', 'HR
 # proxy_prod_mix = pd.concat([proxy_prod_mix], keys=[2020], names=['year', 'technology'], axis=1)
 mix_df = mix_df.append(proxy_prod_mix, sort=True)
 """
+
+
 
 # Add placeholders for missing countries
 # TODO: make better proxies for LI, AD, MC
