@@ -1221,6 +1221,8 @@ for i in np.arange(num_clusters):
                            (europe_shapes['Consumption mix intensity'] <= thresholds[i + 1])]
     europe_shapes['Cluster'][df_bin.index] = i + 1
 
+europe_shapes['Cluster'].replace({1: 'LOW', 2: 'II', 3:'MID', 4:'IV', 5:'HIGH'}, inplace=True)
+
 #%%
 # Plot maps by clusters
 
@@ -1248,13 +1250,13 @@ el_footprints = carbon_footprints_cons.join(europe_shapes.set_index('ISO_A2')['C
 # el_footprints = el_footprints.join(prod_df.sum(level='country'), on='country')
 el_footprints = el_footprints.join(prod_df.stack().sum(level=['country', -1]).unstack(), on='country')
 
-el_footprints.rename({'Cluster': ('Cluster','')}, axis=1, inplace=True)
+el_footprints.rename({'Cluster': ('Cluster', '')}, axis=1, inplace=True)
 el_footprints.columns = pd.MultiIndex.from_tuples(el_footprints.columns)
 
 #%%
 clusters = np.unique(el_footprints['Cluster'].values)
 cluster_footprints = pd.DataFrame(index=pd.Index(clusters, name='Cluster'),
-                                  columns=el_footprints.columns.get_level_values(1).unique())
+                                  columns=carbon_footprints_cons.columns.get_level_values(1).unique())
 
 #%%  Calculate carbon intensity of cluster electricity mix, as weighted average
 
@@ -1263,7 +1265,26 @@ for name, group in el_footprints.groupby(['Cluster']):
     b = group['Total production'].sum()
     cluster_footprints.loc[name] = a.div(b)
 
-cluster_footprints.T.plot(cmap=cmap)
+cluster_footprints.sort_values(by=2020, axis=0, inplace=True)
+
+#%%
+
+
+fig, ax = plt.subplots(1, 1, figsize=(8, 7), dpi=600)
+
+# Plot 2020 country-level footprints
+plt_df = (el_footprints[[('Consumption mix intensity', 2020), ('Cluster','')]])
+plt_df.columns = ['y', 'Cluster']
+plt_df.loc(axis=1)['year'] = 2020
+# plt_df.set_index('year', inplace=True)
+colors = {'LOW': 'midnightblue', 'II': 'lightseagreen', 'MID': 'goldenrod', 'IV': 'indigo', 'HIGH': 'darkred'}
+
+# plt_df.plot(ax=ax, kind='scatter', x='year', y='y', c=plt_df['Cluster'].apply(lambda x: colors[x]), legend=True)
+cluster_footprints.T.plot(ax=ax, cmap=cmap)
+plt_df.plot(ax=ax, kind='scatter', x='year', y='y', c=plt_df['Cluster'].apply(lambda x: colors[x]), legend=True)
+# plt_df.plot(ax=ax, y='y', c=plt_df['Cluster'].apply(lambda x: colors[x]), legend=True)
+
+
 plt.ylabel('Carbon intensity consumption mix \n (weighted average, g CO2/kWh)')
 plt.show()
 
