@@ -188,11 +188,34 @@ plt.legend(handles, labels, bbox_to_anchor=(1, 1))
 
 axes[0].set_ylabel('Share of electricity technology, \n normalized to 2020 shares')"""
 
+#%% Import and clean trade data from Eurostat (2018 values)
+
+# NB: Eurostat publishes both import and export tables; however, these are not internally consistent (i.e., do not balance),
+# and have different geographical resolution.
+# Solution: Take mean of values from both tables where these exist, otherwise take value where present in one of the two
+# tables.
+
+imp_fp = os.path.join(data_fp, 'nrg_ti_eh.xls')
+exp_fp = os.path.join(data_fp, 'nrg_te_eh.xls')
+
+eurostat_import = pd.read_excel(imp_fp, header=0, index_col=[0], skiprows=[0,1,2,3,4,5,6,7,8,9], skipfooter = 3, usecols="A:AS", na_values=":")
+eurostat_export = pd.read_excel(exp_fp, header=0, index_col=[0], skiprows=[0,1,2,3,4,5,6,7,8,9], skipfooter = 5, usecols="A:AU", na_values=":")
+
+eurostat_import = eurostat_import.T  # make matrix in producer-receiver format
+
+eurostat_import.index = pd.Index(coco.convert(eurostat_import.index.tolist(), to='ISO2'))
+eurostat_import.columns = pd.Index(coco.convert(eurostat_import.columns.tolist(), to='ISO2'))
+eurostat_export.index = pd.Index(coco.convert(eurostat_export.index.tolist(), to='ISO2'))
+eurostat_export.columns = pd.Index(coco.convert(eurostat_export.columns.tolist(), to='ISO2'))
+
+eurostat_trade = pd.concat([eurostat_import.stack(), eurostat_export.stack()], axis=1).mean(axis=1).unstack()
+trades_df = eurostat_trade / 1000
+
 #%% Import electricity data from Eurostat - to be used as 2020 baseline
 
 """ Load electricity mixes, regionalized LCA/hybrid LCA factors from BEV footprints """
-# mix_fp = os.path.join(data_fp, 'prod_mixes.csv')  # from ENTSO-E (see extract_bentso.py)
 
+# mix_fp = os.path.join(data_fp, 'prod_mixes.csv')  # from ENTSO-E (see extract_bentso.py)
 mix_fp = os.path.join(data_fp, 'nrg_bal_peh.xls')  # from Eurostat (2018 data)
 hydro_fp = os.path.join(data_fp, 'nrg_ind_pehnf.xls')  # from Eurostat (2018 data)
 
@@ -201,9 +224,11 @@ tec_int_fp = os.path.join(data_fp, 'tec_intensities.csv')  # hybridized, regiona
 
 mix_df = pd.read_excel(mix_fp, header=0, index_col=[0], skiprows=[0, 1, 2, 3, 4, 5], skipfooter=3, na_values=':')  # 2018 production mix, from Eurostat
 hydro_df = pd.read_excel(hydro_fp, header=0, index_col=[0], usecols='A:G', skiprows=[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11], skipfooter=3, na_values=':')  # 2018 production mix, from Eurostat
+# trades_df = pd.read_csv(trades_fp, index_col=[0], na_values='-')  # 2019 production, in TWh
 
 mix_df = mix_df / 1000  # Eurostat data in GWh; convert to TWh
 hydro_df = hydro_df / 1000
+
 
 #%% perform calculations on hydropower (for Eurostat data)
 
@@ -308,8 +333,6 @@ missing_countries_eurostat = list(set(EEU_ISO2 + WEU_ISO2) - set(mix_df.index.to
 
 #%%
 
-# TODO: use eurostat trade data. NB. eurostat's import and export tables do not balance!!!
-trades_df = pd.read_csv(trades_fp, index_col=[0], na_values='-')  # 2019 production, in TWh
 tec_int_df = pd.read_csv(tec_int_fp, index_col=[0], na_values='-')  # regionalized (hybridized) carbon intensity factors of generation (g COw-e/kWh)
 tec_int_df.rename(columns={'other': 'Other', 'other renewable': 'Other renewable'}, inplace=True)
 
