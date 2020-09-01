@@ -500,6 +500,12 @@ tec_int_df.drop(columns='Wind Offshore', inplace=True)
 
 mix_df.rename(columns={'Solar PV': 'Solar'}, inplace=True)  # for Eurostat data
 
+# Assumption: "other renewable" constitutes tidal, marine tec, and renewable waste
+# note waste also includes non-renewable waste (e.g., industrial waste). From Eurostat, approx 50/50 renewable:non renewable
+tec_int_df['Marine'] = tec_int_df['Other renewable']
+tec_int_df['Waste'] = tec_int_df[['Other', 'Other renewable']].mean(axis=1)
+
+# use regional mean for countries missing intensity factors
 for country in proxy_prod:
     tec_list = mix_df.loc[country][2020].index[mix_df.loc[country][2020].notnull()]  # get list of relevant tecs for the country, i.e., where there is production activity
     for tec in tec_list:
@@ -728,6 +734,11 @@ message = message.mul(message.div(message.sum(level=['reg', 'MESSAGE tec'])))
 #%% Disaggregate MESSAGE to country level according to ENTSO
 
 
+# calculate average change in total mix for use in 'Other' category (0 for all periods, regions in MESSAGE )
+msg_sum = message.sum(level='reg')
+avg_chg = 1 + ((msg_sum - msg_sum.shift(1, axis=1)) / msg_sum.shift(1, axis=1))
+message.other = avg_chg
+
 # calculate shares of each sub-technology for disaggregating MESSAGE
 # categories
 x = entso[2020].unstack('MESSAGE tec').sum(level=['reg', 'technology'])  # entso[2020].unstack('MESSAGE tec').sum('country')
@@ -735,6 +746,7 @@ entso_shares = (x.div(x.sum(level='reg'))).stack()
 entso_shares.dropna(axis=0, inplace=True)
 tmp = entso_shares.filter(like='w/o CCS', axis=0).reset_index()
 lvl = entso_shares.index.names[1:]
+
 for ind_lvl in lvl:
     tmp[ind_lvl] = tmp[ind_lvl].str.replace('w/o CCS','w/ CCS')
 tmp.set_index(['reg','technology','MESSAGE tec'], inplace=True)
