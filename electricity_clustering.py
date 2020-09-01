@@ -1291,7 +1291,8 @@ plt.show()
 #%%
 new_mixes = new_mixes.join(europe_shapes.set_index('ISO_A2')['Cluster'], on='country')
 groupby_new_mixes = new_mixes.set_index('Cluster', append=True).groupby(['Cluster', 'technology']).sum()
-groupby_new_mixes.to_csv('new_mixes.csv')
+groupby_new_mixes.to_csv('new_mixes_grouped.csv')
+
 
 #%%
 # prepare cluster footprints for feeding into GAMS
@@ -1307,3 +1308,12 @@ cluster_footprints.to_csv(os.path.join(os.path.curdir, 'Data', 'el_footprints_pa
 
 cluster_classification = europe_shapes.loc(axis=1)['ISO_A2', 'Cluster']
 cluster_classification.sort_values(by='Cluster', inplace=True)
+
+#%% Export for troubleshooting
+from datetime import datetime
+timestamp = datetime.now().strftime("%d_%b_%y,%H_%M")
+output_fp = os.path.join(os.path.curdir, 'calculation output', 'electricity_clustering_output_' + timestamp + '.xlsx')
+with pd.ExcelWriter(output_fp) as writer:
+    new_mixes.to_excel(writer, sheet_name='new_mixes')
+    el_footprints.to_excel(writer, sheet_name='country footprints')
+    tec_int_df.to_excel(writer, sheet_name='tec intensities')
