@@ -773,7 +773,13 @@ for term in filter_terms:
     for i, year in enumerate(scale.columns[1:]):
         scale[year].loc[tmp.index] = ((scale[year] * scale.iloc(axis=1)[i].filter(like=term, axis=0).sum(level='reg')))#, overwrite=True) #.shift(1, axis=1))
 
-# now disaggregate across countries, ENTSO/Eurostat technologies
+
+other_ind = (scale.filter(like='Other', axis=0)).index
+scale.loc[other_ind, 2020] = entso.sum(level=['reg', 'MESSAGE tec']).filter(like='Other', axis=0)[2020]
+scale.update(avg_chg.reindex(scale.loc[other_ind].index, level='reg'))
+for i, year in enumerate(scale.columns[1:]):
+    scale.loc[other_ind, year] = scale.loc[other_ind, year] * scale.loc[other_ind].iloc(axis=1)[i]
+
 message = scale
 
 # old stuff below
@@ -785,9 +791,7 @@ tmp_message = message.loc[(slice(None), drop_labels), :]  # temporary "holding" 
 message = message.drop(index=drop_labels, level='MESSAGE tec')
 """
 
-# calculate country-wise shares for each ENTSO technology (sum across technology, reg = 1) [not currently used]
-# country_shares = entso.div(entso.sum(level=['reg', 'technology']))
-
+# now disaggregate across countries, ENTSO/Eurostat technologies
 # need to change calculations to adjust for technology aggregation in message
 # use tec shares: df.groupby('MESSAGE tec')
 # group.div(group.sum(axis=0, level='ENTSOE tec'))
@@ -956,7 +960,7 @@ for i, year in enumerate(new_mixes.iloc(axis=1)[1:].columns, 1):
     reduced_prod.rename(year, inplace=True)
     red_prod_df[year] = reduced_prod
 
-    sum_neg_delta = reduced_prod.sum(level='reg')  # total amount of production decrease by region
+    sum_neg_delta = reduced_prod.sum(level= 'reg')  # total amount of production decrease by region
     shares_tec = sum_neg_delta * (pos_delta.div(pos_delta.sum(level='reg')))  # mix of technologies with increased production for 'making up' for reduced production
     shares_tec_df[year] = shares_tec
 
@@ -1067,7 +1071,7 @@ def calculate_impact_factors(production, consumption, trades, import_el, export_
     ltmx = np.linalg.pinv(np.identity(i) - Atmx)
     Ltmx = pd.DataFrame(np.linalg.pinv(np.identity(i) - Atmx), trades.columns, trades.index)
 
-   # normalized production matrix quadrant
+    # normalized production matrix quadrant
     Agen = pd.DataFrame(np.diag(g) * np.linalg.pinv(np.diag(q)), index=g.index, columns=g.index)  # coefficient matrix, generation
 
     # Ltmx = Ltmx.reindex(reg_mi, level=1)
@@ -1089,12 +1093,12 @@ def calculate_impact_factors(production, consumption, trades, import_el, export_
 
     # ### Check electricity generated matches demand
     totgen = Xgen.sum(axis=1)
-    r_gendem = totgen / g #y  # All countries should be 1
+    r_gendem = totgen / g  #y  # All countries should be 1
 
     totcons = Xgen.sum(axis=0)
     r_condem = totcons / y  # All countries should be 1
 
-    prod_by_tec = production/g
+    prod_by_tec = production / g
     prod_by_tec = prod_by_tec.unstack(['technology', 'MESSAGE tec'])
     # prod_by_tec = prod_by_tec.stack()
     # prod_by_tec.index = prod_by_tec.index.swaplevel(0,1)
@@ -1105,17 +1109,17 @@ def calculate_impact_factors(production, consumption, trades, import_el, export_
     # TC is a country-by-generation technology matrix - normalized to share of total domestic generation, i.e., normalized generation/production mix
     # technology generation, kWh/ kWh domestic generated electricity
     prod = production.unstack(['technology', 'MESSAGE tec'])
-    prod = prod.T.reset_index(level='MESSAGE tec').T  #set MESSAGE classifications for columns so we can do the sort
+    prod = prod.T.reset_index(level='MESSAGE tec').T  # set MESSAGE classifications for columns so we can do the sort
     prod.sort_index(axis=1, inplace=True)
     prod = ((prod.T).set_index(['MESSAGE tec'], append=True)).T
     prod.fillna(0, inplace=True)
 
     # TC = pd.DataFrame(np.matmul(np.linalg.pinv(np.diag(g)), production.unstack(['technology', 'MESSAGE tec'])))#, index=g.index)#, columns=production.unstack(['technology', 'MESSAGE tec']).columns)
-    TC = pd.DataFrame(np.matmul(np.linalg.pinv(np.diag(g)), prod))#, index=g.index)#, columns=production.unstack(['technology', 'MESSAGE tec']).columns)
+    TC = pd.DataFrame(np.matmul(np.linalg.pinv(np.diag(g)), prod))  # , index=g.index)#, columns=production.unstack(['technology', 'MESSAGE tec']).columns)
     TCsum = TC.sum(axis=1)  # Quality assurance - each country should sum to 1
 
     # # Calculate technology generation mix in GWh based on production in each region
-    TGP = pd.DataFrame(np.matmul(TC.transpose(), np.diag(g)))#, index=TC.columns, columns=g.index)  # .== production
+    TGP = pd.DataFrame(np.matmul(TC.transpose(), np.diag(g)))  # , index=TC.columns, columns=g.index)  # .== production
 
     # # Carbon intensity of production mix
     CFPI_no_TD = pd.DataFrame(prod.multiply(C).sum(axis=1) / prod.sum(axis=1), columns=['Production mix intensity'])  # production mix intensity without losses
@@ -1168,7 +1172,7 @@ for year in cons_df.columns:
 prod_df = pd.concat([prod_df], keys=['Total production'], axis=1)
 
 carbon_footprints_cons = pd.concat([carbon_footprints_cons], keys=['Consumption mix intensity'], axis=1)
-carbon_footprints_cons['Consumption mix intensity'] = np.where(carbon_footprints_cons['Consumption mix intensity']<1e-2,
+carbon_footprints_cons['Consumption mix intensity'] = np.where(carbon_footprints_cons['Consumption mix intensity'] < 1e-2,
                                                                np.nan, carbon_footprints_cons['Consumption mix intensity'])
 """temporary - removal of countries with no consumption mix"""
 # carbon_footprints_cons.dropna(axis=0, how='any', inplace=True)
