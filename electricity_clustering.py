@@ -1317,3 +1317,26 @@ with pd.ExcelWriter(output_fp) as writer:
     new_mixes.to_excel(writer, sheet_name='new_mixes')
     el_footprints.to_excel(writer, sheet_name='country footprints')
     tec_int_df.to_excel(writer, sheet_name='tec intensities')
+
+#%% Run check for trade data from UNdata
+
+export_fp = os.path.join(data_fp, 'UNdata', 'UNdata_export_el.csv')
+import_fp = os.path.join(data_fp, 'UNdata', 'UNdata_import_el.csv')
+
+exp_check = pd.read_csv(export_fp, usecols=[0, 4], index_col=0, skipfooter=2)
+imp_check = pd.read_csv(import_fp, usecols=[0, 4], index_col=0, skipfooter=2)
+
+exp_check.index = coco.convert(exp_check.index.tolist(), to='ISO2')
+imp_check.index = coco.convert(imp_check.index.tolist(), to='ISO2')
+
+country_imports = trades_df[2020].sum(axis=0).droplevel('reg')
+country_exports = trades_df[2020].sum(axis=1).droplevel('reg')
+
+def check_trades(calc_df, stat_df):
+    calc_df = calc_df.to_frame().join(stat_df)
+    calc_df['pct diff'] = ((calc_df.iloc[:,0] - calc_df.iloc[:,1]) / calc_df.iloc[:,0]) * 100
+    calc_df.sort_values(by='pct diff', inplace=True)
+    return calc_df
+
+imp = check_trades(country_imports, imp_check/1000)
+exp = check_trades(country_exports, exp_check/1000)
