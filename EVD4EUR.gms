@@ -740,7 +740,7 @@ EQ_STCK_BAL
 *** Constraint equations
 * For technology-related additions
 EQ_STCK_ADD0
-EQ_STCK_GRD0
+*EQ_STCK_GRD0
 EQ_STCK_GRD
 
 * Keeping segment shares constant
@@ -784,7 +784,7 @@ EQ_STCK_REM_T1(tec,seg,reg,inityear,age)..                VEH_STCK_REM(tec,seg,r
 * calculate stock additions as sum of stock removals from the same year and increase in total fleet (net stock growth)
 *-- Makes assumption that retired segments are replaced by the same segment
 *EQ_STCK_ADD_T1(seg,inityear,age)$(ord(age)=1)..         sum(tec, VEH_STCK_ADD(tec,seg,inityear,age)) =e=  sum((tec,agej), VEH_STCK_REM(tec,seg,inityear,agej));
-EQ_STCK_ADD_T1(seg,reg,inityear,'0')..                    sum(tec, VEH_STCK_ADD(tec,seg,reg,inityear,'0')) =e=  sum((tec,agej), VEH_STCK_REM(tec,seg,reg,inityear,agej))+ (VEH_STCK_DELTA(inityear,reg)*VEH_STCK_INT_SEG(seg));
+EQ_STCK_ADD_T1(seg,reg,inityear,age)$(ord(age)=1)..                    sum(tec, VEH_STCK_ADD(tec,seg,reg,inityear,age)) =e=  sum((tec,agej), VEH_STCK_REM(tec,seg,reg,inityear,agej))+ (VEH_STCK_DELTA(inityear,reg)*VEH_STCK_INT_SEG(seg));
 
 $ontext
 EQ_STCK_ADD_T11('2000')..                             VEH_STCK_DELTA('2000') =e= 3637119.13333321;
@@ -809,7 +809,9 @@ EQ_STCK_REM(tec,seg,reg,optyear,age)$(ord(optyear)>1)..    VEH_STCK_REM(tec,seg,
 * calculate stock additions as sum of stock removals from the same year and increase in total fleet (net stock growth)
 * assumes removed vehicles are replaced with like segment and technology
 *EQ_STCK_ADD(optyear,age)$(ord(optyear)>1 and ord(age)=1)..             sum((tec,seg), VEH_STCK_ADD(tec,seg,optyear,age) - sum(agej, VEH_STCK_REM(tec,seg,optyear,agej))) =e= VEH_STCK_DELTA(optyear);
-EQ_STCK_ADD(optyear,age,reg)$(ord(optyear)>1)..             sum((tec,seg), (VEH_STCK_ADD(tec,seg,reg,optyear,'0') - sum(agej, VEH_STCK_REM(tec,seg,reg,optyear,agej)))) =e= VEH_STCK_DELTA(optyear,reg);
+*EQ_STCK_ADD(optyear,age,reg)$(ord(optyear)>1)..             sum((tec,seg), (VEH_STCK_ADD(tec,seg,reg,optyear,'0') - sum(agej, VEH_STCK_REM(tec,seg,reg,optyear,agej)))) =e= VEH_STCK_DELTA(optyear,reg);
+EQ_STCK_ADD(optyear,age,reg)$(ord(optyear)>1 and ord(age)=1)..             sum((tec,seg), (VEH_STCK_ADD(tec,seg,reg,optyear,age) - sum(agej, VEH_STCK_REM(tec,seg,reg,optyear,agej)))) =e= VEH_STCK_DELTA(optyear,reg);
+
 *EQ_STCK_ADD(seg,optyear,age)$(ord(optyear)>1)..             sum((tec), VEH_STCK_ADD(tec,seg,optyear,'0') - sum(agej, VEH_STCK_REM(tec,seg,optyear,agej))) =e= VEH_STCK_DELTA(optyear)*VEH_STCK_INT_SEG(seg);
 
 * calculate total increase (or change) of total fleet (net stock growth)
@@ -851,21 +853,22 @@ EQ_STCK_BAL(tec,seg,reg,optyear,age)$(ord(optyear)>1)..      VEH_STCK(tec,seg,re
 EQ_STCK_ADD0(tec,seg,reg,'2019','0')..                                 VEH_STCK_ADD_OPTYEAR1('BEV',seg,reg,'2019','0') =e= 0;
 
 * restrict addition to stock based on previous year's uptake
-EQ_STCK_GRD0(tec,seg,reg,'2020','0')..                                 VEH_STCK_ADD(tec,seg,reg,'2020','0') =l= ((1 + VEH_ADD_GRD('IND',tec)) * VEH_STCK_ADD_OPTYEAR1(tec,seg,reg,'2019','0')) + 5e4;
+*EQ_STCK_GRD0(tec,seg,reg,'2020','0')..                                 VEH_STCK_ADD(tec,seg,reg,'2020','0') =l= ((1 + VEH_ADD_GRD('IND',tec)) * VEH_STCK_ADD_OPTYEAR1(tec,seg,reg,'2019','0')) + 50e5;
 
 *EQ_STCK_GRD(tec,seg,optyear,age)$(ord(optyear)>1 and ord(age)=1)..     VEH_STCK_ADD(tec,seg,optyear,age) =l= ((1 + VEH_ADD_GRD('IND',tec)) * VEH_STCK_ADD(tec,seg,optyear-1,age)) + 5e4;
-EQ_STCK_GRD(tec,seg,reg,optyear)$(ord(optyear)>1)..     VEH_STCK_ADD(tec,seg,reg,optyear,'0') =l= ((1 + VEH_ADD_GRD('IND',tec)) * VEH_STCK_ADD(tec,seg,reg,optyear-1,'0')) + 5e4;
+EQ_STCK_GRD(tec,seg,reg,optyear,age)$(ord(optyear)>1 and ord(age)=1)..     VEH_STCK_ADD(tec,seg,reg,optyear,age) =l= ((1 + VEH_ADD_GRD('IND',tec)) * VEH_STCK_ADD(tec,seg,reg,optyear-1,age));
 
 * Segment share constraint (segments kept constant)
 * try to remove - allow for ICEV smart cars (e.g.,) to be replaced by a BEV Model X...
-EQ_SEG_GRD(seg,reg,optyear,'0')$(ord(optyear)>1)..          sum(tec,VEH_STCK_ADD(tec,seg,reg,optyear,'0')) =l= VEH_STCK_INT_SEG(seg) * sum((tec,segj), VEH_STCK_ADD(tec,segj,reg,optyear,'0'));
+EQ_SEG_GRD(seg,reg,optyear,age)$(ord(optyear)>1 and ord(age)=1)..          sum(tec,VEH_STCK_ADD(tec,seg,reg,optyear,age)) =l= VEH_STCK_INT_SEG(seg) * sum((tec,segj), VEH_STCK_ADD(tec,segj,reg,optyear,age));
 
 
 *------ Battery manufacturing constraint;
 
 * total capacity added per year must be less than the battery manufacturing capacity
+* MANUF_CNSTRNT input is in GWh; BEV_CAPAC is in kWh
 * dummy manufacturing constraint to trigger on dummy fleet...
-EQ_NEW_BATT_CAP(optyear)..                              MANUF_CNSTRNT(optyear)*10 =g= sum((seg, reg),VEH_STCK_ADD('BEV',seg,reg,optyear,'0')*BEV_CAPAC(seg))/1000;
+EQ_NEW_BATT_CAP(optyear)..                              MANUF_CNSTRNT(optyear)*1000 =g= sum((seg, reg),VEH_STCK_ADD('BEV',seg,reg,optyear,'0')*BEV_CAPAC(seg))/1000;
 *EQ_NEW_BATT_CAP(optyear)..                              MANUF_CNSTRNT(optyear)*1000 =g= sum((seg, reg),VEH_STCK_ADD('BEV',seg,reg,optyear,'0')*BEV_CAPAC(seg))/1000;
 
 * to-do: add lithium refining constraint;
@@ -882,9 +885,9 @@ EQ_VEH_TOTC(tec,seg,reg,modelyear)..                  VEH_TOTC(tec,seg,reg,model
 *EQ_VEH_PROD_TOTC(tec,seg,modelyear)..             VEH_PROD_TOTC(tec,seg,modelyear) =e= sum( (agej)$(ord(agej)=1), VEH_STCK_ADD(tec,seg,modelyear,agej)*VEH_PROD_CINT(tec,seg,modelyear));
 *EQ_VEH_PROD_TOTC(tec,seg,modelyear)..             VEH_PROD_TOTC(tec,seg,modelyear) =e= sum( (agej), VEH_STCK_ADD(tec,seg,modelyear,'0')*VEH_PROD_CINT(tec,seg,modelyear));
 
-EQ_VEH_PROD_TOTC(tec,seg,reg,modelyear)..             VEH_PROD_TOTC(tec,seg,reg,modelyear) =e= VEH_STCK_ADD(tec,seg,reg,modelyear,'0')*VEH_PROD_CINT(tec,seg,modelyear);
+EQ_VEH_PROD_TOTC(tec,seg,reg,modelyear)..             VEH_PROD_TOTC(tec,seg,reg,modelyear) =e= sum( (agej)$(ord(agej)=1), VEH_STCK_ADD(tec,seg,reg,modelyear,agej))*VEH_PROD_CINT(tec,seg,modelyear);
 
-EQ_VEH_OPER_TOTC(tec,seg,reg,modelyear)..             VEH_OPER_TOTC(tec,seg,reg,modelyear) =e= sum( (agej,enr,prodyear), VEH_STCK(tec,seg,reg,modelyear,agej) *VEH_PAY(prodyear,agej,modelyear)* VEH_OPER_CINT(tec,enr,seg,reg,agej,modelyear,prodyear) *  VEH_OPER_DIST(modelyear));
+EQ_VEH_OPER_TOTC(tec,seg,reg,modelyear)..             VEH_OPER_TOTC(tec,seg,reg,modelyear) =e= sum( (agej,enr,prodyear), VEH_STCK(tec,seg,reg,modelyear,agej) * VEH_PAY(prodyear,agej,modelyear)* VEH_OPER_CINT(tec,enr,seg,reg,agej,modelyear,prodyear) *  VEH_OPER_DIST(modelyear));
 
 EQ_VEH_EOLT_TOTC(tec,seg,reg,modelyear)..             VEH_EOLT_TOTC(tec,seg,reg,modelyear) =e= sum( (agej), VEH_STCK_REM(tec,seg,reg,modelyear,agej))*VEH_EOLT_CINT(tec,seg,modelyear);
 
@@ -900,8 +903,9 @@ MODEL EVD4EUR_Basic "default model, run in normal mode" /ALL/
       seg_test "model without segment constraint" /EVD4EUR_Basic - EQ_SEG_GRD/
       unit_test "model without growth constraint" /EVD4EUR_Basic - EQ_STCK_GRD/
       unit_test2 "model without growth or manufacturing constraint" /unit_test - EQ_NEW_BATT_CAP/
-      neq_stcko_contr "model no constraints at all" /unit_test2 - EQ_STCK_ADD0 - EQ_STCK_GRD0/
 ;
+*      no_contr "model no constraints at all" /unit_test2 - EQ_STCK_ADD0 - EQ_STCK_GRD0/
+*;
 
 * Defining model run options and solver
 
@@ -922,7 +926,9 @@ MODEL EVD4EUR_Basic "default model, run in normal mode" /ALL/
 
 *EVD4EUR_Basic.optfile = 1;
 SOLVE EVD4EUR_Basic USING LP MINIMIZING TOTC_OPT;
-*SOLVE unit_test USING LP MINIMIZING TOTC_OPT;
+*SOLVE seg_test USING LP MINIMIZING TOTC_OPT;
+*unit_test works...but looks wonky.
+*SOLVE unit_test USING LP MINIMIZING TOTC_OPT; 
 *SOLVE unit_test2 USING LP MINIMIZING TOTC_OPT;
 *SOLVE no_contr USING LP MINIMIZING TOTC_OPT;
 
