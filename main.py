@@ -67,7 +67,7 @@ if yaml_name == 'unit_test.yaml':
     fp = r'C:\Users\chrishun\Box Sync\YSSP_temp\visualization output\unit_test_'+now
     input_file = r'C:\Users\chrishun\Box Sync\YSSP_temp\unit_test.yaml'
 else:
-    fp = r'C:\Users\chrishun\Box Sync\YSSP_temp\visualization output\Run_'+now
+    fp = r'C:\Users\chrishun\Box Sync\YSSP_temp\visualization output\Run_' + now
     input_file = r'C:\Users\chrishun\Box Sync\YSSP_temp\GAMS_input.yaml'
 
 try:
@@ -77,19 +77,19 @@ try:
 #        f.write('If I exist, run failed!')
 except:
     print("cannot make folder!")
-        
+
 def run_experiment():
     """--- Read YAML for key parameter values for each experiment,
     create a GAMSRunner object, and loop through each experiment
-    
-    
-    
+
+
+
     ---"""
     # Load parameter values for each experiment from YAML
     # r'C:\Users\chrishun\Box Sync\YSSP_temp\temp_input.yaml'
     # r'C:\Users\chrishun\Box Sync\YSSP_temp\temp_input_presubmission.yaml'
 #    with open(r'C:\Users\chrishun\Box Sync\YSSP_temp\GAMS_input.yaml', 'r') as stream:
-    
+
     with open(input_file, 'r') as stream:
         try:
             params = yaml.safe_load(stream)
@@ -115,14 +115,14 @@ def run_experiment():
     id_and_value = [params[p].items() for p in param_names]
 
     # NB could also change the names here
-    
+
     # Calculate total number of runs
     count = 1
     for x in params:
         temp = len(params[x])
         #temp += len(id_and_value[x])
         count = temp * count
-        
+
     # Create data structures for comparing results from multiple runs
     shares_2030 = None
     shares_2050 = None
@@ -132,10 +132,10 @@ def run_experiment():
     run_id_list = []
     totc_list = []
     full_BEV_yr_df = pd.DataFrame()
-    
+
     # Create a GAMSRunner object to run the experiments
     gams_run = gams_runner.GAMSRunner()
-    
+
     for i, run_params in enumerate(product(*id_and_value)):
         print('Starting run '+str(i+1)+' of '+str(count)+'\n\n')
 #        veh_seg_shr, tec_add_gradient, seg_batt_caps = run_params
@@ -154,10 +154,10 @@ def run_experiment():
 #        sigm = sigmoid.Sigmoid
 #        fun = getattr(sigm, 'batt_cap')(seg_batt_caps[1])
 #        values = fun()
-        
+
 #        values = sigmoid.make_values(**sigmoid_case[1])
 #        values = sigmoid.make_values(A_batt_size=30, F_batt_size=100)
-                
+
 
         log.info(f'Starting run {run_id}')
 
@@ -172,8 +172,8 @@ def run_experiment():
                                     u_term_factors = u_term_factors[1],
                                     eur_batt_share = eur_batt_share[1],
                                     pkm_scenario = pkm_scenario[1])#,
-#                                    growth_constraint = growth_constraint[1]) 
-        
+#                                    growth_constraint = growth_constraint[1])
+
         """fm.run_GAMS(run_tag)"""
         try:
             gams_run.run_GAMS(fm, run_tag, yaml_name) # run the GAMS model
@@ -185,7 +185,7 @@ def run_experiment():
             # Force quit if single run has failed
             if count == 1:
                 sys.exit()
-            
+
         exceptions = gams_run.db.get_database_dvs()
         if len(exceptions) > 1:
             print(exceptions[0].symbol.name)
@@ -196,10 +196,10 @@ def run_experiment():
 
         # Pickle the scenario fleet object
 #        os.chdir(fp)
-        
+
         with open('run_'+run_tag+'.pkl','wb') as f:
-            pickle.dump(fm,f)
-        
+            pickle.dump(fm, f)
+
         # Save log info
         info[run_tag] = {
             'params': {
@@ -221,10 +221,10 @@ def run_experiment():
 #                 'totc in optimization period':fm.totc_opt # collect these from all runs into a dataframe...ditto with shares of BEV/ICE
             }
         }
-        
+
 #        with open(fp+'\failed.txt','a+') as f:
 #            f.write('Successful run. Next: visualization!')
-            
+
         try:
             fm.figure_calculations()  # run extra calculations for cross-experiment figures
             fm.vis_GAMS(fp, run_id, info[run_tag]['params'], export_png=False)
@@ -233,36 +233,36 @@ def run_experiment():
             traceback.print_exc()
             os.chdir('..')
             if os.path.exists(fp):
-                os.rmdir(fp)        
-        
+                os.rmdir(fp)
+
 #        os.rename(fp,fp+'_success_vis')
-        
+
         # Save pertinent info to compare across scenarios in dataframe
         fm.shares_2030.name = run_id
         fm.shares_2050.name = run_id
         fm.add_share.name = run_id
         fm.veh_stck.name = run_id
-        
+
         if shares_2030 is None:
             shares_2030 = pd.DataFrame(fm.shares_2030)
         else:
             shares_2030[run_id] = fm.shares_2030
-        
+
         if shares_2050 is None:
             shares_2050 = pd.DataFrame(fm.shares_2050)
         else:
-            shares_2050[run_id] = fm.shares_2050   
-        
+            shares_2050[run_id] = fm.shares_2050
+
         if add_share is None:
             add_share = pd.DataFrame(fm.add_share.stack().stack())
         else:
             add_share[run_id] = fm.add_share.stack().stack()
-        
+
         if stock_comp is None:
             stock_comp = pd.DataFrame(fm.veh_stck)
         else:
             stock_comp[run_id] = fm.veh_stck
-        
+
         full_BEV_yr_df.append(fm.full_BEV_year, ignore_index=True)
         totc_list.append(fm.totc_opt)
 
@@ -273,7 +273,7 @@ def run_experiment():
     # Write log to file
     with open(f'output_{now}.yaml', 'w') as f:
         yaml.safe_dump(info, f)
-    
+
     # Return last fleet object for troubleshooting
     return fm, run_id_list, shares_2030,  shares_2050, add_share, stock_comp, full_BEV_yr_df, totc_list#, fleet_dict
 
@@ -296,7 +296,7 @@ scenario_totcs = pd.DataFrame(totc_list, index = run_id_list, columns=['totc_opt
 
 try:
     scenario_totcs['Abs. difference from totc_opt'] = default_totc_opt - scenario_totcs['totc_opt']
-    scenario_totcs['%_change_in_totc_opt'] = scenario_totcs['totc_opt']/default_totc_opt  
+    scenario_totcs['%_change_in_totc_opt'] = scenario_totcs['totc_opt']/default_totc_opt
 except:
     print("No comparison to default performed")
 
@@ -307,6 +307,10 @@ with open('run_'+now+'.pkl', 'wb') as f:
 """with open('run_2019-09-22T14_50.pkl','rb') as f:
     d=pickle.load(f)
 d[0][run_id_list[0]].add_share"""
+"""
+"with open(os.path.join(os.path.curdir, 'Run_2020-09-02T22_57', 'run_run_def_baseline_def_def_def_def_def_iTEM2-Base2020-09-02T22_57.pkl','rb') as f:
+    fm=pickle.load(f)
+"""
 
 #with pd.ExcelWriter('cumulative_scenario_output'+now+'.xlsx') as writer:
 #    shares_2030.to_excel(writer,sheet_name='tec_shares_in_2030')
@@ -315,7 +319,7 @@ d[0][run_id_list[0]].add_share"""
 #    stock_comp.to_excel(writer,sheet_name='total_stock')
 #    full_BEV_yr.to_excel(writer,sheet_name='1st_year_full_BEV')
 #    scenario_totcs.to_excel(writer,sheet_name='totc')
-   
+
 #full_BEV_yr.plot()
 
 #os.remove(fp+'\failed.txt')
