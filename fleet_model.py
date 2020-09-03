@@ -154,9 +154,9 @@ class FleetModel:
         # [years] driving distance each year # TODO: rename?
 
         self.veh_stck_int_seg = veh_stck_int_seg or [0.08, 0.21, 0.27, 0.08, 0.03, 0.34]  # Shares from 2017, ICCT report
-        self.veh_stck_int_seg= pd.Series(self.veh_stck_int_seg,index=self.seg)
+        self.veh_stck_int_seg = pd.Series(self.veh_stck_int_seg,index=self.seg)
 
-        self.seg_batt_caps = pd.Series(seg_batt_caps,index = self.seg) # For battery manufacturing capacity constraint
+        self.seg_batt_caps = pd.Series(seg_batt_caps,index = self.seg)  # For battery manufacturing capacity constraint
         self.eur_batt_share = eur_batt_share or 0.5
 
         ################ Life cycle intensities ################
@@ -254,12 +254,12 @@ class FleetModel:
 
         self.tec_add_gradient = tec_add_gradient or 0.2
 
-        self.growth_constraint = 0#growth_constraint
+        self.growth_constraint = 0  #growth_constraint
         self.gro_cnstrnt = [self.growth_constraint for i in range(len(self.modelyear))]
         self.gro_cnstrnt = pd.Series(self.gro_cnstrnt, index=self.modelyear)
         self.gro_cnstrnt.index = self.gro_cnstrnt.index.astype('str')
 
-        self.manuf_cnstrnt = pd.read_excel(self.import_fp, sheet_name='MANUF_CONSTR', header=None, usecols='A,B', skiprows=[0])  # Assumes stabilized manufacturing capacity post-2030ish
+        self.manuf_cnstrnt = pd.read_excel(self.import_fp, sheet_name='MANUF_CONSTR', header=None, usecols='A,B', skiprows=[0])  # Assumes stabilized manufacturing capacity post-2030ish; in GWh
 #        self.manuf_cnstrnt = pd.read_excel(self.import_fp,sheet_name='MANUF_CONSTR',header=None,usecols='A,C',skiprows=[0]) # Assumes continued (linear) growth in manufacturing capacity until end of model period
 #        self.manuf_cnstrnt = pd.read_excel(self.import_fp,sheet_name='MANUF_CONSTR',header=None,usecols='A,D',skiprows=[0]) # Assumes continued (linear) growth in manufacturing capacity until 2050
 
@@ -1157,6 +1157,7 @@ class FleetModel:
 #        pp.savefig(bbox_inches='tight')
 
         """--- Plot operation emissions by tec ---"""
+
         ax = (self.emissions.loc[:, 'Operation']/1e6).plot(kind='area',cmap=LinearSegmentedColormap.from_list('temp', colors=['silver', 'grey']))
         plt.hlines(442, xmin=0.16, xmax=0.6, linestyle='dotted', color='darkslategrey', label='EU 2030 target, \n 20% reduction from 2008 emissions', transform=ax.get_yaxis_transform())
         plt.hlines(185, xmin=0.6, xmax=1, linestyle='-.', color ='darkslategrey', label='EU 2050 target, \n 60% reduction from 1990 emissions', transform=ax.get_yaxis_transform())
@@ -1169,6 +1170,7 @@ class FleetModel:
 #        pp.savefig(bbox_inches='tight')
 
         """--- Plot total stocks by segment ---"""
+
         ax = self.stock_df_plot.sum(axis=1).unstack('seg').sum(axis=0, level=['year']).plot(kind='area', cmap='jet', title='Total stocks by segment')
         fix_age_legend(ax, 'Vehicle segments')
 
@@ -1181,6 +1183,7 @@ class FleetModel:
         fix_age_legend(ax, 'Vehicle segment and technology')
 
         """--- Plot total stocks by age, segment and technology ---"""
+
 #        ax = self.stock_df_plot.sum(axis=1).unstack('seg').unstack('tec').unstack('reg').plot(kind='area',cmap=paired,title='Total stocks by segment, technology and region')
         stock_tec_seg_reg = self.stock_df_plot.sum(axis=1).unstack('seg').unstack('tec').unstack('reg').drop('PROD', level='reg', axis=1)
         ax = stock_tec_seg_reg.plot(kind='area', cmap='jet', title='Total stocks by segment, technology and region')
@@ -1201,6 +1204,7 @@ class FleetModel:
         """--- Plot total stocks by age and technology ---"""
 
         """ Plot BEVs by cohort and region """
+        """
         stock_cohort = self.stock_cohort.copy()
         stock_cohort.sort_index(level=['reg', 'modelyear'],ascending=[1,2], inplace=True)
         temp_stock_cohort = (stock_cohort/1e6).loc['BEV'].loc(axis=0)[:, '2020':'2050']
@@ -1224,7 +1228,7 @@ class FleetModel:
         plt.xlabel('year')
         fix_age_legend(axes[0], title='Vehicle vintage')
         pp.savefig()
-
+        """
         """temp_stock_cohort = (self.stock_cohort/1e6).loc['ICE'].loc[:'2050']
         temp_stock_cohort[temp_stock_cohort<0.4] = 0 # Drops very small vehicle stocks in earlier years
         temp_stock_cohort = temp_stock_cohort.replace(0,np.nan).dropna(how='all',axis=1)
@@ -1335,6 +1339,7 @@ class FleetModel:
 #        pp.savefig(bbox_inches='tight')
 
         """--- Plot production emissions by tec and seg ---"""
+
         prod = self.veh_prod_totc.stack().unstack('tec').sum(level=['seg', 'year'])#/1e9
         prod_int = prod/self.stock_add.sum(axis=1).unstack('tec').sum(level=['seg', 'prodyear']) #production emission intensity
 
