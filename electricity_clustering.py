@@ -1230,7 +1230,31 @@ for i in np.arange(num_clusters):
                            (europe_shapes['Consumption mix intensity'] <= thresholds[i + 1])]
     europe_shapes['Cluster'][df_bin.index] = i + 1
 
-europe_shapes['Cluster'].replace({1: 'LOW', 2: 'II', 3:'MID', 4:'IV', 5:'HIGH'}, inplace=True)
+# europe_shapes['Cluster'].replace({1: 'LOW', 2: 'MID-LOW', 3: 'MID-HIGH', 4:'HIGH'}, inplace=True)
+europe_shapes['Cluster'].replace({1: 'LOW', 2: 'II', 3: 'MID', 4: 'IV', 5: 'HIGH'}, inplace=True)
+
+
+#%%
+
+from datetime import datetime
+from matplotlib.backends.backend_pdf import PdfPages
+
+timestamp = datetime.now().strftime("%d_%b_%y,%H_%M")
+output_fp = os.path.join(os.path.curdir, 'visualization output', 'electricity clustering')
+pp = PdfPages(os.path.join(output_fp ,'output_el_clusters_' + timestamp + '.pdf'))
+
+export_pdf = True
+export_png = True
+
+def export_fig(png_name=None):
+    if export_pdf:
+        pp.savefig(bbox_inches='tight')
+    if export_png:
+        if not png_name:
+            png_name = ax.get_title()
+        print(os.path.abspath(output_fp))
+        print(png_name)
+        plt.savefig(os.path.join(output_fp, png_name + '.png'), format='png', bbox_inches='tight')
 
 #%%
 # Plot maps by clusters
@@ -1253,6 +1277,8 @@ plt.xlim((-19, 34))
 plt.ylim((32, 75))
 plt.yticks([])
 plt.xticks([])
+
+export_fig('cluster_map' + timestamp)
 
 #%%
 el_footprints = carbon_footprints_cons.join(europe_shapes.set_index('ISO_A2')['Cluster'], on='country')
@@ -1287,16 +1313,20 @@ plt_df = (el_footprints[[('Consumption mix intensity', 2020), ('Cluster','')]])
 plt_df.columns = ['y', 'Cluster']
 plt_df.loc(axis=1)['year'] = 2020
 # plt_df.set_index('year', inplace=True)
-colors = {'LOW': 'midnightblue', 'II': 'lightseagreen', 'MID': 'goldenrod', 'IV': 'indigo', 'HIGH': 'darkred'}
+# clrs = {'LOW': 'midnightblue', 'MID-LOW': 'lightseagreen', 'MID-HIGH': 'goldenrod', 'IV': 'indigo', 'HIGH': 'darkred'}
+clrs = {'LOW': 'midnightblue', 'II': 'lightseagreen', 'MID': 'goldenrod', 'IV': 'indigo', 'HIGH': 'darkred'}
 
 # plt_df.plot(ax=ax, kind='scatter', x='year', y='y', c=plt_df['Cluster'].apply(lambda x: colors[x]), legend=True)
 cluster_footprints.T.plot(ax=ax, cmap=cmap)
-plt_df.plot(ax=ax, kind='scatter', x='year', y='y', c=plt_df['Cluster'].apply(lambda x: colors[x]), legend=True)
+plt_df.plot(ax=ax, kind='scatter', x='year', y='y', c=plt_df['Cluster'].apply(lambda x: clrs[x]), legend=True)
 # plt_df.plot(ax=ax, y='y', c=plt_df['Cluster'].apply(lambda x: colors[x]), legend=True)
 
 
 plt.ylabel('Carbon intensity consumption mix \n (weighted average, g CO2/kWh)')
+export_fig('electricity_intensity' + timestamp)
+
 plt.show()
+pp.close()
 
 #%%
 new_mixes = new_mixes.join(europe_shapes.set_index('ISO_A2')['Cluster'], on='country')
@@ -1320,8 +1350,7 @@ cluster_classification = europe_shapes.loc(axis=1)['ISO_A2', 'Cluster']
 cluster_classification.sort_values(by='Cluster', inplace=True)
 
 #%% Export for troubleshooting
-from datetime import datetime
-timestamp = datetime.now().strftime("%d_%b_%y,%H_%M")
+
 output_fp = os.path.join(os.path.curdir, 'calculation output', 'electricity_clustering_output_' + timestamp + '.xlsx')
 with pd.ExcelWriter(output_fp) as writer:
     new_mixes.to_excel(writer, sheet_name='new_mixes')
