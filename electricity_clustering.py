@@ -1219,12 +1219,14 @@ europe_shapes = europe_shapes.join(carbon_footprints_cons_tmp, on='ISO_A2')
 
 num_clusters = 5
 thresholds = jenkspy.jenks_breaks(europe_shapes['Consumption mix intensity'], nb_class=num_clusters)
+print(thresholds[0])
+thresholds[0] = thresholds[0] * 0.99
 
 # Add column to dataframe with cluster values
 europe_shapes['Cluster'] = np.nan
 
 for i in np.arange(num_clusters):
-    df_bin = europe_shapes[(europe_shapes['Consumption mix intensity'] >= thresholds[i]) &
+    df_bin = europe_shapes[(europe_shapes['Consumption mix intensity'] > thresholds[i]) &
                            (europe_shapes['Consumption mix intensity'] <= thresholds[i + 1])]
     europe_shapes['Cluster'][df_bin.index] = i + 1
 
@@ -1235,6 +1237,7 @@ europe_shapes['Cluster'].replace({1: 'LOW', 2: 'II', 3:'MID', 4:'IV', 5:'HIGH'},
 
 fig, ax = plt.subplots(1, 1, figsize=(12, 11), dpi=600)
 
+thresholds[1:] = [i*1.0001 for i in thresholds[1:]]
 norm = colors.BoundaryNorm(thresholds, num_clusters)
 cmap = colors.ListedColormap(['midnightblue',
                               #'slategrey',
