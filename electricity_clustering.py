@@ -382,6 +382,14 @@ proxy_prod_mix = pd.DataFrame([CH], index=['CH'], columns=mix_df.columns)
 # proxy_prod_mix = pd.concat([proxy_prod_mix], keys=[2020], names=['year', 'technology'], axis=1)
 mix_df = mix_df.append(proxy_prod_mix, sort=True)
 
+trades_df.loc['CH', 'DE'] = 16.524  # data from STATISTIQUE SUISSE DE L’ÉLECTRICITÉ 2018, tab 29
+2018
+trades_df.loc['DE', 'CH'] = 4.423
+trades_df.loc['CH', 'LI'] = 0.015
+trades_df.loc['LI', 'CH'] = 0.034
+
+# TODO: need prod mixes for russia, ukraine, belarus, morocco
+
 """
 LU = {'Wind Onshore': 0.245,
       'Hydro Pumped Storage': 1.337,
@@ -456,7 +464,6 @@ mix_df.loc['LI'] = mix_df.loc['NO'] * (80 / 1e6) / mix_df.loc['NO'].sum()
 mix_df.loc['AD'] = mix_df.loc['ES'] * (99 / 1e3) / mix_df.loc['ES'].sum()  #https://www.worlddata.info/europe/andorra/energy-consumption.php
 mix_df.loc['MC'] = mix_df.loc['FR'] * (536 / 1e3) / mix_df.loc['FR'].sum()  #https://en.wikipedia.org/wiki/Energy_in_Monaco#:~:text=Monaco%20has%20no%20domestic%20sources,gas%20and%20fuels%20from%20France.&text=In%202018%2C%20the%20country%20used,it%20was%20used%20tertiary%20services.
 
-# TODO: Add trades
 
 # Data for proxy countries to fill gaps from ENTSO-E Transparency Portal
 
