@@ -227,7 +227,8 @@ def run_experiment():
 
         try:
             fm.figure_calculations()  # run extra calculations for cross-experiment figures
-            fm.vis_GAMS(fp, run_id, info[run_tag]['params'], export_png=False)
+            fleet_model.vis_GAMS(fm, fp, run_id, info[run_tag]['params'], export_png=False)
+            # vis_GAMS(fm, fp, run_id, info[run_tag]['params'], export_png=False)
         except Exception:
             print("failed visualization, deleting folder")
             traceback.print_exc()
