@@ -238,7 +238,6 @@ VEH_EOLT_COHORT(tec,seg,reg,prodyear,modelyear,agej)    Total end-of-life emissi
 ANN_TOTC(modelyear)                     Total CO2 emissions from LDVs by year                              [t CO2-eq]
 VEH_TOT_ADD(reg, year)                  Total vehicles added by region
 VEH_TOT_REM(tec, reg, year)
-
 VEH_STCK_GRD(tec,seg,reg,optyear,age)
 ;
 
@@ -939,8 +938,6 @@ SOLVE EVD4EUR_Basic USING LP MINIMIZING TOTC_OPT;
 *-----------------------------------------------------------------------------------
 * total capacity of batteries added by year in MWh
 TOT_BATT_MANUF(optyear) = sum((seg, reg),VEH_STCK_ADD.l('BEV',seg,reg,optyear,'0')*BEV_CAPAC(seg))/1000;
-
-*VEH_PROD_C_EL(tec,seg,reg,modelyear) = VEH_STCK_ADD.l(tec,seg,reg,modelyear,'0')*(VEH_PROD_EINT(tec,seg,prodyear) * ENR_CINT('elc','prod',prodyear)/1000);
 
 VEH_STCK_GRD(tec,seg,reg,optyear,'0') = ((1 + VEH_ADD_GRD('IND',tec)) * VEH_STCK_ADD.l(tec,seg,reg,optyear-1,'0'));
 VEH_TOT_ADD(reg,optyear) = sum((tec,seg,age), VEH_STCK_ADD.l(tec, seg, reg, optyear, age));
