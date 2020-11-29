@@ -34,9 +34,11 @@ class GAMSRunner:
 #        self.db = self.ws.add_database()#database_name='pyGAMSdb')
         self.opt = self.ws.add_options()
         self.opt.LogLine = 2
+        self.opt.TraceOpt = 3
 #        self.opt.DumpParms = 2
         self.opt.ForceWork = 1
-        gams.execution.SymbolUpdateType =1
+        self.opt.trace = os.path.join(os.path.curdir, 'trace.txt')
+        gams.execution.SymbolUpdateType = 1
 
     def _load_experiment_data_in_gams(self, fleet, filename): # will become unnecessary as we start calculating/defining sets and/or parameters within the class
         # Clear database for new run
@@ -90,7 +92,7 @@ class GAMSRunner:
         year_par = gmspy.df2param(self.db, fleet.year_par, ['year'], 'YEAR_PAR')
         veh_partab = gmspy.df2param(self.db, fleet.veh_partab, ['veheq', 'tec', 'seg', 'sigvar'], 'VEH_PARTAB')
 
-        veh_add_grd = self.db.add_parameter_dc('VEH_ADD_GRD', ['grdeq','tec'])
+        veh_add_grd = self.db.add_parameter_dc('VEH_ADD_GRD', ['grdeq', 'tec'])
 
         # Prep work making add gradient df from given rate constraint
 

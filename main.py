@@ -16,7 +16,6 @@ from datetime import datetime
 import yaml
 import pandas as pd
 
-
 import matplotlib
 import matplotlib.pyplot as plt
 from matplotlib.ticker import (MultipleLocator, FormatStrFormatter, AutoMinorLocator)
@@ -64,7 +63,7 @@ now = datetime.now().isoformat(timespec='minutes').replace(':','_')
 yaml_name = 'GAMS_input'#.yaml'
 
 if yaml_name == 'unit_test.yaml':
-    fp = r'C:\Users\chrishun\Box Sync\YSSP_temp\visualization output\unit_test_'+now
+    fp = r'C:\Users\chrishun\Box Sync\YSSP_temp\visualization output\unit_test_' + now
     input_file = r'C:\Users\chrishun\Box Sync\YSSP_temp\unit_test.yaml'
 else:
     fp = r'C:\Users\chrishun\Box Sync\YSSP_temp\visualization output\Run_' + now
@@ -73,10 +72,9 @@ else:
 try:
     os.mkdir(fp)
     os.chdir(fp)
-#    with open(fp+'\failed.txt','w+') as f:
-#        f.write('If I exist, run failed!')
 except:
     print("cannot make folder!")
+
 
 def run_experiment():
     """--- Read YAML for key parameter values for each experiment,
@@ -137,13 +135,13 @@ def run_experiment():
     gams_run = gams_runner.GAMSRunner()
 
     for i, run_params in enumerate(product(*id_and_value)):
-        print('Starting run '+str(i+1)+' of '+str(count)+'\n\n')
+        print('Starting run ' + str(i+1) + ' of '+str(count) + '\n\n')
 #        veh_seg_shr, tec_add_gradient, seg_batt_caps = run_params
         # Unpack the defined run parameters
         veh_stck_int_seg, tec_add_gradient, seg_batt_caps, B_term_prod, B_term_oper_EOL, r_term_factors, u_term_factors, eur_batt_share, pkm_scenario = run_params
 
         # Make run ID
-        now = datetime.now().isoformat(timespec='minutes').replace(':','_')
+        now = datetime.now().isoformat(timespec='minutes').replace(':', '_')
         run_id = f'run_{tec_add_gradient[0]}_{seg_batt_caps[0]}_{B_term_prod[0]}_{B_term_oper_EOL[0]}_{r_term_factors[0]}_{u_term_factors[0]}_{eur_batt_share[0]}_{pkm_scenario[1]}' #'_{seg_batt_caps[0]}'
         run_tag = run_id + now
         run_id_list.append(run_id)
@@ -176,7 +174,7 @@ def run_experiment():
 
         """fm.run_GAMS(run_tag)"""
         try:
-            gams_run.run_GAMS(fm, run_tag, yaml_name) # run the GAMS model
+            gams_run.run_GAMS(fm, run_tag, yaml_name)  # run the GAMS model
         except Exception:
             print("failed run, deleting folder")
             traceback.print_exc()
@@ -189,15 +187,15 @@ def run_experiment():
         exceptions = gams_run.db.get_database_dvs()
         if len(exceptions) > 1:
             print(exceptions[0].symbol.name)
-            dunno = exceptions[0].symbol_dvs
+            # dunno = exceptions[0].symbol_dvs
 
-            dunno2 = exceptions[0].symbol
+            # dunno2 = exceptions[0].symbol
             print(fm.db.number_symbols)
 
         # Pickle the scenario fleet object
 #        os.chdir(fp)
 
-        with open('run_'+run_tag+'.pkl','wb') as f:
+        with open('run_' + run_tag + '.pkl', 'wb') as f:
             pickle.dump(fm, f)
 
         # Save log info
@@ -228,15 +226,12 @@ def run_experiment():
         try:
             fm.figure_calculations()  # run extra calculations for cross-experiment figures
             fleet_model.vis_GAMS(fm, fp, run_id, info[run_tag]['params'], export_png=False)
-            # vis_GAMS(fm, fp, run_id, info[run_tag]['params'], export_png=False)
         except Exception:
             print("failed visualization, deleting folder")
             traceback.print_exc()
             os.chdir('..')
             if os.path.exists(fp):
                 os.rmdir(fp)
-
-#        os.rename(fp,fp+'_success_vis')
 
         # Save pertinent info to compare across scenarios in dataframe
         fm.shares_2030.name = run_id
@@ -269,14 +264,14 @@ def run_experiment():
 
         # Display the info for this run
         log.info(repr(info[run_tag]))
-        print('\n\n\n ********** End of run ' + str(i+1)+ ' ************** \n\n\n')
+        print('\n\n\n ********** End of run ' + str(i+1) + ' ************** \n\n\n')
 
     # Write log to file
     with open(f'output_{now}.yaml', 'w') as f:
         yaml.safe_dump(info, f)
 
     # Return last fleet object for troubleshooting
-    return fm, run_id_list, shares_2030,  shares_2050, add_share, stock_comp, full_BEV_yr_df, totc_list#, fleet_dict
+    return fm, run_id_list, shares_2030, shares_2050, add_share, stock_comp, full_BEV_yr_df, totc_list  #, fleet_dict
 
 
 """ Run the full experiment portfolio; also returns last instance of FleetModel object for troubleshooting"""
@@ -286,10 +281,10 @@ fm, run_id_list, shares_2030, shares_2050, add_share, stock_comp, full_BEV_yr_df
 #    f.write('Successfully completed all runs!')
 
 """ Perform calculations across the experiments"""
-full_BEV_yr = pd.DataFrame(full_BEV_yr_df, index = run_id_list)
+full_BEV_yr = pd.DataFrame(full_BEV_yr_df, index=run_id_list)
 
 scenario_totcs = pd.DataFrame(totc_list, index=run_id_list)
-scenario_totcs = pd.DataFrame(totc_list, index = run_id_list, columns=['totc_opt'])
+scenario_totcs = pd.DataFrame(totc_list, index=run_id_list, columns=['totc_opt'])
 # Load a "baseline" fleet and extract parameters for comparison
 #with open('run_2019-09-22T14_50.pkl','rb') as f:
 #    d=pickle.load(f)
@@ -302,7 +297,7 @@ except:
     print("No comparison to default performed")
 
 # Export potentially helpful output for analyzing across scenarios
-with open('run_'+now+'.pkl', 'wb') as f:
+with open('run_' + now + '.pkl', 'wb') as f:
     pickle.dump([shares_2030, shares_2050, add_share, stock_comp, full_BEV_yr_df, scenario_totcs], f)
 
 """with open('run_2019-09-22T14_50.pkl','rb') as f:
