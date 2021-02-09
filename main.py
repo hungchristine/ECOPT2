@@ -59,6 +59,8 @@ yaml.SafeDumper.ignore_aliases = lambda *args: True
 
 # Make timestamp and directory for scenario run results for output files
 now = datetime.now().isoformat(timespec='minutes').replace(':','_')
+# unit test consists of static LCA factors
+# (straight line in lieu of logistic function)
 #yaml_name = 'unit_test'#.yaml'
 yaml_name = 'GAMS_input'#.yaml'
 
@@ -77,10 +79,11 @@ except:
 
 
 def run_experiment():
-    """--- Read YAML for key parameter values for each experiment,
-    create a GAMSRunner object, and loop through each experiment
+    """ Parse all experiment parameters and run model.
 
-
+    Read YAML for key parameter values, create a GAMSRunner object,
+    loop through each experiment (Cartesian product of all
+    parameter combinations)
 
     ---"""
     # Load parameter values for each experiment from YAML
@@ -114,7 +117,7 @@ def run_experiment():
 
     # NB could also change the names here
 
-    # Calculate total number of runs
+    # Calculate total number of runs, for progress updates
     count = 1
     for x in params:
         temp = len(params[x])
@@ -135,9 +138,9 @@ def run_experiment():
     gams_run = gams_runner.GAMSRunner()
 
     for i, run_params in enumerate(product(*id_and_value)):
-        print('Starting run ' + str(i+1) + ' of '+str(count) + '\n\n')
+        print('Starting run ' + str(i+1) + ' of ' + str(count) + '\n\n')
 #        veh_seg_shr, tec_add_gradient, seg_batt_caps = run_params
-        # Unpack the defined run parameters
+        # Unpack the defined run parameters from YAML file
         veh_stck_int_seg, tec_add_gradient, seg_batt_caps, B_term_prod, B_term_oper_EOL, r_term_factors, u_term_factors, eur_batt_share, pkm_scenario = run_params
 
         # Make run ID
@@ -146,7 +149,7 @@ def run_experiment():
         run_tag = run_id + now
         run_id_list.append(run_id)
 
-        # run_id = f'run_{i}'  # alternate format
+        # run_id = f'run_{i}'  # alternate tag format
 
         # Run the appropriate function to make sigmoid parameters/values
 #        sigm = sigmoid.Sigmoid
@@ -160,6 +163,7 @@ def run_experiment():
         log.info(f'Starting run {run_id}')
 
         # need to pass in run ID tag for saving gdx/csv
+        # instantiate FleetModel object
         # NB here, use explicit names to avoid any confusion
         fm = fleet_model.FleetModel(veh_stck_int_seg = veh_stck_int_seg[1],
                                     tec_add_gradient = tec_add_gradient[1],
@@ -213,7 +217,7 @@ def run_experiment():
             },
             'output': {
 #                'totc': 42,   # life, the universe, and everything…
-#                 'first year of 100% BEV market share': fm.full_BEV_year,
+#                 'first year of 100% BEV market share': fm.full_BEV_year
                  'totc': fm.totc,
 #                 'BEV shares in 2030': fm.shares_2030.loc[:,'BEV'].to_string(),
 #                 'totc in optimization period':fm.totc_opt # collect these from all runs into a dataframe...ditto with shares of BEV/ICE
@@ -285,6 +289,7 @@ full_BEV_yr = pd.DataFrame(full_BEV_yr_df, index=run_id_list)
 
 scenario_totcs = pd.DataFrame(totc_list, index=run_id_list)
 scenario_totcs = pd.DataFrame(totc_list, index=run_id_list, columns=['totc_opt'])
+
 # Load a "baseline" fleet and extract parameters for comparison
 #with open('run_2019-09-22T14_50.pkl','rb') as f:
 #    d=pickle.load(f)

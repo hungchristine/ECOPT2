@@ -25,11 +25,38 @@ import gmspy
 import fleet_model
 
 class GAMSRunner:
-    """--- This class sets up the GAMS environment for running experiments ---"""
+    """ Control the GAMS environment for running experiments.
+
+    Set up parameters for the GAMS workspace and export filepaths, set up
+
+    Attributes
+    ----------
+    current_path : str
+                Working directory filepath
+    export_fp : str
+                Export directory filepath
+    ws : gams.GamsWorkspace
+        GAMS workspace for experiments
+    opt : gams.GamsOptions
+        Options for GAMS run
+    db : gams.GamsDatabase
+        Database containing all GAMS symbols for experiment
+
+    Methods
+    -------
+    get_output_from_GAMS(gams_db, output_var)
+        Load output from GAMS .gdx file
+    update_fleet(fleet)
+        Update FleetModel instantiation with results from GAMS run. Redundant with fleet.read_gams_db?
+    run_GAMS(fleet, run_tag, filename)
+        Load input and run  experiment in GAMS
+
+    """
+
     def __init__(self):
-        """ Optimization Initialization """
+        """ Initialize GAMS workspace for set of experiments """
         self.current_path = os.path.dirname(os.path.realpath(__file__))
-        self.export_fp = os.path.join(self.current_path, 'Model run data') #r'C:\Users\chrishun\Box Sync\YSSP_temp\Model run data\'
+        self.export_fp = os.path.join(self.current_path, 'Model run data')
         self.ws = gams.GamsWorkspace(working_directory=self.current_path, debug=2)
 #        self.db = self.ws.add_database()#database_name='pyGAMSdb')
         self.opt = self.ws.add_options()
@@ -38,9 +65,14 @@ class GAMSRunner:
 #        self.opt.DumpParms = 2
         self.opt.ForceWork = 1
         self.opt.trace = os.path.join(os.path.curdir, 'trace.txt')
-        gams.execution.SymbolUpdateType = 1
+        # gams.execution.SymbolUpdateType = 1
 
-    def _load_experiment_data_in_gams(self, fleet, filename): # will become unnecessary as we start calculating/defining sets and/or parameters within the class
+    def _load_input_to_gams(self, fleet, filename): # will become unnecessary as we start calculating/defining sets and/or parameters within the class
+        """ Create input gdx file for GAMS experiment
+
+        Add database to workspace, update FleetModel, then load database with
+        experiment parameters
+        """
         # Clear database for new run
 #        self.db.clear() # need to add functionality to gmspy --> check if Symbol exists in database, write over
         self.db = self.ws.add_database(database_name='pyGAMS_input')#database_name='pyGAMSdb')
@@ -60,14 +92,14 @@ class GAMSRunner:
         seg = gmspy.list2set(self.db, fleet.seg, 'seg')
         reg = gmspy.list2set(self.db, fleet.reg, 'reg')
         demeq =  gmspy.list2set(self.db, fleet.demeq, 'demeq')
-        dstvar = gmspy.list2set(self.db, fleet.dstvar,'dstvar')
-        enreq = gmspy.list2set(self.db, fleet.enreq,'enreq')
-        grdeq = gmspy.list2set(self.db, fleet.grdeq,'grdeq')
-        inityear = gmspy.list2set(self.db, fleet.inityear,'inityear')
-        lfteq = gmspy.list2set(self.db, fleet.lfteq,'lfteq')
-        sigvar = gmspy.list2set(self.db, fleet.sigvar,'sigvar')
-        veheq = gmspy.list2set(self.db, fleet.veheq,'veheq')
-        optyear = gmspy.list2set(self.db, fleet.optyear,'optyear')
+        dstvar = gmspy.list2set(self.db, fleet.dstvar, 'dstvar')
+        enreq = gmspy.list2set(self.db, fleet.enreq, 'enreq')
+        grdeq = gmspy.list2set(self.db, fleet.grdeq, 'grdeq')
+        inityear = gmspy.list2set(self.db, fleet.inityear, 'inityear')
+        lfteq = gmspy.list2set(self.db, fleet.lfteq, 'lfteq')
+        sigvar = gmspy.list2set(self.db, fleet.sigvar, 'sigvar')
+        veheq = gmspy.list2set(self.db, fleet.veheq, 'veheq')
+        optyear = gmspy.list2set(self.db, fleet.optyear, 'optyear')
 
         veh_oper_dist = gmspy.df2param(self.db, fleet.veh_oper_dist, ['year'], 'VEH_OPER_DIST')
         veh_stck_tot = gmspy.df2param(self.db, fleet.veh_stck_tot, ['year', 'reg'], 'VEH_STCK_TOT')
@@ -77,7 +109,7 @@ class GAMSRunner:
         veh_lift_cdf = gmspy.df2param(self.db, fleet.veh_lift_cdf, ['age'], 'VEH_LIFT_CDF')
         veh_lift_pdf = gmspy.df2param(self.db, fleet.veh_lift_pdf, ['age'], 'VEH_LIFT_PDF')
         veh_lift_age = gmspy.df2param(self.db, fleet.veh_lift_age, ['age'], 'VEH_LIFT_AGE')
-        veh_lift_mor = gmspy.df2param(self.db, fleet.veh_lift_mor, ['age'], 'VEH_LIFT_MOR' )
+        veh_lift_mor = gmspy.df2param(self.db, fleet.veh_lift_mor, ['age'], 'VEH_LIFT_MOR')
 
         ######  OBS: Originally calculated using VEH_STCK_INT_TEC, VEH_LIFT_AGE, VEH_STCK_TOT
         veh_stck_int = gmspy.df2param(self.db, fleet.veh_stck_int, ['tec','seg', 'age'], 'VEH_STCK_INT')
@@ -95,7 +127,7 @@ class GAMSRunner:
         veh_add_grd = self.db.add_parameter_dc('VEH_ADD_GRD', ['grdeq', 'tec'])
 
         # Prep work making add gradient df from given rate constraint
-
+        # TODO: this is redundant with update_fleet??
         # adding growth constraint for each tec
         for keys, value in iter(fleet.veh_add_grd.items()):
             veh_add_grd.add_record(keys).value = value
@@ -106,36 +138,70 @@ class GAMSRunner:
 
         manuf_cnstrnt = gmspy.df2param(self.db, fleet.manuf_cnstrnt, ['year'], 'MANUF_CNSTRNT')
 
+        mat_content = gmspy.df2param(self.db, fleet.mat_content, ['year','mat'], 'MAT_CONTENT')
+        virg_mat= gmspy.df2param(self.db, fleet.virg_mat, ['year','mat'], 'VIRG_MAT')
+        recovery_pct = gmspy.df2param(self.db, fleet.recovery_pct, ['year','mat'], 'RECOVERY_PCT')
+
         # enr_partab = gmspy.df2param(self.db, fleet.enr_partab,['enr', 'enreq', 'sigvar'], 'ENR_PARTAB')
         # el_cint = gmspy.df2param(self.db, fleet.enr_cint, ['reg','enr','year'], 'ENR_CINT')
 
-        print('\n exporting database...'+filename+'_input')
+        print('\n exporting database...' + filename + '_input')
         self.db.suppress_auto_domain_checking = 1
-        self.db.export(os.path.join(self.current_path, filename+'_input'))
+        #TODO: remove export, redundant with first line of this method??
+        self.db.export(os.path.join(self.current_path, filename + '_input'))
 
     def get_output_from_GAMS(self, gams_db, output_var):
-         temp_GMS_output = []
-         temp_index_list = []
+        """ Retrieve symbol values from gams_db.
 
-         for rec in gams_db[output_var]:
-            if gams_db[output_var].number_records == 1: # special case for totc
+        Parameters
+        ----------
+        gams_db : gams.database.GamsDatabase
+            Database containing experiment run results from GAMS.
+        output_var : str
+            Symbol name for values.
+
+        Returns
+        -------
+        temp_output_df : Pandas DataFrame
+            Contains results from GAMS experiment.
+
+        """
+
+        temp_GMS_output = []
+        temp_index_list = []
+
+        for rec in gams_db[output_var]:
+            if gams_db[output_var].number_records == 1:  # special case for totc
                 temp_output_df = gams_db[output_var].first_record().level
                 return temp_output_df
 
             dict1 = {}
-            dict1.update({'level':rec.level})
+            dict1.update({'level': rec.level})
             temp_GMS_output.append(dict1)
             temp_index_list.append(rec.keys)
-         temp_domain_list = list(gams_db[output_var].domains_as_strings)
-         temp_index = pd.MultiIndex.from_tuples(temp_index_list,names=temp_domain_list)
-         temp_output_df = pd.DataFrame(temp_GMS_output,index = temp_index)
+        temp_domain_list = list(gams_db[output_var].domains_as_strings)
+        temp_index = pd.MultiIndex.from_tuples(temp_index_list, names=temp_domain_list)
+        temp_output_df = pd.DataFrame(temp_GMS_output, index = temp_index)
 
-         return temp_output_df
+        return temp_output_df
 
     def update_fleet(self, fleet):
+        """ Update FleetModel instantiation.
+
+        Parameters
+        ----------
+        fleet : FleetModel
+            FleetModel instantiation to be updated with new parameter results.
+
+        Returns
+        -------
+        None.
+
+        """
+
         """ tec_add_gradient --> veh_add_grd """
         fleet.veh_add_grd = dict()
-        for element in itertools.product(*[fleet.grdeq,fleet.tecs]):
+        for element in itertools.product(*[fleet.grdeq, fleet.tecs]):
             fleet.veh_add_grd[element] = fleet.tec_add_gradient
 
         """ occupancy_rate --> veh_oper_dist """
@@ -143,24 +209,41 @@ class GAMSRunner:
         fleet.veh_oper_dist = fleet.fleet_vkm/fleet.veh_stck_tot
 
         """ recalculate age functions"""
-        fleet.veh_lift_cdf = pd.Series(norm.cdf(fleet.age_int,fleet.avg_age,fleet.std_dev_age),index=fleet.age)#pd.Series(pd.read_pickle(fleet.import_fp+'input.pkl'))#pd.DataFrame()  # [age] TODO Is it this one we feed to gams?
+        fleet.veh_lift_cdf = pd.Series(norm.cdf(fleet.age_int, fleet.avg_age, fleet.std_dev_age), index=fleet.age)#pd.Series(pd.read_pickle(fleet.import_fp+'input.pkl'))#pd.DataFrame()  # [age] TODO Is it this one we feed to gams?
         fleet.veh_lift_cdf.index = fleet.veh_lift_cdf.index.astype('str')
 
-        fleet.veh_lift_age = pd.Series(1-fleet.veh_lift_cdf)     # [age] # probability of car of age x to die in current year
+        fleet.veh_lift_age = pd.Series(1 - fleet.veh_lift_cdf)     # [age] # probability of car of age x to die in current year
 
         #lifetime = [1-fleet.veh_lift_age[i+1]/fleet.veh_lift_age[i] for i in range(len(fleet.age)-1)]
-        fleet.veh_lift_pdf = pd.Series(fleet_model.calc_steadystate_vehicle_age_distributions(fleet.age_int,fleet.avg_age,fleet.std_dev_age), index = fleet.age)   # idealized age PDF given avg fleet age and std dev
+        fleet.veh_lift_pdf = pd.Series(fleet_model.calc_steadystate_vehicle_age_distributions(fleet.age_int, fleet.avg_age, fleet.std_dev_age), index = fleet.age)   # idealized age PDF given avg fleet age and std dev
         fleet.veh_lift_pdf.index = fleet.veh_lift_pdf.index.astype('str')
 
-        fleet.veh_lift_mor = pd.Series(fleet_model.calc_probability_of_vehicle_retirement(fleet.age_int,fleet.veh_lift_pdf), index = fleet.age)
+        fleet.veh_lift_mor = pd.Series(fleet_model.calc_probability_of_vehicle_retirement(fleet.age_int, fleet.veh_lift_pdf),  index=fleet.age)
         fleet.veh_lift_mor.index = fleet.veh_lift_mor.index.astype('str')
 
     def run_GAMS(self, fleet, run_tag, filename):
-        # Pass to GAMS all necessary sets and parameters
-        self._load_experiment_data_in_gams(fleet, filename)
-        #self.db.export(' _custom.gdx')
+        """ Load FleetModel data to GAMS and initiate model solve.
 
-        #Run GMS Optimization
+        Parameters
+        ----------
+        fleet : FleetModel instance
+                FleetModel containing run input.
+        run_tag : str
+                Unique experiment run name.
+        filename : str
+                YAML filename with scenario definition.
+
+        Raises
+        ------
+        exceptions
+            Print all GamsDatabaseDomainViolations, including relevant symbols
+
+        """
+
+        # Pass to GAMS all necessary sets and parameters
+        self._load_input_to_gams(fleet, filename)
+
+        # Run GAMS Optimization
 
         """"    # create a GAMSModelInstance and solve it with single links in the network blocked
     mi = cp.add_modelinstance()
@@ -174,17 +257,17 @@ class GAMSRunner:
 
             opt = self.ws.add_options()
             opt.defines["gdxincname"] = self.db.name
-            print('\n'+ f'Using input gdx file: {self.db.name}')
+            print('\n' + f'Using input gdx file: {self.db.name}')
             print('running GAMS model, please wait...')
-            model_run.run(opt, databases=self.db)#,create_out_db = True)
+            model_run.run(opt, databases=self.db)  # ,create_out_db = True)
             print('\n Ran GAMS model: ' + fleet.gms_file)
 
             gams_db = model_run.out_db
-            self.export_model = os.path.join(self.export_fp, run_tag+'_solution.gdx')
+            self.export_model = os.path.join(self.export_fp, run_tag + '_solution.gdx')
             gams_db.export(self.export_model)
             print('\n' + f'Completed export of solution database to {self.export_model}')
 
-            """ Fetch model outputs"""
+            # Fetch model outputs
 #            fleet.totc = self.get_output_from_GAMS(gams_db,'TOTC')
 #            fleet.totc_opt = self.get_output_from_GAMS(gams_db,'TOTC_OPT')
 
@@ -196,12 +279,14 @@ class GAMSRunner:
             except:
                 print(exceptions)
 
-        fleet.read_gams_db(gams_db)
-        fleet.import_model_results()
+        fleet.read_gams_db(gams_db)  # retrieve results from GAMS run (.gdx file)
+        fleet.import_model_results()  # load key results as FleetModel attributes
 
 
-        """" Test calculation for average lifetime vehicle (~12 years)"""
         def quality_check(age=12):
+            # TODO: move out of class?
+            """" Test calculation for average lifetime vehicle (~12 years)"""
+
             fleet.veh_oper_cint_avg = fleet.veh_oper_cint.index.levels[4].astype(int)
             ind = fleet.veh_oper_cint.index
             fleet.veh_oper_cint.index.set_levels(ind.levels[4].astype(int),level=4,inplace=True) #set ages as int
