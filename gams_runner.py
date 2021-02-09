@@ -25,7 +25,8 @@ import gmspy
 import fleet_model
 
 class GAMSRunner:
-    """ Control the GAMS environment for running experiments.
+    """
+    Control the GAMS environment for running experiments.
 
     Set up parameters for the GAMS workspace and export filepaths, set up
 
@@ -50,7 +51,6 @@ class GAMSRunner:
         Update FleetModel instantiation with results from GAMS run. Redundant with fleet.read_gams_db?
     run_GAMS(fleet, run_tag, filename)
         Load input and run  experiment in GAMS
-
     """
 
     def __init__(self):
@@ -76,6 +76,7 @@ class GAMSRunner:
         # Clear database for new run
 #        self.db.clear() # need to add functionality to gmspy --> check if Symbol exists in database, write over
         self.db = self.ws.add_database(database_name='pyGAMS_input')#database_name='pyGAMSdb')
+        # TODO: sort of this bit below
         if filename.find('unit_test'):
             fleet.veh_add_grd = dict()
             for element in itertools.product(*[fleet.grdeq, fleet.tecs]):
@@ -88,9 +89,12 @@ class GAMSRunner:
         tecs = gmspy.list2set(self.db, fleet.tecs, 'tec')
         #cohort = gmspy.list2set(self.db, self.cohort, 'prodyear') ## prodyear is an alias of year, not a set of its own
         age = gmspy.list2set(self.db, fleet.age, 'age')
+        new = gmspy.list2set(self.db, fleet.new, 'new')
         enr = gmspy.list2set(self.db, fleet.enr, 'enr')
         seg = gmspy.list2set(self.db, fleet.seg, 'seg')
         reg = gmspy.list2set(self.db, fleet.reg, 'reg')
+        fleetreg = gmspy.list2set(self.db, fleet.fleetreg, 'fleetreg')
+        mat = gmspy.list2set(self.db, fleet.mat, 'mat')
         demeq =  gmspy.list2set(self.db, fleet.demeq, 'demeq')
         dstvar = gmspy.list2set(self.db, fleet.dstvar, 'dstvar')
         enreq = gmspy.list2set(self.db, fleet.enreq, 'enreq')
@@ -102,7 +106,7 @@ class GAMSRunner:
         optyear = gmspy.list2set(self.db, fleet.optyear, 'optyear')
 
         veh_oper_dist = gmspy.df2param(self.db, fleet.veh_oper_dist, ['year'], 'VEH_OPER_DIST')
-        veh_stck_tot = gmspy.df2param(self.db, fleet.veh_stck_tot, ['year', 'reg'], 'VEH_STCK_TOT')
+        veh_stck_tot = gmspy.df2param(self.db, fleet.veh_stck_tot, ['year', 'fleetreg'], 'VEH_STCK_TOT')
         veh_stck_int_seg = gmspy.df2param(self.db, fleet.veh_stck_int_seg, ['seg'], 'VEH_STCK_INT_SEG')
         bev_capac = gmspy.df2param(self.db, fleet.seg_batt_caps, ['seg'], 'BEV_CAPAC')
 
@@ -186,7 +190,8 @@ class GAMSRunner:
         return temp_output_df
 
     def update_fleet(self, fleet):
-        """ Update FleetModel instantiation.
+        """
+        Update FleetModel instantiation.
 
         Parameters
         ----------
@@ -196,7 +201,6 @@ class GAMSRunner:
         Returns
         -------
         None.
-
         """
 
         """ tec_add_gradient --> veh_add_grd """
@@ -222,7 +226,8 @@ class GAMSRunner:
         fleet.veh_lift_mor.index = fleet.veh_lift_mor.index.astype('str')
 
     def run_GAMS(self, fleet, run_tag, filename):
-        """ Load FleetModel data to GAMS and initiate model solve.
+        """
+        Load FleetModel data to GAMS and initiate model solve.
 
         Parameters
         ----------
@@ -237,7 +242,6 @@ class GAMSRunner:
         ------
         exceptions
             Print all GamsDatabaseDomainViolations, including relevant symbols
-
         """
 
         # Pass to GAMS all necessary sets and parameters
@@ -285,8 +289,7 @@ class GAMSRunner:
 
         def quality_check(age=12):
             # TODO: move out of class?
-            """" Test calculation for average lifetime vehicle (~12 years)"""
-
+            """ Test calculation for average lifetime vehicle (~12 years)"""
             fleet.veh_oper_cint_avg = fleet.veh_oper_cint.index.levels[4].astype(int)
             ind = fleet.veh_oper_cint.index
             fleet.veh_oper_cint.index.set_levels(ind.levels[4].astype(int),level=4,inplace=True) #set ages as int

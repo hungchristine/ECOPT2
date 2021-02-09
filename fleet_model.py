@@ -145,7 +145,7 @@ class FleetModel:
             try:
                 self._from_python(veh_stck_int_seg, tec_add_gradient, seg_batt_caps,
                                   B_term_prod, B_term_oper_EOL, r_term_factors, u_term_factors,
-                                  pkm_scenario, eur_batt_share, occupancy_rate, data_from_message)
+                                  pkm_scenario, eur_batt_share, occupancy_rate, recycle_rate, data_from_message)
 #                self.B_prod = B_term_prod # not currently used
 #                self.B_oper = B_term_oper_EOL # not currently used
             except AttributeError as err:
@@ -154,7 +154,7 @@ class FleetModel:
 
     def _from_python(self, veh_stck_int_seg, tec_add_gradient, seg_batt_caps,
                      B_term_prod, B_term_oper_EOL, r_term_factors, u_term_factors,
-                     pkm_scenario, eur_batt_share, occupancy_rate, data_from_message):
+                     pkm_scenario, eur_batt_share, occupancy_rate, recycle_rate, data_from_message):
         """
         Instantiate FleetModel object from scratch via Excel input files
 
@@ -203,6 +203,7 @@ class FleetModel:
         self.tec_add_gradient = tec_add_gradient
 
         if data_from_message is not None:
+            # Not currently implemented
             self.el_intensity = data_from_message # regional el-mix intensities as time series from MESSAGE
             self.trsp_dem = data_from_message # EUR transport demand as time series from MESSAGE
         """ boundary conditions for constraints, e.g., electricity market supply constraints, crit. material reserves? could possibly belong in experiment specifications as well..."""
@@ -216,9 +217,11 @@ class FleetModel:
         self.optyear = [str(2020+i) for i in range(61)]
         self.age = [str(i) for i in range(28)]                  # vehicle age, up to 27 years old
 #        self.age = [str(i) for i in range(11)]
+        self.new= ['0']
         self.enr = ['ELC', 'FOS']                                # fuel types; later include H2,
         self.seg = ['A', 'B', 'C', 'D', 'E', 'F']                    # From ACEA: Small, lower medium, upper medium, executive
         self.reg = ['LOW', 'II', 'MID', 'IV', 'HIGH', 'PROD']#['1', '2', '3', '4', '5', '6'] # study regions
+        self.fleetreg = ['LOW', 'II', 'MID', 'IV', 'HIGH']
         self.demeq = ['STCK_TOT', 'OPER_DIST', 'OCUP']             # definition of
         self.dstvar = ['mean', 'stdv']
         self.enreq = ['CINT']
@@ -349,6 +352,10 @@ class FleetModel:
 
         # Temporary introduction of seg-specific VEH_PARTAB from Excel; will later be read in from YAML
 #        self.veh_partab = pd.DataFrame(pd.read_excel(self.import_fp,sheet_name = 'genlogfunc',usecols='A:G',index_col=[0,1,2],skipfooter=6)).stack()
+        if type(r_term_factors) == float:
+            r_term_factors = {'BEV': r_term_factors, 'ICE': r_term_factors}
+        if type(u_term_factors) == float or type(u_term_factors) == int:
+            u_term_factors = {'BEV': u_term_factors, 'ICE': u_term_factors}
         self.veh_partab = self.build_veh_partab(B_term_prod, B_term_oper_EOL, r_term_factors, u_term_factors)#.stack()
         """" if modify_b_ice or modify_b_bev:
                 self.veh_partab.loc[:, 'ICE',:, 'B']=self.veh_partab.loc[:, 'ICE',:, 'A'].values*modify_b_ice
@@ -364,6 +371,7 @@ class FleetModel:
         # More detailed age distribution (https://www.acea.be/uploads/statistic_documents/ACEA_Report_Vehicles_in_use-Europe_2018.pdf)"""
 
         self.tec_add_gradient = tec_add_gradient or 0.2
+        self.recycle_rate = recycle_rate or 0.75
 
         self.growth_constraint = 0  #growth_constraint
         self.gro_cnstrnt = [self.growth_constraint for i in range(len(self.modelyear))]
@@ -377,6 +385,20 @@ class FleetModel:
         self.manuf_cnstrnt = self._process_df_to_series(self.manuf_cnstrnt)
 #        self.manuf_cnstrnt.index = self.manuf_cnstrnt.index.astype('str')
         self.manuf_cnstrnt = self.manuf_cnstrnt * self.eur_batt_share
+
+        self.mat_content = [[0.11, 0.05] for year in range(len(self.modelyear))]
+        self.mat_content = pd.DataFrame(self.mat_content, index=self.modelyear, columns=self.mat)
+        self.mat_content.index = self.mat_content.index.astype('str')
+
+        self.recovery_pct = [[recycle_rate]*len(self.mat) for year in range(len(self.modelyear))]
+        self.recovery_pct = pd.DataFrame(self.recovery_pct, index=self.modelyear, columns=self.mat)
+        self.recovery_pct.index = self.recovery_pct.index.astype('str')
+
+        self.virg_mat = pd.read_excel(self.import_fp, sheet_name='virg_mat', header=[0], usecols='A:C', index_col=[0], skiprows=[0])
+        self.virg_mat = self.virg_mat * 0.4
+        # self.virg_mat = [[5e8, 1e8] for year in range(len(self.modelyear))]
+        # self.virg_mat = pd.DataFrame(self.virg_mat, index=self.modelyear, columns=self.mat)
+        self.virg_mat.index = self.virg_mat.index.astype('str')
 
         self.enr_partab = pd.read_excel(self.import_fp, sheet_name='ENR_PARTAB', usecols='A:G', index_col=[0, 1, 2]) #enr,reg,X
 
@@ -645,6 +667,16 @@ class FleetModel:
         self.emissions.columns = ['Production', 'Operation', 'End-of-life']
         self.emissions = self.emissions.unstack(['tec', 'year']).sum().unstack([None, 'tec'])
 
+        self.recycled_batt = self._v_dict['RECYCLED_BATT']
+        self.mat_req_virg = self._p_dict['MAT_REQ_VIRG']
+        self.mat_req_virg = pd.concat([self.mat_req_virg], axis=1, keys=['primary'])
+        self.mat_recycled = self._p_dict['MAT_RECYCLED']
+        self.mat_recycled = pd.concat([self.mat_recycled], axis=1, keys=['recycled'])
+        self.mat_demand = self._p_dict['MAT_REQ_TOT']
+        self.mat_demand = pd.concat([self.mat_demand], axis=1, keys=['total'])
+        self.resources = pd.concat([self.mat_demand, self.mat_req_virg, self.mat_recycled], axis=1)
+
+        # Prepare model output dataframes for visualization
         self.stock_df = self._v_dict['VEH_STCK']
         self.stock_df = reorder_age_headers(self.stock_df)
         self.stock_add = self._v_dict['VEH_STCK_ADD']
@@ -1679,7 +1711,7 @@ def vis_GAMS(fleet, fp, filename, param_values, export_png, export_pdf=True, max
     try:
         fig, axes = plt.subplots(2, 3, sharex=True, sharey='row')
 
-        tmp = fleet.stock_add.sum(axis=1).unstack('seg').unstack('tec').loc['2020':].drop('PROD', level='reg') / 1e6
+        tmp = fleet.stock_add.sum(axis=1).unstack('seg').unstack('tec').loc['2020':] / 1e6
         tmp.index = sort_ind(tmp.index)
         tmp = tmp.groupby('reg', sort=False)
 
@@ -1773,7 +1805,7 @@ def vis_GAMS(fleet, fp, filename, param_values, export_png, export_pdf=True, max
     """--- Plot market share of BEVs by segment and region ---"""
     fig, axes = plt.subplots(2, 3, sharex=True, sharey='row')
     tmp = fleet.stock_add.div(fleet.stock_add.sum(level=['seg', 'tec', 'prodyear']))
-    tmp = tmp.drop('ICE', axis=0, level='tec').drop('PROD', axis=0, level='reg')
+    tmp = tmp.drop('ICE', axis=0, level='tec')#.drop('PROD', axis=0, level='reg')
     # tmp = (fleet.add_share.div(fleet.add_share.sum(axis=1,level='seg'), axis=1, level='seg')).drop('ICE', axis=1, level='tec')
     # tmp = fleet.add_share.div(fleet.add_share.sum(axis=1, level='seg'), axis=1, level='seg')
     tmp.index = sort_ind(tmp.index)
@@ -1869,6 +1901,41 @@ def vis_GAMS(fleet, fp, filename, param_values, export_png, export_pdf=True, max
     export_fig('LC_emissions_vs_stock')
 #        pp.savefig(bbox_inches='tight')
 
+    """--- Plot total resource use ---"""
+    for resource in fleet.resources.columns.get_level_values(1).unique():
+        fig = plt.figure(figsize=(14,9))
+
+        gs = matplotlib.gridspec.GridSpec(2, 1, height_ratios=[1,3], hspace=0.05)
+        ax2 = fig.add_subplot(gs[0])
+        ax1 = fig.add_subplot(gs[1], sharex=ax2)
+        plot_df = pd.concat([fleet.resources['primary', resource], fleet.resources['recycled', resource]], axis=1)
+        plot_df[plot_df < 0] = 0  # replace with fleet.resources[total required]
+        (plot_df/1e6).plot(ax=ax1, kind='area', lw=0, cmap='jet')
+        (fleet.stock_df_plot.sum(axis=1).unstack('seg').sum(axis=1).unstack('tec').sum(level='year')/1e6).plot(ax=ax2, kind='area', cmap=tec_cm, lw=0)
+
+        ax1.set_ylabel(f'{resource} use \n Mt {resource}', fontsize=13)
+        ax2.set_ylabel('Vehicles, millions', fontsize=13, labelpad=25)
+        if cropx:
+            ax1.set_xlim(right=max_year)
+            ax2.set_xlim(right=max_year)
+    #        patches, labels = ax1.get_legend_handles_labels()
+    #        order = [5, 3, 1, 4, 2, 0]
+    #        ax1.legend([patches[idx] for idx in order],[labels[idx] for idx in order], loc=1, fontsize=12)
+        handles, labels = ax1.get_legend_handles_labels()
+        # labels = [x+', '+y for x,y in itertools.product(['Production', 'Operation', 'End-of-life'], ['ICEV', 'BEV'])]
+        # ax1.legend(handles, labels, loc=1, fontsize=14)
+        handles, labels = ax2.get_legend_handles_labels()
+        ax2.legend(handles, ['BEV', 'ICEV'], loc=4, fontsize=14, framealpha=1)
+
+        ax1.set_xbound(0, 50)
+        ax2.set_xbound(0, 50)
+
+        plt.setp(ax2.get_yticklabels(), fontsize=14)
+        plt.xlabel('year', fontsize=14)
+        plt.xticks(fontsize=14)
+        plt.yticks(fontsize=14)
+
+
     """--- Plot operation emissions by tec ---"""
 
     ax = (fleet.emissions.loc[:, 'Operation'] / 1e6).plot(kind='area', cmap=LinearSegmentedColormap.from_list('temp', colors=['silver', 'grey']), lw=0)
@@ -1893,9 +1960,8 @@ def vis_GAMS(fleet, fp, filename, param_values, export_png, export_pdf=True, max
 
     """--- Plot total stocks by region ---"""
     # TODO: set to categorical index for legend
-    tmp = fleet.stock_df_plot.sum(axis=1).unstack('reg').drop('PROD', axis=1).sum(axis=0, level=['year'])
+    tmp = fleet.stock_df_plot.sum(axis=1).unstack('fleetreg').sum(axis=0, level=['year'])
     tmp.columns = sort_ind(tmp.columns)
-    print(tmp.columns.dtype)
     ax = tmp.plot(kind='area', cmap='jet', lw=0, title='Total stocks by region')
     ax.set_xbound(0, 80)
     fix_age_legend(ax, 'Region')
@@ -1908,10 +1974,10 @@ def vis_GAMS(fleet, fp, filename, param_values, export_png, export_pdf=True, max
     """--- Plot total stocks by age, segment and technology ---"""
 
 #        ax = fleet.stock_df_plot.sum(axis=1).unstack('seg').unstack('tec').unstack('reg').plot(kind='area',cmap=paired,title='Total stocks by segment, technology and region')
-    stock_tec_seg_reg = fleet.stock_df_plot.sum(axis=1).unstack('seg').unstack('tec').unstack('reg').drop('PROD', level='reg', axis=1)
+    stock_tec_seg_reg = fleet.stock_df_plot.sum(axis=1).unstack('seg').unstack('tec').unstack('fleetreg')
     stock_tec_seg_reg = stock_tec_seg_reg.stack(['seg', 'tec'])
     stock_tec_seg_reg.columns = sort_ind(stock_tec_seg_reg.columns)
-    stock_tec_seg_reg = stock_tec_seg_reg.unstack(['seg','tec']).reorder_levels(['seg','tec','reg'], axis=1).sort_index(axis=1, level=['seg','tec'])
+    stock_tec_seg_reg = stock_tec_seg_reg.unstack(['seg','tec']).reorder_levels(['seg','tec','fleetreg'], axis=1).sort_index(axis=1, level=['seg','tec'])
     ax = stock_tec_seg_reg.plot(kind='area', cmap='jet', lw=0, title='Total stocks by segment, technology and region')
     ax.set_xbound(0, 80)
 
@@ -1977,7 +2043,7 @@ def vis_GAMS(fleet, fp, filename, param_values, export_png, export_pdf=True, max
 
     """--- Plot addition to stocks by segment, technology and region ---"""
     fig, ax = plt.subplots(1, 1)
-    plot_stock_add = fleet.stock_add.sum(level=['tec', 'reg', 'prodyear']).unstack(['tec', 'reg']).droplevel(axis=1, level=0).drop(columns='PROD', level=1)
+    plot_stock_add = fleet.stock_add.sum(level=['tec', 'reg', 'prodyear']).unstack(['tec', 'reg']).droplevel(axis=1, level=0)
     plot_stock_add = plot_stock_add.stack('tec')
     plot_stock_add.columns = sort_ind(plot_stock_add.columns)
     plot_stock_add = plot_stock_add.unstack('tec').swaplevel('tec', 'reg', axis=1).sort_index(axis=1, level='tec')
@@ -1992,7 +2058,7 @@ def vis_GAMS(fleet, fp, filename, param_values, export_png, export_pdf=True, max
 
     """--- Plot total stocks by segment, technology and region ---"""
     fig, ax = plt.subplots(1, 1)
-    plot_stock = fleet.veh_stck.sum(axis=1).unstack(['tec', 'reg']).sum(level=['year']).drop(columns='PROD', level=1)
+    plot_stock = fleet.veh_stck.sum(axis=1).unstack(['tec', 'fleetreg']).sum(level=['year'])
 
     plot_stock = plot_stock.stack('tec')  # remove MultiIndex to set Categorical type for regions
     plot_stock.columns = sort_ind(plot_stock.columns)
@@ -2157,7 +2223,7 @@ def vis_GAMS(fleet, fp, filename, param_values, export_png, export_pdf=True, max
     fig, axes = plt.subplots(3, 2, figsize=(9,9), sharex=True, sharey=True)
     title = 'initial stock of each cohort'
     tmp = (fleet.stock_add.unstack('tec').droplevel('age', axis=1) / 1e6)
-    tmp.drop('PROD', level='reg', axis=0, inplace=True)
+    # tmp.drop('PROD', level='reg', axis=0, inplace=True)
     tmp = tmp.unstack('reg')
     tmp.columns = sort_ind(tmp.columns)
 
@@ -2173,7 +2239,7 @@ def vis_GAMS(fleet, fp, filename, param_values, export_png, export_pdf=True, max
     fig, axes = plt.subplots(3, 2, figsize=(9,9), sharex=True, sharey=True)
     fig.text(0.04, 0.5, 'Vehicle operating emissions intensity, by region and segment \n (kg CO2-eq/km)', ha='center', va='center', rotation='vertical')
     title = 'VEH_OPER_CINT for BEVs, by region and segment'
-    veh_op_cint_plot = fleet.veh_oper_cint.drop(labels='PROD', axis=0, level='reg').droplevel(['prodyear', 'enr']).drop_duplicates().unstack(['reg']).loc(axis=0)['BEV']
+    veh_op_cint_plot = fleet.veh_oper_cint.droplevel(['prodyear', 'enr']).drop_duplicates().unstack(['reg']).loc(axis=0)['BEV']
     veh_op_cint_plot = (veh_op_cint_plot.swaplevel(-2, -1, axis=0) * 1000).unstack('age')
 
     k_r_cmap = ListedColormap(['k' for i in np.arange(0, (len(veh_op_cint_plot.columns) / 2))] +
