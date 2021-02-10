@@ -3,6 +3,12 @@
 Created on Fri May 29 11:54:01 2020
 
 @author: chrishun
+
+This script calculates the electricity pathways for European countries and
+determines the region clusters using the carbon intensity....
+
+Plots region cluster footprints
+Exports cluster footprint pathways for use in fleet model
 """
 
 
@@ -100,7 +106,7 @@ for index, country_row in country_shapes[country_shapes['ISO_A2'] == '-99'].iter
     if country in list(country_dict.keys()):
         country_shapes.at[index, 'ISO_A2'] = country_dict[country]
 
-europe_ind = country_shapes[country_shapes.iloc(axis=1)[:-1].isin(message_countries)].dropna(axis=0, how='all').index.tolist()
+# europe_ind = country_shapes[country_shapes.iloc(axis=1)[:-1].isin(message_countries)].dropna(axis=0, how='all').index.tolist()
 
 europe_shapes = country_shapes.cx[-19:34, 32:75]  # filter to only the countries within the bounds of our map figures; NB: this excludes Greenland, Iceland, Canary Islands
 
@@ -780,7 +786,7 @@ lvl = entso_shares.index.names[1:]
 for ind_lvl in lvl:
     tmp[ind_lvl] = tmp[ind_lvl].str.replace('w/o CCS','w/ CCS')
 tmp.set_index(['reg','technology','MESSAGE tec'], inplace=True)
-entso_shares = entso_shares.append(tmp).iloc(axis=1)[0]
+entso_shares = entso_shares.append(tmp.iloc(axis=1)[0])  #entso_shares = entso_shares.append(tmp).iloc(axis=1)[0]
 
 #entso_shares.replace(1, np.nan, inplace=True)
 
@@ -1233,6 +1239,12 @@ for i in np.arange(num_clusters):
 # europe_shapes['Cluster'].replace({1: 'LOW', 2: 'MID-LOW', 3: 'MID-HIGH', 4:'HIGH'}, inplace=True)
 europe_shapes['Cluster'].replace({1: 'LOW', 2: 'II', 3: 'MID', 4: 'IV', 5: 'HIGH'}, inplace=True)
 
+cat_type = pd.CategoricalDtype(categories=["LOW", "II", "MID", "IV", "HIGH"], ordered=True)
+
+cluster_mappings = europe_shapes.loc(axis=1)['Cluster', 'ISO_A2', 'ADMIN'].copy()
+cluster_mappings['Cluster'] = cluster_mappings['Cluster'].astype(cat_type)
+cluster_mappings.dropna(axis=0, how='any', inplace=True)
+cluster_mappings.sort_values(['Cluster']).to_csv('cluster_mappings.csv')
 
 #%%
 
