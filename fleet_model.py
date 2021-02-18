@@ -431,7 +431,7 @@ class FleetModel:
         self.enr_cint = self.enr_cint.swaplevel(0, 1) # enr, reg, year
 
         # --------------- Expected GAMS Outputs ------------------------------
-        self.totc = 0
+        self.totc = None
         self.BEV_fraction = pd.DataFrame()
         self.ICEV_fraction = pd.DataFrame()
         self.BEV_ADD_blaaaah = pd.DataFrame()
@@ -802,15 +802,16 @@ class FleetModel:
         self.temp_prod_df['B'] = self.temp_a['a'] * self.temp_a[0]
         self.temp_prod_df.dropna(how='any', axis=0, inplace=True)
 
+        reform = {(firstKey, secondKey): values for firstKey, secondDict in B_term_oper_EOL.items() for secondKey, values in secondDict.items()}
+        mi = pd.MultiIndex.from_tuples(reform.keys())
+        self.b_oper = pd.DataFrame(reform.values(), index=mi, columns=['b'])
+
         # Apply B-multiplication factors for operation and EOL A-factors
         self.temp_oper_df = self.A_terms_raw.join(self.b_oper, on=['veheq', 'tec'], how='left')
         self.temp_oper_df['B'] = self.temp_oper_df['a'] * self.temp_oper_df['b']
         self.temp_oper_df.dropna(how='any', axis=0, inplace=True)
         self.temp_oper_df.drop(columns=['a', 'b'], inplace=True)
 
-        reform = {(firstKey, secondKey): values for firstKey, secondDict in B_term_oper_EOL.items() for secondKey, values in secondDict.items()}
-        mi = pd.MultiIndex.from_tuples(reform.keys())
-        self.b_oper = pd.DataFrame(reform.values(), index=mi, columns=['b'])
 
         # Aggregate component A values for VEH_PARTAB parameter
         self.A = self.A_terms_raw.sum(axis=1)
