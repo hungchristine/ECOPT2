@@ -22,6 +22,7 @@ from matplotlib.ticker import (MultipleLocator, FormatStrFormatter, AutoMinorLoc
 from matplotlib.backends.backend_pdf import PdfPages
 
 import pickle
+import gzip
 import os
 import traceback
 
@@ -178,12 +179,14 @@ def run_experiment():
 
         """fm.run_GAMS(run_tag)"""
         try:
-            gams_run.run_GAMS(fm, run_tag, yaml_name)  # run the GAMS model
+            gams_run.run_GAMS(fm, run_tag, yaml_name, now)  # run the GAMS model
         except Exception:
-            print("failed run, deleting folder")
+            log.warning("Failed run")
             traceback.print_exc()
             os.chdir('..')
-            os.rmdir(fp)
+            if not os.listdir(fp):  # check folder is empty before deleting
+                log.warning(f'Deleting folder {fp}')
+                os.rmdir(fp)
             # Force quit if single run has failed
             if count == 1:
                 sys.exit()
@@ -199,7 +202,8 @@ def run_experiment():
         # Pickle the scenario fleet object
 #        os.chdir(fp)
 
-        with open('run_' + run_tag + '.pkl', 'wb') as f:
+        # with open('run_' + run_tag + '.pkl', 'wb') as f:
+        with gzip.GzipFile('run_' + run_tag + '.pkl', 'w') as f:
             pickle.dump(fm, f)
 
         # Save log info
@@ -218,7 +222,7 @@ def run_experiment():
             'output': {
 #                'totc': 42,   # life, the universe, and everything…
 #                 'first year of 100% BEV market share': fm.full_BEV_year
-                 'totc': fm.totc,
+                 'totc_opt': fm.totc_opt,
 #                 'BEV shares in 2030': fm.shares_2030.loc[:,'BEV'].to_string(),
 #                 'totc in optimization period':fm.totc_opt # collect these from all runs into a dataframe...ditto with shares of BEV/ICE
             }
@@ -231,10 +235,10 @@ def run_experiment():
             fm.figure_calculations()  # run extra calculations for cross-experiment figures
             fleet_model.vis_GAMS(fm, fp, run_id, info[run_tag]['params'], export_png=False)
         except Exception:
-            print("failed visualization, deleting folder")
+            log.warning("Failed visualization, deleting folder")
             traceback.print_exc()
             os.chdir('..')
-            if os.path.exists(fp):
+            if (os.path.exists(fp)) and (not os.listdir(fp)):
                 os.rmdir(fp)
 
         # Save pertinent info to compare across scenarios in dataframe

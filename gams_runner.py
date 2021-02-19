@@ -67,11 +67,25 @@ class GAMSRunner:
         self.opt.trace = os.path.join(os.path.curdir, 'trace.txt')
         # gams.execution.SymbolUpdateType = 1
 
-    def _load_input_to_gams(self, fleet, filename): # will become unnecessary as we start calculating/defining sets and/or parameters within the class
-        """ Create input gdx file for GAMS experiment
+    def _load_input_to_gams(self, fleet, filename, timestamp): # will become unnecessary as we start calculating/defining sets and/or parameters within the class
+        """
+        Create input gdx file for GAMS experiment
 
         Add database to workspace, update FleetModel, then load database with
         experiment parameters
+
+        Parameters
+        ----------
+        fleet : FleetModel object
+                FleetModel containing run input.
+        filename : str
+            YAML filename with scenario definition.
+        timestamp : str
+            Runtime ID for filenames.
+
+         Returns
+        -------
+        None.
         """
         # Clear database for new run
 #        self.db.clear() # need to add functionality to gmspy --> check if Symbol exists in database, write over
@@ -86,6 +100,8 @@ class GAMSRunner:
 
         years = gmspy.list2set(self.db, fleet.cohort,'year')
         modelyear = gmspy.list2set(self.db, fleet.modelyear,'modelyear')
+        optyear = gmspy.list2set(self.db, fleet.optyear, 'optyear')
+        inityear = gmspy.list2set(self.db, fleet.inityear, 'inityear')
         tecs = gmspy.list2set(self.db, fleet.tecs, 'tec')
         #cohort = gmspy.list2set(self.db, self.cohort, 'prodyear') ## prodyear is an alias of year, not a set of its own
         age = gmspy.list2set(self.db, fleet.age, 'age')
@@ -99,11 +115,10 @@ class GAMSRunner:
         dstvar = gmspy.list2set(self.db, fleet.dstvar, 'dstvar')
         enreq = gmspy.list2set(self.db, fleet.enreq, 'enreq')
         grdeq = gmspy.list2set(self.db, fleet.grdeq, 'grdeq')
-        inityear = gmspy.list2set(self.db, fleet.inityear, 'inityear')
         lfteq = gmspy.list2set(self.db, fleet.lfteq, 'lfteq')
         sigvar = gmspy.list2set(self.db, fleet.sigvar, 'sigvar')
         veheq = gmspy.list2set(self.db, fleet.veheq, 'veheq')
-        optyear = gmspy.list2set(self.db, fleet.optyear, 'optyear')
+
 
         veh_oper_dist = gmspy.df2param(self.db, fleet.veh_oper_dist, ['year'], 'VEH_OPER_DIST')
         veh_stck_tot = gmspy.df2param(self.db, fleet.veh_stck_tot, ['year', 'fleetreg'], 'VEH_STCK_TOT')
@@ -150,9 +165,14 @@ class GAMSRunner:
         # el_cint = gmspy.df2param(self.db, fleet.enr_cint, ['reg','enr','year'], 'ENR_CINT')
 
         print('\n exporting database...' + filename + '_input')
-        self.db.suppress_auto_domain_checking = 1
         #TODO: remove export, redundant with first line of this method??
-        self.db.export(os.path.join(self.current_path, filename + '_input'))
+        try:
+            self.db.export(os.path.join(self.current_path, filename + '_'+timestamp))
+        except Exception as e:
+            print(e)
+            self.db.suppress_auto_domain_checking = 1
+            self.db.export(os.path.join(self.current_path, filename + '_FAILED_'+timestamp))
+
 
     def get_output_from_GAMS(self, gams_db, output_var):
         """ Retrieve symbol values from gams_db.
@@ -225,7 +245,7 @@ class GAMSRunner:
         fleet.veh_lift_mor = pd.Series(fleet_model.calc_probability_of_vehicle_retirement(fleet.age_int, fleet.veh_lift_pdf),  index=fleet.age)
         fleet.veh_lift_mor.index = fleet.veh_lift_mor.index.astype('str')
 
-    def run_GAMS(self, fleet, run_tag, filename):
+    def run_GAMS(self, fleet, run_tag, filename, timestamp):
         """
         Load FleetModel data to GAMS and initiate model solve.
 
@@ -237,6 +257,8 @@ class GAMSRunner:
                 Unique experiment run name.
         filename : str
                 YAML filename with scenario definition.
+        timestamp: str
+                Runtime ID for filenames.
 
         Raises
         ------
@@ -245,7 +267,7 @@ class GAMSRunner:
         """
 
         # Pass to GAMS all necessary sets and parameters
-        self._load_input_to_gams(fleet, filename)
+        self._load_input_to_gams(fleet, filename, timestamp)
 
         # Run GAMS Optimization
 
@@ -258,14 +280,36 @@ class GAMSRunner:
     mi.solve() """
         try:
             model_run = self.ws.add_job_from_file(fleet.gms_file) # model_run is type GamsJob
+            cp = self.ws.add_checkpoint()
 
             opt = self.ws.add_options()
             opt.defines["gdxincname"] = self.db.name
             print('\n' + f'Using input gdx file: {self.db.name}')
             print('running GAMS model, please wait...')
-            model_run.run(opt, databases=self.db)  # ,create_out_db = True)
-            print('\n Ran GAMS model: ' + fleet.gms_file)
-
+            model_run.run(gams_options=opt, databases=self.db, checkpoint=cp)  # ,create_out_db = True)
+            stat = gams.execution.GamsModelInstance(cp).get_model_status()
+            model_stat_dict = {1: 'Optimal',
+                               2: 'Locally Optimal',
+                               3 : 'Unbounded',
+                               4 : 'Infeasible',
+                               5 : 'Locally Infeasible',
+                               6 : 'Intermediate Infeasible',
+                               7 : 'Intermediate Nonoptimal',
+                               8 : 'Integer Solution',
+                               9 : 'Intermediate Non-Integer',
+                               10 : 'Integer Infeasible',
+                               11 : 'Licensing Problems - No Solution',
+                               12 : 'Error Unknown',
+                               13 : 'Error No Solution',
+                               14 : 'No Solution Returned',
+                               15 : 'Solved Unique',
+                               16 : 'Solved',
+                               17 : 'Solved Singular',
+                               18 : 'Unbounded - No Solution',
+                               19 : 'Infeasible - No Solution'
+                               }
+            print('\n \n \n \n \n Ran GAMS model: ' + fleet.gms_file)
+            print(f'Solve status: {stat}, {model_stat_dict[stat]}'+ '\n \n \n')
             gams_db = model_run.out_db
             self.export_model = os.path.join(self.export_fp, run_tag + '_solution.gdx')
             gams_db.export(self.export_model)
