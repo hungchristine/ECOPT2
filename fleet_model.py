@@ -81,8 +81,21 @@ class FleetModel:
         elmix()
     """
 
-    def __init__(self, veh_stck_int_seg=None, tec_add_gradient=None, seg_batt_caps=None, B_term_prod=None, B_term_oper_EOL=None, r_term_factors=0.2,
-                 u_term_factors=2025, pkm_scenario='iTEM2-Base', eur_batt_share=0.5, occupancy_rate=1.643, recycle_rate=0.6, data_from_message=None, gdx_file=None):
+    def __init__(self,
+                 veh_stck_int_seg=None,
+                 tec_add_gradient=None,
+                 seg_batt_caps=None,
+                 B_term_prod=None,
+                 B_term_oper_EOL=None,
+                 r_term_factors=0.2,
+                 u_term_factors=2025,
+                 pkm_scenario='iTEM2-Base',
+                 eur_batt_share=0.5,
+                 occupancy_rate=1.643,
+                 recycle_rate=0.6,
+                 data_from_message=None,
+                 gdx_file=None
+                 ):
         """
         Initialize with experiment values.
 
@@ -210,18 +223,12 @@ class FleetModel:
 
         """ GAMS-relevant attributes"""
         #  --------------- GAMS sets / domains -------------------------------
-        self.tecs = ['ICE', 'BEV']                               # drivetrain technologies; can include e.g., alternative battery chemistries
-        self.modelyear = [str((2000)+i) for i in range(81)]
-        self.inityear = [str(2000+i) for i in range(21)]          # reduce to one/five year(s)? Originally 2000-2020
-        self.cohort = [str((2000-28)+i) for i in range(81+28)]  # vehicle cohorts (production year)
-        self.optyear = [str(2020+i) for i in range(61)]
-        self.age = [str(i) for i in range(28)]                  # vehicle age, up to 27 years old
-#        self.age = [str(i) for i in range(11)]
-        self.new= ['0']
-        self.enr = ['ELC', 'FOS']                                # fuel types; later include H2,
-        self.seg = ['A', 'B', 'C', 'D', 'E', 'F']                    # From ACEA: Small, lower medium, upper medium, executive
-        self.reg = ['LOW', 'II', 'MID', 'IV', 'HIGH', 'PROD']#['1', '2', '3', '4', '5', '6'] # study regions
-        self.fleetreg = ['LOW', 'II', 'MID', 'IV', 'HIGH']
+        # sets to read from Excel
+        self.set_list = ['tecs', 'enr', 'seg', 'mat', 'reg', 'fleetreg',
+                          'modelyear', 'inityear', 'cohort', 'optyear', 'age']
+
+        self.sets_from_excel(r"C:\Users\chrishun\Box Sync\YSSP_temp\Data\load_data\sets.xlsx")
+
         self.demeq = ['STCK_TOT', 'OPER_DIST', 'OCUP']             # definition of
         self.dstvar = ['mean', 'stdv']
         self.enreq = ['CINT']
@@ -229,7 +236,7 @@ class FleetModel:
         self.veheq = ['PROD_EINT', 'PROD_CINT_CSNT', 'OPER_EINT', 'EOLT_CINT']
         self.lfteq = ['LFT_DISTR', 'AGE_DISTR']
         self.sigvar = ['A', 'B', 'r', 'u']                         # S-curve terms
-        self.mat = ['Li', 'Co'] #['Cu', 'Li', 'Co', 'Pt', '', '']           # critical elements to count for; to incorporate later
+
         self.age_int = list(map(int,self.age))
 
         # --------------- GAMS Parameters -------------------------------------
@@ -524,6 +531,41 @@ class FleetModel:
         df.index.names = [''] * dims
         df = pd.Series(df.iloc[:, 0])
         return df
+
+    def sets_from_excel(self, fp, sheet=0):
+        """
+        Assign GAMS set values from Excel file.
+
+        Checks that all mandatory sets are present and sets values from
+        Excel file. Raises Exception for missing sets.
+
+        Parameters
+        ----------
+        fp : str
+            Filepath to Excel file.
+        sheet : str or int, optional
+            Sheet name or position in Excel file containing set values.
+            The default is 0 (first sheet).
+
+        Returns
+        -------
+        None.
+
+        """
+        all_sets = pd.read_excel(fp, sheet, dtype='str')
+        all_sets.columns = all_sets.columns.str.lower()
+
+        # Check all mandatory sets are present
+        err = []
+        for s in self.set_list:
+            if s not in all_sets.columns:
+                err.append(s)
+        if len(err):
+            raise(f'Set(s) {err} not found in Excel file')
+
+        sets_dict = {}
+        for ind in all_sets.columns:
+            setattr(self, ind, all_sets[ind].dropna().to_list())
 
 
     def read_gams_db(self, gams_db):
