@@ -785,6 +785,7 @@ class FleetModel:
         self.prod_df = self.prod_df.stack()
         self.prod_df.index.names = ['veheq', 'tec', 'comp', 'seg']
         self.prod_df.index = self.prod_df.index.swaplevel(i=-2, j=-1)
+        self.prod_df.drop('battery weight', axis=0, inplace=True)  # remove (currently) unnecessary data
 
         # self.oper_df =
         # body_weight = [923,np.average(923,1247),1247,1407,average(1407,1547),1547]
