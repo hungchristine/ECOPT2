@@ -48,7 +48,8 @@ enr             energy carrier
 reg             region or country group
 fleetreg(reg)     model regions of BEV operation
 seg             segment or size class
-mat             critical material
+mat_prod        producers or sources for all critical materials /Li1, Li2, Co1, Co2/
+mat_cats        critical material categories /Li, Co/
 sigvar          variables for sigmoid equations
 dstvar          variables for statistical distributions
 enreq           equations for energy (electricity and fuels) system
@@ -56,9 +57,12 @@ veheq           equations for vehicle parameters
 demeq           equations for demand parameters
 lfteq           equations for fleet lifetime parameters
 grdeq           parameters for gradient of change (fleet additions) - individual (IND) for each tech or related to all tech (ALL)
+mat(mat_cats,mat_prod)      critical material
+    /
+    Li.(Li1,Li2)
+    Co.(Co1,Co2)
+    /
 ;
-
-
 SINGLETON SETS
 new(age)    
 ;
@@ -118,7 +122,7 @@ $offtext
 
 *$gdxin C:\Users\chrishun\Box Sync\YSSP_temp\Cleanup April 2020\run_def_baseline_def_def_def_def_aggr_iTEM2-Base2019-10-23T07_40_input.gdx
 
-* This .gdx for running via Python
+* This .gdx for running via Python-defined sets
 $gdxin C:\Users\chrishun\Box Sync\YSSP_temp\pyGAMS_input.gdx
 
 * This .gdx is for troubleshooting
@@ -134,7 +138,9 @@ $LOAD enr
 $LOAD reg
 $LOAD fleetreg
 $LOAD seg
-$LOAD mat
+*$LOAD mat_cats
+*$LOAD mat_prod
+*$LOAD mat
 
 $LOAD sigvar
 $LOAD dstvar
@@ -145,6 +151,7 @@ $LOAD lfteq
 $LOAD grdeq
 
 $GDXIN
+
 
 * alias call for prodyear = production year is identical set to year
 * change prodyear to cohort later
@@ -247,17 +254,18 @@ VEH_ADD_GRD(grdeq,tec)           Parameter for gradient of change constraint (fl
 *VEH_SEG_SHR(seg)                 Parameter for segment share minimums in fleet
 GRO_CNSTRNT(year)                Segment growth rate constraint relative to stock additions
 MANUF_CNSTRNT(year)              Annual manufacturing capacity (for batteries destined for Europe) [MWh]
-MAT_CONTENT(year,mat)                 Critical material content per kWh by production year [kg kWh^-1]
-RECOVERY_PCT(year,mat)            Recovery of critical materials from battery recycling processes, in wt%
-VIRG_MAT(year,mat)             Virgin critical material resources available in a given year [kg yr^-1]
+MAT_CONTENT(year,mat_cats)                 Critical material content per kWh by production year [kg kWh^-1]
+RECOVERY_PCT(year,mat_cats)            Recovery of critical materials from battery recycling processes in wt%
+VIRG_MAT_SUPPLY(year,mat_prod)             Virgin critical material resources available in a given year [kg yr^-1]
+MAT_CINT(year,mat_prod)       Carbon intensity of each material by source [kg CO2e kg mat]
 
 ** POST-PROCESSING --------
 TOT_BEVS(year)                                Total number of BEVs in Europe
 TOT_BATT_MANUF(year)                               Total battery capacity required by year [MWh]
 TOT_BATT_RECYCLED(year)                            Total battery capacity retired each year [kWh]
-MAT_REQ_TOT(year, mat)                                  Total resources required by year [kg]
-MAT_RECYCLED(year, mat)                                  Total critical materials recycled per year [kg]
-MAT_REQ_VIRG(year, mat)                               Total critical material from virgin resources required [kg]
+MAT_REQ_TOT(year, mat_cats)                                  Total resources required by year [kg]
+MAT_RECYCLED(year, mat_cats)                                  Total critical materials recycled per year [kg]
+MAT_REQ_VIRG(year, mat_cats)                               Total critical material from virgin resources required [kg]
 VEH_STCK_TOT_CHECK(modelyear)
 *POS_STOCK(tec,seg,reg,modelyear,agej)
 VEH_STCK_CHRT(tec,seg,fleetreg,prodyear,age,modelyear)       Total stock by technology segment region and cohort
@@ -299,7 +307,7 @@ VEH_STCK_GRD(tec,seg,fleetreg,optyear)
 *$gdxin C:\Users\chrishun\Box Sync\YSSP_temp\run_slow_baseline_def_def_def_def_iTEM2_Base2019-09-24T12_50_input.gdx
 *$gdxin C:\Users\chrishun\Box Sync\YSSP_temp\GAMS_input.gdx
 
-* Default input .gdx output from Python
+* Default input .gdx built in Python
 $gdxin C:\Users\chrishun\Box Sync\YSSP_temp\pyGAMS_input.gdx 
 
 * Sample input GDX as trial for introducing the region set
@@ -342,7 +350,7 @@ $LOAD MANUF_CNSTRNT
 
 $LOAD MAT_CONTENT
 $LOAD RECOVERY_PCT
-$LOAD VIRG_MAT
+*$LOAD VIRG_MAT_SUPPLY
 
 $OFFMULTI
 $GDXIN
@@ -362,8 +370,16 @@ $GDXIN
 *ELC .LOW  .CINT     .5      0.1     0.2     2030
 *
 
+* temporary definition for testing
+VIRG_MAT_SUPPLY(year, 'Li1') = 4e6;
+VIRG_MAT_SUPPLY(year, 'Li2') = 8.5e6;
+VIRG_MAT_SUPPLY(year, 'Co1') = 20e6;
+VIRG_MAT_SUPPLY(year, 'Co2') = 9e6;
 
-
+MAT_CINT(year, 'Li1')=0.00005;
+MAT_CINT(year, 'Li2')=0.00008;
+MAT_CINT(year, 'Co1')=0.001;
+MAT_CINT(year, 'Co2')=0.0015;
 *
 *PARAMETER VEH_STCK_TOT(year, reg)
 */
@@ -723,7 +739,7 @@ $offtext
 FREE VARIABLES
 TOTC                                        Total CO2 emissions for the whole system over the whole period
 TOTC_OPT                                    Total CO2 emissions for the whole system over optimization period
-VEH_STCK_DELTA(year,fleetreg)                    Net change in stock from one year to the next
+VEH_STCK_DELTA(year,fleetreg)               Net change in stock from one year to the next
 *slack_VEH_ADD(seg,year,age)                Slack variable for additions to stock
 ;
 
@@ -738,8 +754,12 @@ VEH_PROD_TOTC(tec,seg,fleetreg,year)             Total CO2 emissions from produc
 VEH_OPER_TOTC(tec,seg,fleetreg,year)             Total CO2 emissions from operations of vehicles per year            [t CO2-eq]
 VEH_EOLT_TOTC(tec,seg,fleetreg,year)             Total CO2 emissions from vehicle end of life treatment per year     [t CO2-eq]
 
-RECYCLED_BATT(year,fleetreg, age)             Total battery capacity sent to recycling per year                   [kWh]
+RECYCLED_BATT(year,fleetreg, age)           Total battery capacity sent to recycling per year                   [kWh]
+RECYCLED_MAT(modelyear, mat_cats)           Materials recovered from recycled batteries
 *TOTAL_NEW_CAP(year)                     Total battery capacity added to fleet                               [MWh]
+MAT_REQ(modelyear,mat_cats)
+MAT_MIX(year, mat_prod)                     Production mixes for virgin materials                           [kg]
+MAT_CO2(year, mat_prod)                     Total CO2 emissions from virgin material production per year    [t CO2e kg^-1]
 ;
 
 *-----------------------------------------------------------------------------------
@@ -793,6 +813,9 @@ EQ_SEG_GRD
 * Manufacturing capacity constraint
 EQ_NEW_BATT_CAP
 EQ_RECYCLED_BATT
+EQ_RECYCLED_MAT
+EQ_VIRG_MAT_SUPPLY
+EQ_MAT_SUPPLY
 *$ontext
 * Raw critical materials availability constraint
 EQ_MAT_REQ
@@ -810,6 +833,8 @@ EQ_TOTC_OPT
 EQ_VEH_TOTC
 *producton emissions
 EQ_VEH_PROD_TOTC
+* virgin material production emissions
+EQ_MAT_TOTC
 *operation emissions
 EQ_VEH_OPER_TOTC
 *eolt emissions
@@ -924,19 +949,34 @@ EQ_NEW_BATT_CAP(modelyear)..                            MANUF_CNSTRNT(modelyear)
 *EQ_NEW_BATT_CAP(optyear)..                              MANUF_CNSTRNT(optyear)*1000 - RECYCLED_BATT(optyear,reg,age)*RECOVERY_PCT(optyear) =g= sum((seg, reg),VEH_STCK_ADD('BEV',seg,reg,optyear,'0')*BEV_CAPAC(seg))/1000;
 *EQ_NEW_BATT_CAP(optyear)..                              MANUF_CNSTRNT(optyear)*1000 =g= sum((seg, reg),VEH_STCK_ADD('BEV',seg,reg,optyear,'0')*BEV_CAPAC(seg))/1000;
 
-*------ Lithium/elemental resource availability constraint;
+*------ Lithium/elemental resource availability constraints;
+
 * Calculate amount of batteries retired each year in kWh
-EQ_RECYCLED_BATT(modelyear,fleetreg, age)..                  RECYCLED_BATT(modelyear,fleetreg, age) =e= sum((seg), VEH_STCK_REM('BEV',seg,fleetreg,modelyear, age)* BEV_CAPAC(seg));
-EQ_MAT_REQ(modelyear, mat)..                                VIRG_MAT(modelyear, mat) + sum((prodyear,age), sum((fleetreg), RECYCLED_BATT(modelyear, fleetreg, age))*VEH_PAY(prodyear, age, modelyear)*MAT_CONTENT(prodyear, mat))*RECOVERY_PCT(modelyear, mat) =g= sum((seg, fleetreg), VEH_STCK_ADD('BEV',seg,fleetreg,modelyear,new)*BEV_CAPAC(seg))*MAT_CONTENT(modelyear, mat);
+EQ_RECYCLED_BATT(modelyear,fleetreg, age)..             RECYCLED_BATT(modelyear,fleetreg, age) =e= sum((seg), VEH_STCK_REM('BEV',seg,fleetreg,modelyear, age)* BEV_CAPAC(seg));
+
+* Calculate amount of materials recovered from end-of-life batteries for recycling (i.e., to new batteries)
+EQ_RECYCLED_MAT(modelyear,mat_cats)..                   RECYCLED_MAT(modelyear, mat_cats) =e= sum((prodyear,age), sum((fleetreg), RECYCLED_BATT(modelyear, fleetreg, age))*VEH_PAY(prodyear, age, modelyear)*MAT_CONTENT(prodyear, mat_cats))*RECOVERY_PCT(modelyear, mat_cats);
+* Calculate total amount of materials available (virgin and recycled)
+*eq_tot_mats(mat_cats,year)..          sum(mat_prod$mat(mat_cats,mat_prod), mat_mix(year,mat_prod)) =e= battery(mat_cats,year);
+
+* Material availability constraint; demand of virgin resources from each source must be less than or equal to available supply
+EQ_VIRG_MAT_SUPPLY(modelyear,mat_prod)..                     MAT_MIX(modelyear, mat_prod) =l= VIRG_MAT_SUPPLY(modelyear,mat_prod);
+
+* Amount of virgin + recycled material to produce new batteries
+EQ_MAT_REQ(modelyear, mat_cats)..                       MAT_REQ(modelyear,mat_cats) =e= sum((seg, fleetreg), VEH_STCK_ADD('BEV',seg,fleetreg,modelyear,new)*BEV_CAPAC(seg))*MAT_CONTENT(modelyear, mat_cats);
+
+EQ_MAT_SUPPLY(modelyear, mat_cats)..                       sum(mat_prod$mat(mat_cats, mat_prod), MAT_MIX(modelyear, mat_prod)) + RECYCLED_MAT(modelyear,mat_cats) =e= MAT_REQ(modelyear, mat_cats);
+*EQ_MAT_REQ(modelyear, mat_cats)..                       sum(mat_prod$mat(mat_cats, mat_prod), VIRG_MAT_SUPPLY(modelyear, mat_prod)) + RECYCLED_MAT(modelyear,mat_cats) =g= sum((seg, fleetreg), VEH_STCK_ADD('BEV',seg,fleetreg,modelyear,new)*BEV_CAPAC(seg))*MAT_CONTENT(modelyear, mat_cats);
 
 $ontext
+virgin material supply + recycled material must be greater than the material demand
 EQ_MAT_REQ(optyear, mat)..                                VIRG_MAT(optyear, mat) + sum((prodyear,age), sum((reg), RECYCLED_BATT(optyear, reg, age))*VEH_PAY(prodyear, age, optyear)*MAT_CONTENT(prodyear, mat))*RECOVERY_PCT(optyear, mat) =g= sum((seg, reg), VEH_STCK_ADD('BEV',seg,reg,optyear,'0')*BEV_CAPAC(seg))*MAT_CONTENT(optyear, mat);
 $offtext
 
 
 *** EMISSION and ENERGY MODELS incl OBJ. FUNCTION ------------------------------------
 * Objective function
-EQ_TOTC_OPT..                                         TOTC_OPT =e= sum((tec,seg,fleetreg,optyear), VEH_TOTC(tec,seg,fleetreg,optyear));
+EQ_TOTC_OPT..                                              TOTC_OPT =e= sum((tec,seg,fleetreg,optyear), VEH_TOTC(tec,seg,fleetreg,optyear));
 
 * Calculation of emissions from all vehicle classes per year
 EQ_VEH_TOTC(tec,seg,fleetreg,modelyear)..                  VEH_TOTC(tec,seg,fleetreg,modelyear) =e= VEH_PROD_TOTC(tec,seg,fleetreg,modelyear) + VEH_OPER_TOTC(tec,seg,fleetreg,modelyear) + VEH_EOLT_TOTC(tec,seg,fleetreg,modelyear);
@@ -945,7 +985,10 @@ EQ_VEH_TOTC(tec,seg,fleetreg,modelyear)..                  VEH_TOTC(tec,seg,flee
 *EQ_VEH_PROD_TOTC(tec,seg,modelyear)..             VEH_PROD_TOTC(tec,seg,modelyear) =e= sum( (agej)$(ord(agej)=1), VEH_STCK_ADD(tec,seg,modelyear,agej)*VEH_PROD_CINT(tec,seg,modelyear));
 *EQ_VEH_PROD_TOTC(tec,seg,modelyear)..             VEH_PROD_TOTC(tec,seg,modelyear) =e= sum( (agej), VEH_STCK_ADD(tec,seg,modelyear,'0')*VEH_PROD_CINT(tec,seg,modelyear));
 
-EQ_VEH_PROD_TOTC(tec,seg,fleetreg,modelyear)..             VEH_PROD_TOTC(tec,seg,fleetreg,modelyear) =e= VEH_STCK_ADD(tec,seg,fleetreg,modelyear,new)*VEH_PROD_CINT(tec,seg,modelyear);
+* Calculate emissions from virgin materials. Currently assumes zero emissions for recycled materials.
+EQ_MAT_TOTC(modelyear, mat_prod)..                         MAT_CO2(modelyear, mat_prod) =e= MAT_MIX(modelyear, mat_prod) * MAT_CINT(modelyear,mat_prod);
+
+EQ_VEH_PROD_TOTC(tec,seg,fleetreg,modelyear)..             VEH_PROD_TOTC(tec,seg,fleetreg,modelyear) =e= VEH_STCK_ADD(tec,seg,fleetreg,modelyear,new)*VEH_PROD_CINT(tec,seg,modelyear) + sum(mat_prod, MAT_CO2(modelyear, mat_prod));
 
 EQ_VEH_OPER_TOTC(tec,seg,fleetreg,modelyear)..             VEH_OPER_TOTC(tec,seg,fleetreg,modelyear) =e= sum( (agej,enr,prodyear), VEH_STCK(tec,seg,fleetreg,modelyear,agej) * VEH_PAY(prodyear,agej,modelyear)* VEH_OPER_CINT(tec,enr,seg,fleetreg,agej,modelyear,prodyear) *  VEH_OPER_DIST(modelyear));
 
@@ -962,12 +1005,11 @@ execute_loadpoint 'EVD4EUR_Basic_p.gdx';
 
 * Defining name of model(s) and what equations are used in each model
 
-MODEL EVD4EUR_Basic "default model, run in normal mode" /ALL/
+MODEL EVD4EUR_Basic "default model run in normal mode" /ALL/
       seg_test "model without segment constraint" /EVD4EUR_Basic - EQ_SEG_GRD/
       unit_test "model without growth constraint" /EVD4EUR_Basic - EQ_STCK_GRD/
       unit_test2 "model without growth or manufacturing constraint" /unit_test - EQ_NEW_BATT_CAP/
-      no_constraints model without constraints /EVD4EUR_Basic - EQ_SEG_GRD - EQ_STCK_GRD - EQ_NEW_BATT_CAP - EQ_MAT_REQ/
-
+      no_constraints "model without constraints" /EVD4EUR_Basic - EQ_SEG_GRD - EQ_STCK_GRD - EQ_NEW_BATT_CAP - EQ_MAT_REQ/
 ;
 *      no_contr "model no constraints at all" /unit_test2 - EQ_STCK_ADD0 - EQ_STCK_GRD0/
 *;
@@ -1006,9 +1048,9 @@ TOT_BEVS(modelyear) = sum((seg, fleetreg, age), VEH_STCK.l('BEV', seg, fleetreg,
 * total capacity of batteries added by year in MWh
 TOT_BATT_MANUF(modelyear) = sum((seg, fleetreg)$VEH_STCK_ADD.l('BEV', seg, fleetreg, modelyear, new), VEH_STCK_ADD.l('BEV',seg,fleetreg,modelyear,new)*BEV_CAPAC(seg))/1000;
 TOT_BATT_RECYCLED(modelyear) = sum((seg, fleetreg, age), VEH_STCK_REM.l('BEV',seg,fleetreg,modelyear, age)* BEV_CAPAC(seg));
-MAT_REQ_TOT(modelyear,mat) = sum((seg, fleetreg), VEH_STCK_ADD.l('BEV',seg,fleetreg,modelyear,new)*BEV_CAPAC(seg)*MAT_CONTENT(modelyear,mat));
-MAT_RECYCLED(modelyear, mat) = sum((prodyear,age), sum((fleetreg), RECYCLED_BATT.l(modelyear, fleetreg, age))*VEH_PAY(prodyear, age, modelyear)*MAT_CONTENT(prodyear, mat))*RECOVERY_PCT(modelyear, mat);
-MAT_REQ_VIRG(modelyear, mat) = MAT_REQ_TOT(modelyear, mat) - MAT_RECYCLED(modelyear, mat);
+MAT_REQ_TOT(modelyear, mat_cats) = sum((seg, fleetreg), VEH_STCK_ADD.l('BEV',seg,fleetreg,modelyear,new)*BEV_CAPAC(seg)*MAT_CONTENT(modelyear,mat_cats));
+MAT_RECYCLED(modelyear, mat_cats) = sum((prodyear,age), sum((fleetreg), RECYCLED_BATT.l(modelyear, fleetreg, age))*VEH_PAY(prodyear, age, modelyear)*MAT_CONTENT(prodyear, mat_cats))*RECOVERY_PCT(modelyear, mat_cats);
+MAT_REQ_VIRG(modelyear, mat_cats) = MAT_REQ_TOT(modelyear, mat_cats) - MAT_RECYCLED(modelyear, mat_cats);
 *shares(inityear, fleetreg, tec,seg,age) = VEH_STCK_TOT(inityear,fleetreg) * (VEH_STCK_INT_TEC(tec) * VEH_LIFT_PDF(age)* VEH_STCK_INT_SEG(seg));
 *(((VEH_STCK_TOT(inityear,fleetreg) * VEH_STCK_INT_TEC(tec) / tec.len) * VEH_LIFT_PDF(age)/age.len) * VEH_STCK_INT_SEG(seg)/seg.len);
 
