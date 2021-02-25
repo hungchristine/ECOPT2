@@ -223,12 +223,13 @@ class FleetModel:
 
         """ GAMS-relevant attributes"""
         #  --------------- GAMS sets / domains -------------------------------
-        # sets to read from Excel
-        self.set_list = ['tecs', 'enr', 'seg', 'mat', 'reg', 'fleetreg',
-                          'modelyear', 'inityear', 'cohort', 'optyear', 'age']
+        # sets to check for in Excel sheet
+        self.set_list = ['tecs', 'enr', 'seg', 'mat_cats',
+                         'reg', 'fleetreg', 'modelyear', 'inityear',
+                         'cohort', 'optyear', 'age']
 
         self.sets_from_excel(r"C:\Users\chrishun\Box Sync\YSSP_temp\Data\load_data\sets.xlsx")
-
+        self.new = ['0']
         self.demeq = ['STCK_TOT', 'OPER_DIST', 'OCUP']             # definition of
         self.dstvar = ['mean', 'stdv']
         self.enreq = ['CINT']
@@ -394,18 +395,22 @@ class FleetModel:
         self.manuf_cnstrnt = self.manuf_cnstrnt * self.eur_batt_share
 
         self.mat_content = [[0.11, 0.05] for year in range(len(self.modelyear))]
-        self.mat_content = pd.DataFrame(self.mat_content, index=self.modelyear, columns=self.mat)
+        self.mat_content = pd.DataFrame(self.mat_content, index=self.modelyear, columns=self.mat_cats)
         self.mat_content.index = self.mat_content.index.astype('str')
 
-        self.recovery_pct = [[recycle_rate]*len(self.mat) for year in range(len(self.modelyear))]
-        self.recovery_pct = pd.DataFrame(self.recovery_pct, index=self.modelyear, columns=self.mat)
+        self.recovery_pct = [[recycle_rate]*len(self.mat_cats) for year in range(len(self.modelyear))]
+        self.recovery_pct = pd.DataFrame(self.recovery_pct, index=self.modelyear, columns=self.mat_cats)
         self.recovery_pct.index = self.recovery_pct.index.astype('str')
 
-        self.virg_mat = pd.read_excel(self.import_fp, sheet_name='virg_mat', header=[0], usecols='A:C', index_col=[0], skiprows=[0])
+        self.virg_mat = pd.read_excel(self.import_fp, sheet_name='virg_mat', header=[0], usecols='A:E', index_col=[0], skiprows=[0,1])
+        #TODO: remove hardcoding of European share
         self.virg_mat = self.virg_mat * 0.4
         # self.virg_mat = [[5e8, 1e8] for year in range(len(self.modelyear))]
         # self.virg_mat = pd.DataFrame(self.virg_mat, index=self.modelyear, columns=self.mat)
         self.virg_mat.index = self.virg_mat.index.astype('str')
+
+        self.mat_cint = pd.read_excel(self.import_fp, sheet_name='mat_cint', header=[0], usecols='A:E', index_col=[0], skiprows=[0,1])
+        self.mat_cint.index = self.mat_cint.index.astype('str')
 
         self.enr_partab = pd.read_excel(self.import_fp, sheet_name='ENR_PARTAB', usecols='A:G', index_col=[0, 1, 2]) #enr,reg,X
 
@@ -561,12 +566,18 @@ class FleetModel:
             if s not in all_sets.columns:
                 err.append(s)
         if len(err):
+            #TODO: below raises this error: TypeError: exceptions must derive from BaseException
             raise(f'Set(s) {err} not found in Excel file')
 
-        sets_dict = {}
+        self.mat_dict = {}
         for ind in all_sets.columns:
-            setattr(self, ind, all_sets[ind].dropna().to_list())
+            if '_prod' in ind:
+                key = ind.capitalize().split('_prod')[0]
+                self.mat_dict[key] = all_sets[ind].dropna().to_list()
+            else:
+                setattr(self, ind, all_sets[ind].dropna().to_list())
 
+        # TODO: build check to make sure there are no orphan materials or producer lists in mat_dict
 
     def read_gams_db(self, gams_db):
         """

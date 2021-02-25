@@ -48,8 +48,8 @@ enr             energy carrier
 reg             region or country group
 fleetreg(reg)     model regions of BEV operation
 seg             segment or size class
-mat_prod        producers or sources for all critical materials /Li1, Li2, Co1, Co2/
-mat_cats        critical material categories /Li, Co/
+mat_prod        producers or sources for all critical materials 
+mat_cats        critical material categories
 sigvar          variables for sigmoid equations
 dstvar          variables for statistical distributions
 enreq           equations for energy (electricity and fuels) system
@@ -58,10 +58,10 @@ demeq           equations for demand parameters
 lfteq           equations for fleet lifetime parameters
 grdeq           parameters for gradient of change (fleet additions) - individual (IND) for each tech or related to all tech (ALL)
 mat(mat_cats,mat_prod)      critical material
-    /
-    Li.(Li1,Li2)
-    Co.(Co1,Co2)
-    /
+*    /
+*    Li.(Li1,Li2)
+*    Co.(Co1,Co2)
+*    /
 ;
 SINGLETON SETS
 new(age)    
@@ -138,9 +138,9 @@ $LOAD enr
 $LOAD reg
 $LOAD fleetreg
 $LOAD seg
-*$LOAD mat_cats
-*$LOAD mat_prod
-*$LOAD mat
+$LOAD mat_cats
+$LOAD mat_prod
+$LOAD mat
 
 $LOAD sigvar
 $LOAD dstvar
@@ -350,7 +350,8 @@ $LOAD MANUF_CNSTRNT
 
 $LOAD MAT_CONTENT
 $LOAD RECOVERY_PCT
-*$LOAD VIRG_MAT_SUPPLY
+$LOAD MAT_CINT
+$LOAD VIRG_MAT_SUPPLY
 
 $OFFMULTI
 $GDXIN
@@ -371,16 +372,18 @@ $GDXIN
 *
 
 * temporary definition for testing
+$ontext
 VIRG_MAT_SUPPLY(year, 'Li1') = 4e6;
 VIRG_MAT_SUPPLY(year, 'Li2') = 8.5e6;
 VIRG_MAT_SUPPLY(year, 'Co1') = 20e6;
 VIRG_MAT_SUPPLY(year, 'Co2') = 9e6;
 
-MAT_CINT(year, 'Li1')=0.00005;
+MAT_CINT(year, 'Li1')=0.000005;
 MAT_CINT(year, 'Li2')=0.00008;
 MAT_CINT(year, 'Co1')=0.001;
 MAT_CINT(year, 'Co2')=0.0015;
-*
+$offtext
+
 *PARAMETER VEH_STCK_TOT(year, reg)
 */
 *2000	.HIGH	=       500000
