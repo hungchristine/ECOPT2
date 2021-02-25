@@ -223,12 +223,13 @@ class FleetModel:
 
         """ GAMS-relevant attributes"""
         #  --------------- GAMS sets / domains -------------------------------
-        # sets to read from Excel
-        self.set_list = ['tecs', 'enr', 'seg', 'mat', 'reg', 'fleetreg',
-                          'modelyear', 'inityear', 'cohort', 'optyear', 'age']
+        # sets to check for in Excel sheet
+        self.set_list = ['tecs', 'enr', 'seg', 'mat_cats', 'reg', 'fleetreg',
+                         'year', 'modelyear', 'inityear',
+                         'cohort', 'optyear', 'age']
 
         self.sets_from_excel(r"C:\Users\chrishun\Box Sync\YSSP_temp\Data\load_data\sets.xlsx")
-
+        self.new = ['0']
         self.demeq = ['STCK_TOT', 'OPER_DIST', 'OCUP']             # definition of
         self.dstvar = ['mean', 'stdv']
         self.enreq = ['CINT']
@@ -394,18 +395,22 @@ class FleetModel:
         self.manuf_cnstrnt = self.manuf_cnstrnt * self.eur_batt_share
 
         self.mat_content = [[0.11, 0.05] for year in range(len(self.modelyear))]
-        self.mat_content = pd.DataFrame(self.mat_content, index=self.modelyear, columns=self.mat)
+        self.mat_content = pd.DataFrame(self.mat_content, index=self.modelyear, columns=self.mat_cats)
         self.mat_content.index = self.mat_content.index.astype('str')
 
-        self.recovery_pct = [[recycle_rate]*len(self.mat) for year in range(len(self.modelyear))]
-        self.recovery_pct = pd.DataFrame(self.recovery_pct, index=self.modelyear, columns=self.mat)
+        self.recovery_pct = [[recycle_rate]*len(self.mat_cats) for year in range(len(self.modelyear))]
+        self.recovery_pct = pd.DataFrame(self.recovery_pct, index=self.modelyear, columns=self.mat_cats)
         self.recovery_pct.index = self.recovery_pct.index.astype('str')
 
-        self.virg_mat = pd.read_excel(self.import_fp, sheet_name='virg_mat', header=[0], usecols='A:C', index_col=[0], skiprows=[0])
+        self.virg_mat = pd.read_excel(self.import_fp, sheet_name='virg_mat', header=[0], usecols='A:E', index_col=[0], skiprows=[0,1])
+        #TODO: remove hardcoding of European share
         self.virg_mat = self.virg_mat * 0.4
         # self.virg_mat = [[5e8, 1e8] for year in range(len(self.modelyear))]
         # self.virg_mat = pd.DataFrame(self.virg_mat, index=self.modelyear, columns=self.mat)
         self.virg_mat.index = self.virg_mat.index.astype('str')
+
+        self.mat_cint = pd.read_excel(self.import_fp, sheet_name='mat_cint', header=[0], usecols='A:E', index_col=[0], skiprows=[0,1])
+        self.mat_cint.index = self.mat_cint.index.astype('str')
 
         self.enr_partab = pd.read_excel(self.import_fp, sheet_name='ENR_PARTAB', usecols='A:G', index_col=[0, 1, 2]) #enr,reg,X
 
@@ -561,12 +566,18 @@ class FleetModel:
             if s not in all_sets.columns:
                 err.append(s)
         if len(err):
+            #TODO: below raises this error: TypeError: exceptions must derive from BaseException
             raise(f'Set(s) {err} not found in Excel file')
 
-        sets_dict = {}
+        self.mat_dict = {}
         for ind in all_sets.columns:
-            setattr(self, ind, all_sets[ind].dropna().to_list())
+            if '_prod' in ind:
+                key = ind.capitalize().split('_prod')[0]
+                self.mat_dict[key] = all_sets[ind].dropna().to_list()
+            else:
+                setattr(self, ind, all_sets[ind].dropna().to_list())
 
+        # TODO: build check to make sure there are no orphan materials or producer lists in mat_dict
 
     def read_gams_db(self, gams_db):
         """
@@ -717,6 +728,8 @@ class FleetModel:
         self.mat_demand = self._p_dict['MAT_REQ_TOT']
         self.mat_demand = pd.concat([self.mat_demand], axis=1, keys=['total'])
         self.resources = pd.concat([self.mat_demand, self.mat_req_virg, self.mat_recycled], axis=1)
+        self.mat_mix = self._v_dict['MAT_MIX']
+        self.mat_co2 = self._v_dict['MAT_CO2']
 
         # Prepare model output dataframes for visualization
         self.stock_df = self._v_dict['VEH_STCK']
@@ -1945,41 +1958,6 @@ def vis_GAMS(fleet, fp, filename, param_values, export_png, export_pdf=True, max
     export_fig('LC_emissions_vs_stock')
 #        pp.savefig(bbox_inches='tight')
 
-    """--- Plot total resource use ---"""
-    for resource in fleet.resources.columns.get_level_values(1).unique():
-        fig = plt.figure(figsize=(14,9))
-
-        gs = matplotlib.gridspec.GridSpec(2, 1, height_ratios=[1,3], hspace=0.05)
-        ax2 = fig.add_subplot(gs[0])
-        ax1 = fig.add_subplot(gs[1], sharex=ax2)
-        plot_df = pd.concat([fleet.resources['primary', resource], fleet.resources['recycled', resource]], axis=1)
-        plot_df[plot_df < 0] = 0  # replace with fleet.resources[total required]
-        (plot_df/1e6).plot(ax=ax1, kind='area', lw=0, cmap='jet')
-        (fleet.stock_df_plot.sum(axis=1).unstack('seg').sum(axis=1).unstack('tec').sum(level='year')/1e6).plot(ax=ax2, kind='area', cmap=tec_cm, lw=0)
-
-        ax1.set_ylabel(f'{resource} use \n Mt {resource}', fontsize=13)
-        ax2.set_ylabel('Vehicles, millions', fontsize=13, labelpad=25)
-        if cropx:
-            ax1.set_xlim(right=max_year)
-            ax2.set_xlim(right=max_year)
-    #        patches, labels = ax1.get_legend_handles_labels()
-    #        order = [5, 3, 1, 4, 2, 0]
-    #        ax1.legend([patches[idx] for idx in order],[labels[idx] for idx in order], loc=1, fontsize=12)
-        handles, labels = ax1.get_legend_handles_labels()
-        # labels = [x+', '+y for x,y in itertools.product(['Production', 'Operation', 'End-of-life'], ['ICEV', 'BEV'])]
-        # ax1.legend(handles, labels, loc=1, fontsize=14)
-        handles, labels = ax2.get_legend_handles_labels()
-        ax2.legend(handles, ['BEV', 'ICEV'], loc=4, fontsize=14, framealpha=1)
-
-        ax1.set_xbound(0, 50)
-        ax2.set_xbound(0, 50)
-
-        plt.setp(ax2.get_yticklabels(), fontsize=14)
-        plt.xlabel('year', fontsize=14)
-        plt.xticks(fontsize=14)
-        plt.yticks(fontsize=14)
-
-
     """--- Plot operation emissions by tec ---"""
 
     ax = (fleet.emissions.loc[:, 'Operation'] / 1e6).plot(kind='area', cmap=LinearSegmentedColormap.from_list('temp', colors=['silver', 'grey']), lw=0)
@@ -2132,11 +2110,73 @@ def vis_GAMS(fleet, fp, filename, param_values, export_png, export_pdf=True, max
 #        fig.suptitle('Additions to stock by segment and technology')
 #        ax.legend(labels=fleet.seg,title='Segment',markerscale=15)
 
+    """--- Plot total resource use ---"""
+    for resource in fleet.resources.columns.get_level_values(1).unique():
+        fig = plt.figure(figsize=(14,9))
+
+        gs = matplotlib.gridspec.GridSpec(2, 1, height_ratios=[1,3], hspace=0.05)
+        ax2 = fig.add_subplot(gs[0])
+        ax1 = fig.add_subplot(gs[1], sharex=ax2)
+        plot_df = pd.concat([fleet.resources['primary', resource], fleet.resources['recycled', resource]], axis=1)
+        plot_df[plot_df < 0] = 0  # replace with fleet.resources[total required]
+        (plot_df/1e6).plot(ax=ax1, kind='area', lw=0, cmap='jet')
+        (fleet.stock_df_plot.sum(axis=1).unstack('seg').sum(axis=1).unstack('tec').sum(level='year')/1e6).plot(ax=ax2, kind='area', cmap=tec_cm, lw=0)
+
+        ax1.set_ylabel(f'{resource} used in new batteries \n Mt {resource}', fontsize=13)
+        ax2.set_ylabel('Vehicles, millions', fontsize=13, labelpad=25)
+        if cropx:
+            ax1.set_xlim(right=max_year)
+            ax2.set_xlim(right=max_year)
+    #        patches, labels = ax1.get_legend_handles_labels()
+    #        order = [5, 3, 1, 4, 2, 0]
+    #        ax1.legend([patches[idx] for idx in order],[labels[idx] for idx in order], loc=1, fontsize=12)
+        handles, labels = ax1.get_legend_handles_labels()
+        new_labels = []
+        for label in labels:
+            new_labels.append(str(label)[1:-3].replace(",", "").replace("'","").capitalize())
+        ax1.legend(handles, new_labels, title=f'{resource} source used')
+
+        # labels = [x+', '+y for x,y in itertools.product(['Production', 'Operation', 'End-of-life'], ['ICEV', 'BEV'])]
+        # ax1.legend(handles, labels, loc=1, fontsize=14)
+        handles, labels = ax2.get_legend_handles_labels()
+        ax2.legend(handles, ['BEV', 'ICEV'], loc=4, fontsize=14, framealpha=1)
+
+
+        ax1.set_xbound(0, 50)
+        ax2.set_xbound(0, 50)
+
+        plt.setp(ax2.get_yticklabels(), fontsize=14)
+        plt.xlabel('year', fontsize=14)
+        plt.xticks(fontsize=14)
+        plt.yticks(fontsize=14)
+
+    """--- Plot production mixes for virgin critical materials ---"""
+    fig, axes = plt.subplots(len(fleet.mat_cats), 1, sharex=True)
+    plot_data = fleet.mat_mix.copy()
+    plot_data.drop(index=plot_data.loc[str(max_year + 2001):].index.tolist(), inplace=True)
+    plot_data = plot_data / 1e6
+    for i, (mat, prods) in enumerate(fleet.mat_dict.items()):
+        plot_data[prods].plot(ax=axes[i], kind='area', stacked=True, cmap='jet')
+        axes[i].set_title(f'{mat} production mix', fontsize=10, fontweight='bold')
+        axes[i].legend(title=f'{mat} producer')
+        axes[i].set_ylabel('Mt material')
+
+    fig.suptitle('Production shares for virgin critical materials', y=0.995)
+
+    pp.savefig()
+
+    """--- Divider page for input parameter checking ---"""
+    div_page = plt.figure(figsize=(11.69, 8.27))
+    txt = 'Plotting of input parameters for checking'
+    div_page.text(0.5, 0.5, txt, transform=div_page.transFigure, size=30, ha="center")
+    pp.savefig()
+
+
     """ Plot evolution of lifecycle emissions """
-    fig, axes = plt.subplots(len(fleet.reg) - 1, len(fleet.tecs), sharey=True, sharex=True, figsize=(5, 12))
+    fig, axes = plt.subplots(len(fleet.fleetreg), len(fleet.tecs), sharey=True, sharex=True, figsize=(5, 12))
     plt.subplots_adjust(top=0.85, hspace=0.25, wspace=0.05)
 
-    for i, reg in enumerate(fleet.reg[:-1]):
+    for i, reg in enumerate(fleet.fleetreg):
         for j, tec in enumerate(fleet.tecs):
             plot_data = fleet.LC_emissions.unstack('seg').loc(axis=0)[tec, '1995':'2050', reg]
             plot_data.plot(ax=axes[i,j], legend=False)
@@ -2168,13 +2208,6 @@ def vis_GAMS(fleet, fp, filename, param_values, export_png, export_pdf=True, max
 
     """--- to do: plot BEV cohorts as share of total fleet ---"""
     """--- to do: plot crossover in LC emissions between ICEV and BEV by segment---"""
-
-
-    """--- Divider page for input parameter checking ---"""
-    div_page = plt.figure(figsize=(11.69, 8.27))
-    txt = 'Plotting of input parameters for checking'
-    div_page.text(0.5, 0.5, txt, transform=div_page.transFigure, size=30, ha="center")
-    pp.savefig()
 
     """--- Plot production emissions by tec and seg ---"""
 #        fig,axes = plt.subplots(1,2)

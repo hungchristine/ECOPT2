@@ -98,7 +98,7 @@ class GAMSRunner:
         else:
             self.update_fleet(fleet)
 
-        years = gmspy.list2set(self.db, fleet.cohort,'year')
+        years = gmspy.list2set(self.db, fleet.year,'year')
         modelyear = gmspy.list2set(self.db, fleet.modelyear,'modelyear')
         optyear = gmspy.list2set(self.db, fleet.optyear, 'optyear')
         inityear = gmspy.list2set(self.db, fleet.inityear, 'inityear')
@@ -110,7 +110,7 @@ class GAMSRunner:
         seg = gmspy.list2set(self.db, fleet.seg, 'seg')
         reg = gmspy.list2set(self.db, fleet.reg, 'reg')
         fleetreg = gmspy.list2set(self.db, fleet.fleetreg, 'fleetreg')
-        mat = gmspy.list2set(self.db, fleet.mat, 'mat')
+        # mat = gmspy.list2set(self.db, fleet.mat, 'mat')
         demeq =  gmspy.list2set(self.db, fleet.demeq, 'demeq')
         dstvar = gmspy.list2set(self.db, fleet.dstvar, 'dstvar')
         enreq = gmspy.list2set(self.db, fleet.enreq, 'enreq')
@@ -118,6 +118,13 @@ class GAMSRunner:
         lfteq = gmspy.list2set(self.db, fleet.lfteq, 'lfteq')
         sigvar = gmspy.list2set(self.db, fleet.sigvar, 'sigvar')
         veheq = gmspy.list2set(self.db, fleet.veheq, 'veheq')
+
+        mat_cats = gmspy.list2set(self.db, fleet.mat_cats, 'mat_cats')
+        mat_prods = gmspy.list2set(self.db, sum(fleet.mat_dict.values(), []), 'mat_prod')  # concatenate all material producers
+        mat = self.db.add_set("mat",2,"")
+        for key, item in fleet.mat_dict.items():
+            for producer in item:
+                mat.add_record((key, producer))
 
 
         veh_oper_dist = gmspy.df2param(self.db, fleet.veh_oper_dist, ['year'], 'VEH_OPER_DIST')
@@ -157,9 +164,10 @@ class GAMSRunner:
 
         manuf_cnstrnt = gmspy.df2param(self.db, fleet.manuf_cnstrnt, ['year'], 'MANUF_CNSTRNT')
 
-        mat_content = gmspy.df2param(self.db, fleet.mat_content, ['year','mat'], 'MAT_CONTENT')
-        virg_mat= gmspy.df2param(self.db, fleet.virg_mat, ['year','mat'], 'VIRG_MAT')
-        recovery_pct = gmspy.df2param(self.db, fleet.recovery_pct, ['year','mat'], 'RECOVERY_PCT')
+        mat_content = gmspy.df2param(self.db, fleet.mat_content, ['year','mat_cats'], 'MAT_CONTENT')
+        mat_cint = gmspy.df2param(self.db, fleet.mat_cint, ['year', 'mat_prods'], 'MAT_CINT')
+        virg_mat= gmspy.df2param(self.db, fleet.virg_mat, ['year','mat_prod'], 'VIRG_MAT_SUPPLY')
+        recovery_pct = gmspy.df2param(self.db, fleet.recovery_pct, ['year','mat_cats'], 'RECOVERY_PCT')
 
         # enr_partab = gmspy.df2param(self.db, fleet.enr_partab,['enr', 'enreq', 'sigvar'], 'ENR_PARTAB')
         # el_cint = gmspy.df2param(self.db, fleet.enr_cint, ['reg','enr','year'], 'ENR_CINT')
