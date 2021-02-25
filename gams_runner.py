@@ -98,7 +98,7 @@ class GAMSRunner:
         else:
             self.update_fleet(fleet)
 
-        years = gmspy.list2set(self.db, fleet.cohort,'year')
+        years = gmspy.list2set(self.db, fleet.year,'year')
         modelyear = gmspy.list2set(self.db, fleet.modelyear,'modelyear')
         optyear = gmspy.list2set(self.db, fleet.optyear, 'optyear')
         inityear = gmspy.list2set(self.db, fleet.inityear, 'inityear')
