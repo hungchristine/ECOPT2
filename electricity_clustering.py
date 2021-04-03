@@ -1164,6 +1164,7 @@ def calculate_impact_factors(production, consumption, trades, import_el, export_
     # # Carbon intensity of consumption mix
     CFCI_no_TD = pd.DataFrame(np.matmul(CFPI_no_TD.T, Lgen).T)
     CFCI_no_TD.columns = ['Consumption mix intensity']
+    CFCI_no_TD.index = CFPI_no_TD.index
 
     # # Transpose added after removing country aggregation as data pre-treatment
     # if include_TD_losses:
@@ -1218,23 +1219,82 @@ carbon_footprints_cons_tmp.rename('Consumption mix intensity', inplace=True)
 
 # add consumption mix columns to europe_shapes
 europe_shapes.drop(columns=['Consumption mix intensity'], inplace=True)  # drop precalculated CF factors in favour of those just calculated which are more complete
-europe_shapes = europe_shapes.join(carbon_footprints_cons_tmp, on='ISO_A2')
+# europe_shapes = europe_shapes.join(carbon_footprints_cons_tmp, on='ISO_A2')
 
 #%%
 # Perform clustering and add cluster column
+def determine_clusters(num_clusters, df):
+    tmp_df = df.copy()
+    if isinstance(tmp_df, pd.Series):
+        tmp_df = pd.DataFrame(tmp_df)
+    tmp_df['Cluster'] = np.nan
+
+    thresholds = jenkspy.jenks_breaks(tmp_df['Consumption mix intensity'], nb_class=num_clusters)
+    thresholds[0] = thresholds[0] * 0.99
+
+    for i in np.arange(num_clusters):
+        tmp_df_bin = tmp_df[(tmp_df['Consumption mix intensity'] > thresholds[i]) &
+                               (tmp_df['Consumption mix intensity'] <= thresholds[i + 1])]
+        tmp_df['Cluster'][tmp_df_bin.index] = i + 1
+
+    return tmp_df
+
+def clean_clusters(num_clusters, df):
+    clustered_df = determine_clusters(num_clusters, df)
+    cluster_pop = clustered_df.value_counts(subset='Cluster')
+    # if there are any single- or two-country clusters, recalculate the cluster
+    # thresholds with n+1 clusters, and merge with the closest
+    if (cluster_pop < 2).any():
+        cl = cluster_pop.loc[cluster_pop < 2].index
+        for cluster in cl:
+            df2 = determine_clusters(num_clusters + 1, clustered_df)
+            if cluster == (clustered_df['Cluster'].max()):
+                # if singleton cluster is at max, combine with next lowest group
+                df2.loc[df2['Cluster'] == (cluster + 1), 'Cluster'] = num_clusters
+            elif cluster == clustered_df['Cluster'].min():
+                # if singleton cluster is at min, combine with next highest group
+                # and adjust cluster numbering
+                df2['Cluster'] -= 1
+                df2.loc[clustered_df['Cluster'] == 0,'Cluster'] = 1
+            else:
+                # re-run clustering with neighbouring bins to find best position
+                pass
+                # tmp_df = determine_clusters(2, df2[df2['Cluster'].between(cluster-1, cluster+1, inclusive=True)])
+                # df2.loc[~df2['Consumption mix intensity'].isin(tmp_df['Consumption mix intensity'])] -= 1
+                # df2.update(tmp_df)
+                # # temp_thresholds = jenkspy.jenks_breaks(df2[df2['Cluster'].between(cluster-1, cluster+1, inclusive=True)]['Consumption mix intensity'], nb_class=2)
+
+                # for i in np.arange(3):
+                #     df_bin = df2[(df2['Consumption mix intensity'] > temp_thresholds[i]) & (df2['Consumption mix intensity'] <= thresholds[i+1])]
+                #     df['Cluster'][df_bin.index]
+        return df2
+    else:
+        return clustered_df
+
 
 num_clusters = 5
-thresholds = jenkspy.jenks_breaks(europe_shapes['Consumption mix intensity'], nb_class=num_clusters)
-print(thresholds[0])
-thresholds[0] = thresholds[0] * 0.99
+test_df = clean_clusters(num_clusters, carbon_footprints_cons_tmp)
+europe_shapes = europe_shapes.join(test_df, on='ISO_A2')
+thresholds = [test_df[test_df['Cluster']==i+1]['Consumption mix intensity'].max() for i in range(int(test_df['Cluster'].max()))]
+thresholds.insert(0, 0) # prepend lower boundary for cluster thresholds
+
+# test code for clustering
+# test_clust = pd.DataFrame([1,2,3,100,1000,1001,1002], columns=['Consumption mix intensity'])
+# test_df = clean_clusters(3, test_clust)
+
+
+# thresholds = jenkspy.jenks_breaks(europe_shapes['Consumption mix intensity'], nb_class=num_clusters)
+# thresholds = jenkspy.jenks_breaks(carbon_footprints_cons_tmp.values, nb_class=num_clusters)
+# print(thresholds[0])
+# thresholds[0] = thresholds[0] * 0.99
 
 # Add column to dataframe with cluster values
-europe_shapes['Cluster'] = np.nan
+# europe_shapes['Cluster'] = np.nan
 
-for i in np.arange(num_clusters):
-    df_bin = europe_shapes[(europe_shapes['Consumption mix intensity'] > thresholds[i]) &
-                           (europe_shapes['Consumption mix intensity'] <= thresholds[i + 1])]
-    europe_shapes['Cluster'][df_bin.index] = i + 1
+# for i in np.arange(num_clusters):
+#     df_bin = europe_shapes[(europe_shapes['Consumption mix intensity'] > thresholds[i]) &
+#                            (europe_shapes['Consumption mix intensity'] <= thresholds[i + 1])]
+#     europe_shapes['Cluster'][df_bin.index] = i + 1
 
 # europe_shapes['Cluster'].replace({1: 'LOW', 2: 'MID-LOW', 3: 'MID-HIGH', 4:'HIGH'}, inplace=True)
 europe_shapes['Cluster'].replace({1: 'LOW', 2: 'II', 3: 'MID', 4: 'IV', 5: 'HIGH'}, inplace=True)
@@ -1271,9 +1331,9 @@ def export_fig(png_name=None):
 #%%
 # Plot maps by clusters
 
-fig, ax = plt.subplots(1, 1, figsize=(12, 11), dpi=600)
+fig, ax = plt.subplots(1, 1, figsize=(11, 12), dpi=600)
 
-thresholds[1:] = [i*1.0001 for i in thresholds[1:]]
+thresholds = [i*1.0001 for i in thresholds]
 norm = colors.BoundaryNorm(thresholds, num_clusters)
 cmap = colors.ListedColormap(['midnightblue',
                               #'slategrey',
@@ -1354,7 +1414,7 @@ cluster_footprints[''] = 'ELC'
 cluster_footprints = cluster_footprints.set_index('', append=True)
 cluster_footprints = cluster_footprints / 1000
 cluster_footprints.to_csv(os.path.join(os.path.curdir, 'Data', 'el_footprints_pathways.csv'))
-# el_footprints.to_csv(os.path.join(os.path.curdir, 'Data', 'el_footprints_pathways.csv'))
+
 
 #%%
 
@@ -1363,11 +1423,11 @@ cluster_classification.sort_values(by='Cluster', inplace=True)
 
 #%% Export for troubleshooting
 
-output_fp = os.path.join(os.path.curdir, 'calculation output', 'electricity_clustering_output_' + timestamp + '.xlsx')
-with pd.ExcelWriter(output_fp) as writer:
-    new_mixes.to_excel(writer, sheet_name='new_mixes')
-    el_footprints.to_excel(writer, sheet_name='country footprints')
-    tec_int_df.to_excel(writer, sheet_name='tec intensities')
+# output_fp = os.path.join(os.path.curdir, 'calculation output', 'electricity_clustering_output_' + timestamp + '.xlsx')
+# with pd.ExcelWriter(output_fp) as writer:
+#     new_mixes.to_excel(writer, sheet_name='new_mixes')
+#     el_footprints.to_excel(writer, sheet_name='country footprints')
+#     tec_int_df.to_excel(writer, sheet_name='tec intensities')
 
 #%% Run check for trade data from UNdata
 
