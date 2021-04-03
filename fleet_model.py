@@ -151,7 +151,6 @@ class FleetModel:
         self.export_fp = os.path.join(self.home_fp, r'Model run data')
         self.keeper = "{:%d-%m-%y, %H_%M}".format(datetime.now())
 
-
         if gdx_file is not None:
             self._from_gdx(gdx_file)
         else:
@@ -464,7 +463,7 @@ class FleetModel:
 #        self.opt.DumpParms = 2
         self.opt.ForceWork = 1"""
 #        self.opt.SysOut = 1
-
+    @classmethod
     def _from_gdx(self, gdx_file):
         """
         Instantiate FleetModel object via an existing GAMS .gdx file.
@@ -1110,6 +1109,7 @@ class FleetModel:
         # Assembles vehicle from powertrain, glider and BoP and checks that vehicles makes sense (i.e., no Tesla motors in a Polo or vice versa)
         # used in calc_veh_mass()
         pass
+
     """
     def run_GAMS(self,filename):
         # Pass to GAMS all necessary sets and parameters

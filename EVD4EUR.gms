@@ -1,33 +1,11 @@
-*-----------------------------------------------------------------------------------
+***
 * EVD4EUR Model
-* Basic Edition
-* Januar 2018
-* Anders Hammer Str�mman
+* =============
 *
-* ver 0.1:       basic parameters and structires
-* ver 0.2:       refinement of basic parameters and initiation period
-* ver 0.3:       introduction of stock initialisation
-* ver 0.4:       refinement of stock initialisation
-* ver 0.5:       initialization of stock completed
-* ver 0.6:       basic equations added
-* ver 0.7:       moving stock initialisation from parameters to model equations - AS separate EQs
-* ver 0.8:       stock initialisation loop vs sep equ. index problem fixed
-* ver 0.9:       linking initial stock model to BEV and ICE Model
-* ver 0.91:      Running version with stock total constraint as equal to or larger than
-* ver 0.92:      Running version with total constraint as equal - fixed.
-* ver 0.93:      Adding BEV STCK and ADD fractions - to be moved to post processing in 0.94
-* ver 0.94:      Post processing as above completed
-* ver 0.95:      Output analysis and debogging p.t 1 - Clean up Emissions and Stock e.q.s
-* ver 0.96:      Include fix for vehicle removal-add constraint across BEV-ICE. Pref constraint forced BEVs to replace BEVs and ICEs to replace ICEs
-* ver 0.97:      Changed DELTA variables from positive to free variables
-* ver 0.98       Added gradient of change dampening constraint
-* ver 0.99       Added init variables for ICE_ADD and ICE_REM
-* ver 1.00       Generalized version with technologies as sets etc (only front end).
-* ver 1.01       Generalized version with technologies as sets etc. Running version
-* ver 1.02       Tecnology gradient of change constraints added.
-* ver 1.03       Tecnology gradient of change constraints ver B added.
-* ver 1.04       Initiaton resolved
-
+* The EVD4EUR model minimizes total CO2 emissions while satisfying
+* transport demand via light duty vehicles. Manufacturing and supply
+* chain constraints are considered.
+*
 *-----------------------------------------------------------------------------------
 
 $funclibin stolib stodclib
@@ -252,28 +230,28 @@ VEH_STCK_INT(tec,seg,reg,age)    Initial size of stock of vehicles by age cohort
 ** CONSTRAINTS -------
 VEH_ADD_GRD(grdeq,tec)           Parameter for gradient of change constraint (fleet additions) - individual (IND) for each tech or related to all tech (ALL)
 *VEH_SEG_SHR(seg)                 Parameter for segment share minimums in fleet
-GRO_CNSTRNT(year)                Segment growth rate constraint relative to stock additions
+*GRO_CNSTRNT(year)                Segment growth rate constraint relative to stock additions
 MANUF_CNSTRNT(year)              Annual manufacturing capacity (for batteries destined for Europe) [MWh]
-MAT_CONTENT(year,mat_cats)                 Critical material content per kWh by production year [kg kWh^-1]
-RECOVERY_PCT(year,mat_cats)            Recovery of critical materials from battery recycling processes in wt%
-VIRG_MAT_SUPPLY(year,mat_prod)             Virgin critical material resources available in a given year [kg yr^-1]
-MAT_CINT(year,mat_prod)       Carbon intensity of each material by source [kg CO2e kg mat]
+MAT_CONTENT(year,mat_cats)       Critical material content per kWh by production year [kg kWh^-1]
+RECOVERY_PCT(year,mat_cats)      Recovery of critical materials from battery recycling processes in wt%
+VIRG_MAT_SUPPLY(year,mat_prod)   Primary critical material resources available in a given year [kg yr^-1]
+MAT_CINT(year,mat_prod)          Carbon intensity of each material by source [kg CO2e kg mat]
 
 ** POST-PROCESSING --------
-TOT_BEVS(year)                                Total number of BEVs in Europe
-TOT_BATT_MANUF(year)                               Total battery capacity required by year [MWh]
-TOT_BATT_RECYCLED(year)                            Total battery capacity retired each year [kWh]
-MAT_REQ_TOT(year, mat_cats)                                  Total resources required by year [kg]
-MAT_RECYCLED(year, mat_cats)                                  Total critical materials recycled per year [kg]
-MAT_REQ_VIRG(year, mat_cats)                               Total critical material from virgin resources required [kg]
+TOT_BEVS(year)                   Total number of BEVs in Europe
+TOT_BATT_MANUF(year)             Total battery capacity required by year [MWh]
+TOT_BATT_RECYCLED(year)          Total battery capacity retired each year [kWh]
+MAT_REQ_TOT(year, mat_cats)      Total resources required by year [kg]
+MAT_RECYCLED(year, mat_cats)     Total critical materials recycled per year [kg]
+MAT_REQ_VIRG(year, mat_cats)     Total critical material from primary resources required [kg]
 VEH_STCK_TOT_CHECK(modelyear)
 *POS_STOCK(tec,seg,reg,modelyear,agej)
 VEH_STCK_CHRT(tec,seg,fleetreg,prodyear,age,modelyear)       Total stock by technology segment region and cohort
 VEH_OPER_COHORT(tec,seg,fleetreg,prodyear,modelyear,agej)    Total fleet operating emissions by technology segment region and cohort
 VEH_EOLT_COHORT(tec,seg,fleetreg,prodyear,modelyear,agej)    Total end-of-life emissions by technology segment region and cohort
 *VEH_LC_EMISS(tec,seg,reg,prodyear)
-ANN_TOTC(modelyear)                                     Total CO2 emissions from LDVs by year                              [t CO2-eq]
-VEH_TOT_ADD(fleetreg, year)                                  Total vehicles added by region
+ANN_TOTC(modelyear)              Total CO2 emissions from LDVs by year                              [t CO2-eq]
+VEH_TOT_ADD(fleetreg, year)      Total vehicles added by region
 VEH_TOT_REM(tec, fleetreg, year)
 VEH_STCK_GRD(tec,seg,fleetreg,optyear)
 ;
@@ -345,7 +323,7 @@ $LOAD VEH_STCK_INT_SEG
 $LOAD BEV_CAPAC
 $LOAD VEH_ADD_GRD
 *$LOAD VEH_SEG_SHR
-$LOAD GRO_CNSTRNT
+*$LOAD GRO_CNSTRNT
 $LOAD MANUF_CNSTRNT
 
 $LOAD MAT_CONTENT
@@ -962,14 +940,15 @@ EQ_RECYCLED_MAT(modelyear,mat_cats)..                   RECYCLED_MAT(modelyear, 
 * Calculate total amount of materials available (virgin and recycled)
 *eq_tot_mats(mat_cats,year)..          sum(mat_prod$mat(mat_cats,mat_prod), mat_mix(year,mat_prod)) =e= battery(mat_cats,year);
 
-* Material availability constraint; demand of virgin resources from each source must be less than or equal to available supply
-EQ_VIRG_MAT_SUPPLY(modelyear,mat_prod)..                     MAT_MIX(modelyear, mat_prod) =l= VIRG_MAT_SUPPLY(modelyear,mat_prod);
-
+* Material supply balance
 * Amount of virgin + recycled material to produce new batteries
 EQ_MAT_REQ(modelyear, mat_cats)..                       MAT_REQ(modelyear,mat_cats) =e= sum((seg, fleetreg), VEH_STCK_ADD('BEV',seg,fleetreg,modelyear,new)*BEV_CAPAC(seg))*MAT_CONTENT(modelyear, mat_cats);
 
 EQ_MAT_SUPPLY(modelyear, mat_cats)..                       sum(mat_prod$mat(mat_cats, mat_prod), MAT_MIX(modelyear, mat_prod)) + RECYCLED_MAT(modelyear,mat_cats) =e= MAT_REQ(modelyear, mat_cats);
 *EQ_MAT_REQ(modelyear, mat_cats)..                       sum(mat_prod$mat(mat_cats, mat_prod), VIRG_MAT_SUPPLY(modelyear, mat_prod)) + RECYCLED_MAT(modelyear,mat_cats) =g= sum((seg, fleetreg), VEH_STCK_ADD('BEV',seg,fleetreg,modelyear,new)*BEV_CAPAC(seg))*MAT_CONTENT(modelyear, mat_cats);
+
+* Primary material availability constraint; demand of virgin resources from each source must be less than or equal to available supply
+EQ_VIRG_MAT_SUPPLY(modelyear,mat_prod)..                     MAT_MIX(modelyear, mat_prod) =l= VIRG_MAT_SUPPLY(modelyear,mat_prod);
 
 $ontext
 virgin material supply + recycled material must be greater than the material demand
@@ -977,7 +956,7 @@ EQ_MAT_REQ(optyear, mat)..                                VIRG_MAT(optyear, mat)
 $offtext
 
 
-*** EMISSION and ENERGY MODELS incl OBJ. FUNCTION ------------------------------------
+*** EMISSION and ENERGY MODELS incl OBJ. FUNCTION -------------------------------------------------
 * Objective function
 EQ_TOTC_OPT..                                              TOTC_OPT =e= sum((tec,seg,fleetreg,optyear), VEH_TOTC(tec,seg,fleetreg,optyear));
 

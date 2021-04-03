@@ -64,6 +64,7 @@ now = datetime.now().isoformat(timespec='minutes').replace(':','_')
 # (straight line in lieu of logistic function)
 #yaml_name = 'unit_test'#.yaml'
 yaml_name = 'GAMS_input'#.yaml'
+# yaml_name = 'GAMS_input_demo'
 
 if yaml_name == 'unit_test.yaml':
     fp = r'C:\Users\chrishun\Box Sync\YSSP_temp\visualization output\unit_test_' + now

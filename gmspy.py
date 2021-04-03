@@ -1,6 +1,6 @@
 """ gmspy - Simple convenience functions to ease the use of GAMS API
 
-There is nothing very special here. All based on (as of 2019-04-23): 
+There is nothing very special here. All based on (as of 2019-04-23):
     https://www.gams.com/latest/docs/API_PY_TUTORIAL.html#PY_GAMSDATABASE_GDX_IMPORT
 
 """
@@ -32,7 +32,7 @@ def list2set(db, var, name, comment='', verbose=True):
     a_set : GamsSet instance
 
     """
-    
+
     ### Try something like:
     ## if isinstance(db.get_symbol(name), GamsSet):
     ##  db.merge_record(name)
@@ -48,6 +48,29 @@ def list2set(db, var, name, comment='', verbose=True):
                 warnings.warn('Set added just fine, but with its elements converted to strings.')
     return a_set
 
+def df2set(db, var, name, comment=''):
+    """ Insert GAMS multidimensional set based on DataFrame.
+
+
+    Parameters
+    ----------
+    db : Gams Database
+        Where the parameter will live
+    var : TYPE
+        DESCRIPTION.
+    name: str
+        Name of the parameter in GAMS
+    comment : str
+        Optional, comment
+
+    Returns
+    -------
+    a_set : GamsSet instance
+
+    """
+    #TODO: implement
+    a_set = None
+    return a_set
 
 def df2param(db, df, domains, name, comment=''):
     """ Insert pandas dataframe as Parameter in a GAMS database. Revision: also accepts dictionaries.
@@ -70,7 +93,7 @@ def df2param(db, df, domains, name, comment=''):
     a_param : GamsParameter instance
 
     """
-   
+
     ## if df is a single-column dataframe (i.e., series cast as dataframe), the below doesn't work; keys uses the index-column name pair...
     a_param = db.add_parameter_dc(name, domains, comment)
     if isinstance(df,pd.DataFrame) or isinstance(df,pd.Series):
@@ -213,21 +236,21 @@ def param2df(name, db=None, ws=None, gdx_filepath=None):
         # Ensure that the unstacked columns are ordered as in Data Series
         ix_len = len(ds.index.levels[-1])
         cols = ds.index.get_level_values(-1)[:ix_len]
-        
+
         if len(cols) == len(ds):
-            df = df.reindex(columns=cols)        
+            df = df.reindex(columns=cols)
 #        if name=='VEH_STCK_CHRT':
 ##            print(df)
 #            print(df.count().sum())
 #            print(df.shape)
     else:
-        df = ds.to_frame(0)    
+        df = ds.to_frame(0)
     return df
 
 
 def var2series(name, db=None, ws=None, gdx_filepath=None):
     """--- DEPRECATED ---"""
-    
+
     """
     Read in a variable from a GAMS database or gdx file
 
@@ -287,7 +310,7 @@ def var2df(name, db=None, ws=None, gdx_filepath=None):
     data = dict((tuple(rec.keys), rec.level) for rec in db[name])
     df = pd.Series(data)
     df.index.rename(db[name].domains_as_strings,inplace=True)
-    
+
     if df.index.nlevels >1:
         df = df.unstack()
     else:
@@ -318,10 +341,10 @@ def eq2series(name, db=None, ws=None, gdx_filepath=None):
     --------
     var2series
     """
-    
+
     # Sort out database access or file reading
     db = _iwantitall(db, ws, gdx_filepath)
-        
+
     # Read in data and recast as Pandas Series
     data = dict((tuple(rec.keys), rec.marginal) for rec in db[name])
     df = pd.Series(data)
