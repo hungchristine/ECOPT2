@@ -288,15 +288,18 @@ class GAMSRunner:
     mi.instantiate("transport use lp min z", GamsModifier(x, UpdateAction.Upper, xup))
     mi.solve() """
         try:
-            model_run = self.ws.add_job_from_file(fleet.gms_file) # model_run is type GamsJob
+            model_run = self.ws.add_job_from_file(fleet.gms_file, job_name='EVD4EUR') # model_run is type GamsJob
             cp = self.ws.add_checkpoint()
 
             opt = self.ws.add_options()
             opt.defines["gdxincname"] = self.db.name
             print('\n' + f'Using input gdx file: {self.db.name}')
             print('running GAMS model, please wait...')
-            model_run.run(gams_options=opt, databases=self.db, checkpoint=cp)  # ,create_out_db = True)
-            stat = gams.execution.GamsModelInstance(cp).get_model_status()
+            model_run.run(gams_options=opt, output=sys.stdout, databases=self.db)  # ,create_out_db = True)
+            # stat = gams.execution.GamsModelInstance(cp).get_model_status()
+            ms = model_run.out_db['ms'].find_record().value
+            ss = model_run.out_db['ss'].find_record().value
+
             model_stat_dict = {1: 'Optimal',
                                2: 'Locally Optimal',
                                3 : 'Unbounded',
@@ -317,8 +320,23 @@ class GAMSRunner:
                                18 : 'Unbounded - No Solution',
                                19 : 'Infeasible - No Solution'
                                }
-            print('\n \n \n \n \n Ran GAMS model: ' + fleet.gms_file)
-            print(f'Solve status: {stat}, {model_stat_dict[stat]}'+ '\n \n \n')
+            solve_stat_dict = {1 : 'Normal Completion',
+                               2 : 'Iteration Interrupt',
+                               3 : 'Resource Interrupt',
+                               4 : 'Terminated By Solver',
+                               5 : 'Evaluation Interrupt',
+                               6 : 'Capability Problems',
+                               7 : 'Licensing Problems',
+                               8 : 'User Interrupt',
+                               9 : 'Setup Failure',
+                               10 : 'Solver Failure',
+                               11 : 'Internal Solver Failure',
+                               12 : 'Solve Processing Skipped',
+                               13 : 'System Failure'
+                               }
+            print('\n \n \n Ran GAMS model: ' + fleet.gms_file)
+            print(f'Model status: {ms}, {model_stat_dict[ms]}'+ '\n')
+            print(f'Solve status: {ss}, {solve_stat_dict[ss]}' + '\n \n \n')
             gams_db = model_run.out_db
             self.export_model = os.path.join(self.export_fp, run_tag + '_solution.gdx')
             gams_db.export(self.export_model)
@@ -345,7 +363,7 @@ class GAMSRunner:
             """ Test calculation for average lifetime vehicle (~12 years)"""
             fleet.veh_oper_cint_avg = fleet.veh_oper_cint.index.levels[4].astype(int)
             ind = fleet.veh_oper_cint.index
-            fleet.veh_oper_cint.index.set_levels(ind.levels[4].astype(int),level=4,inplace=True) #set ages as int
+            fleet.veh_oper_cint.index = fleet.veh_oper_cint.index.set_levels(ind.levels[4].astype(int), level=4) #set ages as int
             fleet.veh_oper_cint.sort_index(level='age', inplace=True)
             fleet.veh_oper_cint.sort_index(level='age', inplace=True)
             fleet.veh_oper_cint_avg = fleet.veh_oper_cint.reset_index(level='age')
@@ -355,6 +373,7 @@ class GAMSRunner:
             fleet.veh_oper_cint_avg = fleet.veh_oper_cint_avg.reorder_levels(['tec','enr','seg','reg','age','modelyear','prodyear'])
 
             fleet.avg_oper_dist = fleet.full_oper_dist.reset_index(level='age')
+            fleet.avg_oper_dist = fleet.avg_oper_dist.astype({'age': 'int32'})
             fleet.avg_oper_dist = fleet.avg_oper_dist[fleet.avg_oper_dist.age <= age]  # again, drop ages over lifetime
             fleet.avg_oper_dist = fleet.avg_oper_dist.set_index([fleet.avg_oper_dist.index, fleet.avg_oper_dist.age]) # make same index for joining with fleet.veh_oper_cint_avg
             fleet.avg_oper_dist.drop(columns='age', inplace=True)

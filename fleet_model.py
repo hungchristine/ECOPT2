@@ -610,19 +610,22 @@ class FleetModel:
         # Export parameters
         self._p_dict = {}
         for p in parameters:
-            try:
-                self._p_dict[p] = gmspy.param2df(p, db=gams_db)
-#            except ValueError:
-#                try:
-#                    self._p_dict[p] = gmspy.param2series(p, db=gams_db)
-##                    print('param2series')
-#                except:
-#                    pass
-#                print(f'Warning!: p_dict ValueError in {p}!')
-#                pass
-            except AttributeError:
-                print(f'Warning!: p_dict AttributeError in {p}! Probably no records for this parameter.')
-                pass
+            # Skip model status and solver status scalar parameters
+            if (p != 'ms') or (p != 'ss'):
+                try:
+                    self._p_dict[p] = gmspy.param2df(p, db=gams_db)
+                except ValueError as e:
+                    print(f'p_dict ValueError in {p}')
+    #                try:
+    #                    self._p_dict[p] = gmspy.param2series(p, db=gams_db)
+    ##                    print('param2series')
+    #                except:
+    #                    pass
+    #                print(f'Warning!: p_dict ValueError in {p}!')
+    #                pass
+                except AttributeError:
+                    print(f'Warning!: p_dict AttributeError in {p}! Probably no records for this parameter.')
+                    pass
 
         # Export variables
         self._v_dict = {}

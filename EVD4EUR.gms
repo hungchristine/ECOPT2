@@ -1008,6 +1008,8 @@ OPTION PROFILE = 2;
 OPTION Solprint = off;
 OPTION savepoint = 1;
 
+Scalar ms 'model status', ss 'solve status';
+
 *-----------------------------------------------------------------------------------
 *
 * Model Execution
@@ -1026,6 +1028,9 @@ SOLVE EVD4EUR_Basic USING LP MINIMIZING TOTC_OPT;
 * Post-processing calculations
 *
 *-----------------------------------------------------------------------------------
+ms = EVD4EUR_Basic.modelstat;
+ss = EVD4EUR_Basic.solvestat;
+
 TOT_BEVS(modelyear) = sum((seg, fleetreg, age), VEH_STCK.l('BEV', seg, fleetreg, modelyear,age)); 
 * total capacity of batteries added by year in MWh
 TOT_BATT_MANUF(modelyear) = sum((seg, fleetreg)$VEH_STCK_ADD.l('BEV', seg, fleetreg, modelyear, new), VEH_STCK_ADD.l('BEV',seg,fleetreg,modelyear,new)*BEV_CAPAC(seg))/1000;
