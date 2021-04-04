@@ -93,36 +93,37 @@ class GAMSRunner:
         # TODO: sort of this bit below
         if filename.find('unit_test'):
             fleet.veh_add_grd = dict()
-            for element in itertools.product(*[fleet.grdeq, fleet.tecs]):
+            for element in itertools.product(*[fleet.sets.grdeq, fleet.sets.tecs]):
                 fleet.veh_add_grd[element] = fleet.tec_add_gradient
         else:
             self.update_fleet(fleet)
 
-        years = gmspy.list2set(self.db, fleet.year,'year')
-        modelyear = gmspy.list2set(self.db, fleet.modelyear,'modelyear')
-        optyear = gmspy.list2set(self.db, fleet.optyear, 'optyear')
-        inityear = gmspy.list2set(self.db, fleet.inityear, 'inityear')
-        tecs = gmspy.list2set(self.db, fleet.tecs, 'tec')
+        years = gmspy.list2set(self.db, fleet.sets.year,'year')
+        modelyear = gmspy.list2set(self.db, fleet.sets.modelyear,'modelyear')
+        optyear = gmspy.list2set(self.db, fleet.sets.optyear, 'optyear')
+        inityear = gmspy.list2set(self.db, fleet.sets.inityear, 'inityear')
+        tecs = gmspy.list2set(self.db, fleet.sets.tecs, 'tec')
         #cohort = gmspy.list2set(self.db, self.cohort, 'prodyear') ## prodyear is an alias of year, not a set of its own
-        age = gmspy.list2set(self.db, fleet.age, 'age')
-        new = gmspy.list2set(self.db, fleet.new, 'new')
-        enr = gmspy.list2set(self.db, fleet.enr, 'enr')
-        seg = gmspy.list2set(self.db, fleet.seg, 'seg')
-        reg = gmspy.list2set(self.db, fleet.reg, 'reg')
-        fleetreg = gmspy.list2set(self.db, fleet.fleetreg, 'fleetreg')
+        age = gmspy.list2set(self.db, fleet.sets.age, 'age')
+        new = gmspy.list2set(self.db, fleet.sets.new, 'new')
+        enr = gmspy.list2set(self.db, fleet.sets.enr, 'enr')
+        seg = gmspy.list2set(self.db, fleet.sets.seg, 'seg')
+        reg = gmspy.list2set(self.db, fleet.sets.reg, 'reg')
+        fleetreg = gmspy.list2set(self.db, fleet.sets.fleetreg, 'fleetreg')
         # mat = gmspy.list2set(self.db, fleet.mat, 'mat')
-        demeq =  gmspy.list2set(self.db, fleet.demeq, 'demeq')
-        dstvar = gmspy.list2set(self.db, fleet.dstvar, 'dstvar')
-        enreq = gmspy.list2set(self.db, fleet.enreq, 'enreq')
-        grdeq = gmspy.list2set(self.db, fleet.grdeq, 'grdeq')
-        lfteq = gmspy.list2set(self.db, fleet.lfteq, 'lfteq')
-        sigvar = gmspy.list2set(self.db, fleet.sigvar, 'sigvar')
-        veheq = gmspy.list2set(self.db, fleet.veheq, 'veheq')
+        demeq =  gmspy.list2set(self.db, fleet.sets.demeq, 'demeq')
+        dstvar = gmspy.list2set(self.db, fleet.sets.dstvar, 'dstvar')
+        enreq = gmspy.list2set(self.db, fleet.sets.enreq, 'enreq')
+        grdeq = gmspy.list2set(self.db, fleet.sets.grdeq, 'grdeq')
+        lfteq = gmspy.list2set(self.db, fleet.sets.lfteq, 'lfteq')
+        sigvar = gmspy.list2set(self.db, fleet.sets.sigvar, 'sigvar')
+        veheq = gmspy.list2set(self.db, fleet.sets.veheq, 'veheq')
 
-        mat_cats = gmspy.list2set(self.db, fleet.mat_cats, 'mat_cats')
-        mat_prods = gmspy.list2set(self.db, sum(fleet.mat_dict.values(), []), 'mat_prod')  # concatenate all material producers
-        mat = self.db.add_set("mat",2,"")
-        for key, item in fleet.mat_dict.items():
+        mat_cats = gmspy.list2set(self.db, fleet.sets.mat_cats, 'mat_cats')
+        mat_prods = gmspy.list2set(self.db, sum(fleet.sets.mat_prod.values(), []), 'mat_prod')  # concatenate all material producers
+        # mat_prods = gmspy.list2set(self.db, sum(fleet.mat_dict.values(), []), 'mat_prod')  # concatenate all material producers
+        mat = self.db.add_set("mat", 2, "")
+        for key, item in fleet.sets.mat_prod.items():
             for producer in item:
                 mat.add_record((key, producer))
 

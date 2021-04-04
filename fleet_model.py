@@ -7,6 +7,7 @@ Created on Sun Apr 21 13:27:57 2019
 
 import os
 import sys
+import traceback
 import pandas as pd
 import numpy as np
 from scipy.stats import norm
@@ -24,7 +25,7 @@ import itertools
 
 import gams
 import gmspy
-
+from fleet_model_init import SetsClass
 
 class FleetModel:
     """
@@ -82,6 +83,7 @@ class FleetModel:
     """
 
     def __init__(self,
+                 sets: SetsClass=None,
                  veh_stck_int_seg=None,
                  tec_add_gradient=None,
                  seg_batt_caps=None,
@@ -154,6 +156,7 @@ class FleetModel:
         if gdx_file is not None:
             self._from_gdx(gdx_file)
         else:
+            self.sets = sets
             try:
                 self._from_python(veh_stck_int_seg, tec_add_gradient, seg_batt_caps,
                                   B_term_prod, B_term_oper_EOL, r_term_factors, u_term_factors,
@@ -162,6 +165,7 @@ class FleetModel:
 #                self.B_oper = B_term_oper_EOL # not currently used
             except AttributeError as err:
                 print(f"Exception: {err}")
+                print(traceback.format_exc())
                 print("Generating empty fleet object")
 
     def _from_python(self, veh_stck_int_seg, tec_add_gradient, seg_batt_caps,
@@ -222,22 +226,23 @@ class FleetModel:
 
         """ GAMS-relevant attributes"""
         #  --------------- GAMS sets / domains -------------------------------
+
         # sets to check for in Excel sheet
-        self.set_list = ['tecs', 'enr', 'seg', 'mat_cats', 'reg', 'fleetreg',
-                         'year', 'modelyear', 'inityear',
-                         'cohort', 'optyear', 'age']
+        # self.set_list = ['tecs', 'enr', 'seg', 'mat_cats', 'reg', 'fleetreg',
+        #                  'year', 'modelyear', 'inityear',
+        #                  'cohort', 'optyear', 'age']
 
-        self.sets_from_excel(r"C:\Users\chrishun\Box Sync\YSSP_temp\Data\load_data\sets.xlsx")
-        self.new = ['0']
-        self.demeq = ['STCK_TOT', 'OPER_DIST', 'OCUP']             # definition of
-        self.dstvar = ['mean', 'stdv']
-        self.enreq = ['CINT']
-        self.grdeq = ['IND', 'ALL']
-        self.veheq = ['PROD_EINT', 'PROD_CINT_CSNT', 'OPER_EINT', 'EOLT_CINT']
-        self.lfteq = ['LFT_DISTR', 'AGE_DISTR']
-        self.sigvar = ['A', 'B', 'r', 'u']                         # S-curve terms
+        # self.sets_from_excel(r"C:\Users\chrishun\Box Sync\YSSP_temp\Data\load_data\sets.xlsx")
+        # self.new = ['0']
+        # self.demeq = ['STCK_TOT', 'OPER_DIST', 'OCUP']             # definition of
+        # self.dstvar = ['mean', 'stdv']
+        # self.enreq = ['CINT']
+        # self.grdeq = ['IND', 'ALL']
+        # self.veheq = ['PROD_EINT', 'PROD_CINT_CSNT', 'OPER_EINT', 'EOLT_CINT']
+        # self.lfteq = ['LFT_DISTR', 'AGE_DISTR']
+        # self.sigvar = ['A', 'B', 'r', 'u']                         # S-curve terms
 
-        self.age_int = list(map(int,self.age))
+        # self.age_int = list(map(int, self.age))
 
         # --------------- GAMS Parameters -------------------------------------
 
@@ -276,9 +281,9 @@ class FleetModel:
         # [years] driving distance each year # TODO: rename?
 
         self.veh_stck_int_seg = veh_stck_int_seg or [0.08, 0.21, 0.27, 0.08, 0.03, 0.34]  # Shares from 2017, ICCT report
-        self.veh_stck_int_seg = pd.Series(self.veh_stck_int_seg, index=self.seg)
+        self.veh_stck_int_seg = pd.Series(self.veh_stck_int_seg, index=self.sets.seg)
 
-        self.seg_batt_caps = pd.Series(seg_batt_caps, index=self.seg)  # For battery manufacturing capacity constraint
+        self.seg_batt_caps = pd.Series(seg_batt_caps, index=self.sets.seg)  # For battery manufacturing capacity constraint
         self.eur_batt_share = eur_batt_share or 0.5
 
         #### Life cycle intensities ####
@@ -318,16 +323,16 @@ class FleetModel:
         self.std_dev_age = 2.21
 #        self.avg_age = 11
 #        self.std_dev_age = 0
-        self.veh_lift_cdf = pd.Series(norm.cdf(self.age_int, self.avg_age, self.std_dev_age), index=self.age)#pd.Series(pd.read_pickle(self.import_fp+'input.pkl'))#pd.DataFrame()  # [age] TODO Is it this one we feed to gams?
+        self.veh_lift_cdf = pd.Series(norm.cdf(self.sets.age_int, self.avg_age, self.std_dev_age), index=self.sets.age)#pd.Series(pd.read_pickle(self.import_fp+'input.pkl'))#pd.DataFrame()  # [age] TODO Is it this one we feed to gams?
         self.veh_lift_cdf.index = self.veh_lift_cdf.index.astype('str')
 
         self.veh_lift_age = pd.Series(1 - self.veh_lift_cdf)     # [age] # probability of car of age x to die in current year
 
         #lifetime = [1-self.veh_lift_age[i+1]/self.veh_lift_age[i] for i in range(len(self.age)-1)]
-        self.veh_lift_pdf = pd.Series(calc_steadystate_vehicle_age_distributions(self.age_int, self.avg_age, self.std_dev_age), index=self.age)   # idealized age PDF given avg fleet age and std dev
+        self.veh_lift_pdf = pd.Series(calc_steadystate_vehicle_age_distributions(self.sets.age_int, self.avg_age, self.std_dev_age), index=self.sets.age)   # idealized age PDF given avg fleet age and std dev
         self.veh_lift_pdf.index = self.veh_lift_pdf.index.astype('str')
 
-        self.veh_lift_mor = pd.Series(calc_probability_of_vehicle_retirement(self.age_int, self.veh_lift_pdf), index=self.age)
+        self.veh_lift_mor = pd.Series(calc_probability_of_vehicle_retirement(self.sets.age_int, self.veh_lift_pdf), index=self.sets.age)
         self.veh_lift_mor.index = self.veh_lift_mor.index.astype('str')
 
         # Initial stocks
@@ -348,13 +353,13 @@ class FleetModel:
         self.veh_pay = pd.DataFrame(pd.read_excel(self.import_fp, sheet_name='VEH_PAY', header=None, usecols='A:D', skiprows=[0]))            # [cohort, age, year]
         self.veh_pay = self._process_df_to_series(self.veh_pay)
 
-        self.age_par = pd.Series([float(i) for i in self.age])
+        self.age_par = pd.Series([float(i) for i in self.sets.age])
         self.age_par.index = self.age_par.index.astype('str')
 
-        self.year_par = pd.Series([float(i) for i in self.cohort], index=self.cohort)
+        self.year_par = pd.Series([float(i) for i in self.sets.cohort], index=self.sets.cohort)
         self.year_par.index = self.year_par.index.astype('str')
 
-        self.prodyear_par = pd.Series([int(i) for i in self.cohort], index=self.cohort)
+        self.prodyear_par = pd.Series([int(i) for i in self.sets.cohort], index=self.sets.cohort)
         self.prodyear_par.index = self.prodyear_par.index.astype('str')
 
         # Temporary introduction of seg-specific VEH_PARTAB from Excel; will later be read in from YAML
@@ -381,8 +386,8 @@ class FleetModel:
         self.recycle_rate = recycle_rate or 0.75
 
         self.growth_constraint = 0  #growth_constraint
-        self.gro_cnstrnt = [self.growth_constraint for i in range(len(self.modelyear))]
-        self.gro_cnstrnt = pd.Series(self.gro_cnstrnt, index=self.modelyear)
+        self.gro_cnstrnt = [self.growth_constraint for i in range(len(self.sets.modelyear))]
+        self.gro_cnstrnt = pd.Series(self.gro_cnstrnt, index=self.sets.modelyear)
         self.gro_cnstrnt.index = self.gro_cnstrnt.index.astype('str')
 
         self.manuf_cnstrnt = pd.read_excel(self.import_fp, sheet_name='MANUF_CONSTR', header=None, usecols='A,B', skiprows=[0])  # Assumes stabilized manufacturing capacity post-2030ish; in GWh
@@ -393,12 +398,12 @@ class FleetModel:
 #        self.manuf_cnstrnt.index = self.manuf_cnstrnt.index.astype('str')
         self.manuf_cnstrnt = self.manuf_cnstrnt * self.eur_batt_share
 
-        self.mat_content = [[0.11, 0.05] for year in range(len(self.modelyear))]
-        self.mat_content = pd.DataFrame(self.mat_content, index=self.modelyear, columns=self.mat_cats)
+        self.mat_content = [[0.11, 0.05] for year in range(len(self.sets.modelyear))]
+        self.mat_content = pd.DataFrame(self.mat_content, index=self.sets.modelyear, columns=self.sets.mat_cats)
         self.mat_content.index = self.mat_content.index.astype('str')
 
-        self.recovery_pct = [[recycle_rate]*len(self.mat_cats) for year in range(len(self.modelyear))]
-        self.recovery_pct = pd.DataFrame(self.recovery_pct, index=self.modelyear, columns=self.mat_cats)
+        self.recovery_pct = [[recycle_rate]*len(self.sets.mat_cats) for year in range(len(self.sets.modelyear))]
+        self.recovery_pct = pd.DataFrame(self.recovery_pct, index=self.sets.modelyear, columns=self.sets.mat_cats)
         self.recovery_pct.index = self.recovery_pct.index.astype('str')
 
         self.virg_mat = pd.read_excel(self.import_fp, sheet_name='virg_mat', header=[0], usecols='A:E', index_col=[0], skiprows=[0,1])
@@ -463,6 +468,7 @@ class FleetModel:
 #        self.opt.DumpParms = 2
         self.opt.ForceWork = 1"""
 #        self.opt.SysOut = 1
+
     @classmethod
     def _from_gdx(self, gdx_file):
         """
@@ -2151,11 +2157,11 @@ def vis_GAMS(fleet, fp, filename, param_values, export_png, export_pdf=True, max
         plt.yticks(fontsize=14)
 
     """--- Plot production mixes for virgin critical materials ---"""
-    fig, axes = plt.subplots(len(fleet.mat_cats), 1, sharex=True)
+    fig, axes = plt.subplots(len(fleet.sets.mat_cats), 1, sharex=True)
     plot_data = fleet.mat_mix.copy()
     plot_data.drop(index=plot_data.loc[str(max_year + 2001):].index.tolist(), inplace=True)
     plot_data = plot_data / 1e6
-    for i, (mat, prods) in enumerate(fleet.mat_dict.items()):
+    for i, (mat, prods) in enumerate(fleet.sets.mat_prod.items()):
         plot_data[prods].plot(ax=axes[i], kind='area', stacked=True, cmap='jet')
         axes[i].set_title(f'{mat} production mix', fontsize=10, fontweight='bold')
         axes[i].legend(title=f'{mat} producer')
@@ -2173,11 +2179,11 @@ def vis_GAMS(fleet, fp, filename, param_values, export_png, export_pdf=True, max
 
 
     """ Plot evolution of lifecycle emissions """
-    fig, axes = plt.subplots(len(fleet.fleetreg), len(fleet.tecs), sharey=True, sharex=True, figsize=(5, 12))
+    fig, axes = plt.subplots(len(fleet.sets.fleetreg), len(fleet.sets.tecs), sharey=True, sharex=True, figsize=(5, 12))
     plt.subplots_adjust(top=0.85, hspace=0.25, wspace=0.05)
 
-    for i, reg in enumerate(fleet.fleetreg):
-        for j, tec in enumerate(fleet.tecs):
+    for i, reg in enumerate(fleet.sets.fleetreg):
+        for j, tec in enumerate(fleet.sets.tecs):
             plot_data = fleet.LC_emissions.unstack('seg').loc(axis=0)[tec, '1995':'2050', reg]
             plot_data.plot(ax=axes[i,j], legend=False)
             axes[i,j].set_title(f'{tec}, {reg}', fontsize=10, fontweight='bold')

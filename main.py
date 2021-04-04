@@ -9,6 +9,8 @@ import sys
 
 import fleet_model
 import gams_runner
+from fleet_model_init import SetsClass
+
 #import sigmoid
 #import test_gams
 from itertools import product
@@ -167,7 +169,8 @@ def run_experiment():
         # need to pass in run ID tag for saving gdx/csv
         # instantiate FleetModel object
         # NB here, use explicit names to avoid any confusion
-        fm = fleet_model.FleetModel(veh_stck_int_seg = veh_stck_int_seg[1],
+        sets = SetsClass.from_file(r'C:\Users\chrishun\Box Sync\YSSP_temp\Data\load_data\sets.xlsx')
+        fm = fleet_model.FleetModel(sets, veh_stck_int_seg = veh_stck_int_seg[1],
                                     tec_add_gradient = tec_add_gradient[1],
                                     seg_batt_caps = seg_batt_caps[1],
                                     B_term_prod = B_term_prod[1],
@@ -176,6 +179,16 @@ def run_experiment():
                                     u_term_factors = u_term_factors[1],
                                     eur_batt_share = eur_batt_share[1],
                                     pkm_scenario = pkm_scenario[1])#,
+#                                    growth_constraint = growth_constraint[1])
+        # fm = fleet_model.FleetModel(veh_stck_int_seg = veh_stck_int_seg[1],
+        #                             tec_add_gradient = tec_add_gradient[1],
+        #                             seg_batt_caps = seg_batt_caps[1],
+        #                             B_term_prod = B_term_prod[1],
+        #                             B_term_oper_EOL = B_term_oper_EOL[1],
+        #                             r_term_factors = r_term_factors[1],
+        #                             u_term_factors = u_term_factors[1],
+        #                             eur_batt_share = eur_batt_share[1],
+        #                             pkm_scenario = pkm_scenario[1])#,
 #                                    growth_constraint = growth_constraint[1])
 
         """fm.run_GAMS(run_tag)"""
