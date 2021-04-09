@@ -9,7 +9,7 @@ import sys
 
 import fleet_model
 import gams_runner
-from fleet_model_init import SetsClass
+from fleet_model_init import SetsClass, ParametersClass
 
 #import sigmoid
 #import test_gams
@@ -68,12 +68,12 @@ now = datetime.now().isoformat(timespec='minutes').replace(':','_')
 yaml_name = 'GAMS_input'#.yaml'
 # yaml_name = 'GAMS_input_demo'
 
-if yaml_name == 'unit_test.yaml':
+if 'unit_test' in yaml_name:
     fp = r'C:\Users\chrishun\Box Sync\YSSP_temp\visualization output\unit_test_' + now
-    input_file = r'C:\Users\chrishun\Box Sync\YSSP_temp\unit_test.yaml'
+    input_file = os.path.join(os.path.curdir, yaml_name + '.yml') #r'C:\Users\chrishun\Box Sync\YSSP_temp\unit_test.yaml'
 else:
     fp = r'C:\Users\chrishun\Box Sync\YSSP_temp\visualization output\Run_' + now
-    input_file = r'C:\Users\chrishun\Box Sync\YSSP_temp\GAMS_input.yaml'
+    input_file = os.path.join(os.path.abspath(os.path.curdir), yaml_name + '.yaml') #'r'C:\Users\chrishun\Box Sync\YSSP_temp\ +yaml_name+'.yaml'
 
 try:
     os.mkdir(fp)
@@ -94,7 +94,7 @@ def run_experiment():
     # r'C:\Users\chrishun\Box Sync\YSSP_temp\temp_input.yaml'
     # r'C:\Users\chrishun\Box Sync\YSSP_temp\temp_input_presubmission.yaml'
 #    with open(r'C:\Users\chrishun\Box Sync\YSSP_temp\GAMS_input.yaml', 'r') as stream:
-
+    print(os.path.abspath(os.path.curdir))
     with open(input_file, 'r') as stream:
         try:
             params = yaml.safe_load(stream)
@@ -102,10 +102,15 @@ def run_experiment():
         except yaml.YAMLError as exc:
             print(exc)
 
+    params_dict = {}  # dict with parameter names key values, and dict of experiments as values
+    for key, item in params.items():
+        params_dict[key] = item
+
     # Dictionary for logging
     info = {}
 
     # Explicit list of parameters
+    """
     param_names = ['veh_stck_int_seg',
                    'tec_add_gradient',
                    'seg_batt_caps',
@@ -117,8 +122,9 @@ def run_experiment():
                    'pkm_scenario']#,'seg_batt_caps']
 
     # Run experiments
+    # list of dict items for each parameter
     id_and_value = [params[p].items() for p in param_names]
-
+    """
     # NB could also change the names here
 
     # Calculate total number of runs, for progress updates
@@ -141,9 +147,41 @@ def run_experiment():
     # Create a GAMSRunner object to run the experiments
     gams_run = gams_runner.GAMSRunner()
 
+    all_exp_list = []  # list of all exp_dicts
+    exp_dict = {}  # dict containing current experiment parameters
+    param_vals = [params_dict[p].items() for p in params_dict.keys()]  # list containing all parameter experiment values (for Cartesian product)
+    exp_id_list = []  # list of experiment IDs
+
+    # unpack/create all experiments as Cartesian product of all parameter options
+    now = datetime.now().isoformat(timespec='minutes').replace(':', '_')  # timestamp for run ID
+    for i, experiment in enumerate(product(*param_vals)):
+        id_string = "run"
+
+        for key, exp in zip(params_dict.keys(), experiment):
+            # build dict describing each experiment - {parameter: experiment value}
+            exp_dict[key] = exp[1]
+            id_string = id_string + "_" + exp[0]  # make run ID
+        all_exp_list.append(exp_dict.copy())
+        exp_id_list.append(id_string + now)
+
+    # start iterating and running experiments
+    for i, experiment in enumerate(all_exp_list):
+        print('Starting run ' + str(i+1) + ' of ' + str(count) + '\n\n')
+        log.info(f'Starting run {exp_id_list[i]}')
+        run_tag = exp_id_list[i]
+        run_id = f'run{i}'
+        run_id_list.append(run_id)
+
+        sets = SetsClass.from_file(r'C:\Users\chrishun\Box Sync\YSSP_temp\Data\load_data\sets.xlsx')
+        params = ParametersClass.from_file(r'C:\Users\chrishun\Box Sync\YSSP_temp\Data\load_data\GAMS_input_demo.xls', experiment=experiment)
+        fm = fleet_model.FleetModel(sets,
+                                    params
+                                    )
+
+        """
     for i, run_params in enumerate(product(*id_and_value)):
         print('Starting run ' + str(i+1) + ' of ' + str(count) + '\n\n')
-#        veh_seg_shr, tec_add_gradient, seg_batt_caps = run_params
+        #        veh_seg_shr, tec_add_gradient, seg_batt_caps = run_params
         # Unpack the defined run parameters from YAML file
         veh_stck_int_seg, tec_add_gradient, seg_batt_caps, B_term_prod, B_term_oper_EOL, r_term_factors, u_term_factors, eur_batt_share, pkm_scenario = run_params
 
@@ -156,21 +194,25 @@ def run_experiment():
         # run_id = f'run_{i}'  # alternate tag format
 
         # Run the appropriate function to make sigmoid parameters/values
-#        sigm = sigmoid.Sigmoid
-#        fun = getattr(sigm, 'batt_cap')(seg_batt_caps[1])
-#        values = fun()
+        #        sigm = sigmoid.Sigmoid
+        #        fun = getattr(sigm, 'batt_cap')(seg_batt_caps[1])
+        #        values = fun()
 
-#        values = sigmoid.make_values(**sigmoid_case[1])
-#        values = sigmoid.make_values(A_batt_size=30, F_batt_size=100)
+        #        values = sigmoid.make_values(**sigmoid_case[1])
+        #        values = sigmoid.make_values(A_batt_size=30, F_batt_size=100)
 
 
         log.info(f'Starting run {run_id}')
-
+        """
+        """
         # need to pass in run ID tag for saving gdx/csv
         # instantiate FleetModel object
-        # NB here, use explicit names to avoid any confusion
-        sets = SetsClass.from_file(r'C:\Users\chrishun\Box Sync\YSSP_temp\Data\load_data\sets.xlsx')
-        fm = fleet_model.FleetModel(sets, veh_stck_int_seg = veh_stck_int_seg[1],
+        # NB here, use explicit names to avoid any confusion """
+        # sets = SetsClass.from_file(r'C:\Users\chrishun\Box Sync\YSSP_temp\Data\load_data\sets.xlsx')
+
+        """
+        fm = fleet_model.FleetModel(sets,
+                                    veh_stck_int_seg = veh_stck_int_seg[1],
                                     tec_add_gradient = tec_add_gradient[1],
                                     seg_batt_caps = seg_batt_caps[1],
                                     B_term_prod = B_term_prod[1],
@@ -179,7 +221,7 @@ def run_experiment():
                                     u_term_factors = u_term_factors[1],
                                     eur_batt_share = eur_batt_share[1],
                                     pkm_scenario = pkm_scenario[1])#,
-#                                    growth_constraint = growth_constraint[1])
+        #                                    growth_constraint = growth_constraint[1])
         # fm = fleet_model.FleetModel(veh_stck_int_seg = veh_stck_int_seg[1],
         #                             tec_add_gradient = tec_add_gradient[1],
         #                             seg_batt_caps = seg_batt_caps[1],
@@ -189,9 +231,12 @@ def run_experiment():
         #                             u_term_factors = u_term_factors[1],
         #                             eur_batt_share = eur_batt_share[1],
         #                             pkm_scenario = pkm_scenario[1])#,
-#                                    growth_constraint = growth_constraint[1])
+        #                                    growth_constraint = growth_constraint[1])
+
+    """
 
         """fm.run_GAMS(run_tag)"""
+
         try:
             gams_run.run_GAMS(fm, run_tag, yaml_name, now)  # run the GAMS model
         except Exception:
@@ -222,21 +267,23 @@ def run_experiment():
 
         # Save log info
         info[run_tag] = {
-            'params': {
-                'veh_stck_int_seg ': veh_stck_int_seg,
-                'tec_add_gradient ': tec_add_gradient,
-                'seg_batt_caps ': seg_batt_caps,
-                'B_term_prod ': B_term_prod,
-                'B_term_oper_EOL ': B_term_oper_EOL,
-                'r_term_factors ': r_term_factors,
-                'u_term_factors ': u_term_factors,
-                'pkm_scenario': pkm_scenario,
-                'European share of global batter manuf. capacity': eur_batt_share
-            },
+            'params': experiment,
+            #     'veh_stck_int_seg ': veh_stck_int_seg,
+            #     'tec_add_gradient ': tec_add_gradient,
+            #     'seg_batt_caps ': seg_batt_caps,
+            #     'B_term_prod ': B_term_prod,
+            #     'B_term_oper_EOL ': B_term_oper_EOL,
+            #     'r_term_factors ': r_term_factors,
+            #     'u_term_factors ': u_term_factors,
+            #     'pkm_scenario': pkm_scenario,
+            #     'European share of global batter manuf. capacity': eur_batt_share
+            # },
             'output': {
 #                'totc': 42,   # life, the universe, and everything…
 #                 'first year of 100% BEV market share': fm.full_BEV_year
                  'totc_opt': fm.totc_opt,
+                 'solver status': gams_run.ss,
+                 'model status': gams_run.ms
 #                 'BEV shares in 2030': fm.shares_2030.loc[:,'BEV'].to_string(),
 #                 'totc in optimization period':fm.totc_opt # collect these from all runs into a dataframe...ditto with shares of BEV/ICE
             }
@@ -245,9 +292,18 @@ def run_experiment():
 #        with open(fp+'\failed.txt','a+') as f:
 #            f.write('Successful run. Next: visualization!')
 
+        # convert dict values in experiment to list (drop keys)
+        exp_params = {}
+        for key, value in experiment.items():
+            if isinstance(value, dict):
+                tmp = [val for key, val in value.items()]
+                exp_params[key] = tmp
+            else:
+                exp_params[key] = value
+
         try:
             fm.figure_calculations()  # run extra calculations for cross-experiment figures
-            fleet_model.vis_GAMS(fm, fp, run_id, info[run_tag]['params'], export_png=False)
+            fleet_model.vis_GAMS(fm, fp, run_id, experiment, export_png=False)
         except Exception:
             log.warning("Failed visualization, deleting folder")
             traceback.print_exc()
@@ -287,6 +343,7 @@ def run_experiment():
         # Display the info for this run
         log.info(repr(info[run_tag]))
         print('\n\n\n ********** End of run ' + str(i+1) + ' ************** \n\n\n')
+
 
     # Write log to file
     with open(f'output_{now}.yaml', 'w') as f:

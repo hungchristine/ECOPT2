@@ -91,7 +91,7 @@ class GAMSRunner:
 #        self.db.clear() # need to add functionality to gmspy --> check if Symbol exists in database, write over
         self.db = self.ws.add_database(database_name='pyGAMS_input')#database_name='pyGAMSdb')
         # TODO: sort of this bit below
-        if filename.find('unit_test'):
+        if filename.find('unit_test') >= 0:
             fleet.veh_add_grd = dict()
             for element in itertools.product(*[fleet.sets.grdeq, fleet.sets.tecs]):
                 fleet.veh_add_grd[element] = fleet.tec_add_gradient
@@ -128,10 +128,10 @@ class GAMSRunner:
                 mat.add_record((key, producer))
 
 
-        veh_oper_dist = gmspy.df2param(self.db, fleet.veh_oper_dist, ['year'], 'VEH_OPER_DIST')
-        veh_stck_tot = gmspy.df2param(self.db, fleet.veh_stck_tot, ['year', 'fleetreg'], 'VEH_STCK_TOT')
-        veh_stck_int_seg = gmspy.df2param(self.db, fleet.veh_stck_int_seg, ['seg'], 'VEH_STCK_INT_SEG')
-        bev_capac = gmspy.df2param(self.db, fleet.seg_batt_caps, ['seg'], 'BEV_CAPAC')
+        veh_oper_dist = gmspy.df2param(self.db, fleet.parameters.veh_oper_dist, ['year'], 'VEH_OPER_DIST')
+        veh_stck_tot = gmspy.df2param(self.db, fleet.parameters.veh_stck_tot, ['year', 'fleetreg'], 'VEH_STCK_TOT')
+        veh_stck_int_seg = gmspy.df2param(self.db, fleet.parameters.veh_stck_int_seg, ['seg'], 'VEH_STCK_INT_SEG')
+        bev_capac = gmspy.df2param(self.db, fleet.parameters.seg_batt_caps, ['seg'], 'BEV_CAPAC')
 
         veh_lift_cdf = gmspy.df2param(self.db, fleet.veh_lift_cdf, ['age'], 'VEH_LIFT_CDF')
         veh_lift_pdf = gmspy.df2param(self.db, fleet.veh_lift_pdf, ['age'], 'VEH_LIFT_PDF')
@@ -139,15 +139,14 @@ class GAMSRunner:
         veh_lift_mor = gmspy.df2param(self.db, fleet.veh_lift_mor, ['age'], 'VEH_LIFT_MOR')
 
         ######  OBS: Originally calculated using VEH_STCK_INT_TEC, VEH_LIFT_AGE, VEH_STCK_TOT
-        veh_stck_int = gmspy.df2param(self.db, fleet.veh_stck_int, ['tec','seg', 'age'], 'VEH_STCK_INT')
+        # veh_stck_int = gmspy.df2param(self.db, fleet.veh_stck_int, ['tec','seg', 'age'], 'VEH_STCK_INT')
         veh_stck_int_tec = gmspy.df2param(self.db, fleet.veh_stck_int_tec,['tec'],'VEH_STCK_INT_TEC')
 
-        enr_veh = gmspy.df2param(self.db, fleet.enr_veh, ['enr', 'tec'], 'ENR_VEH')
+        enr_veh = gmspy.df2param(self.db, fleet.parameters.enr_veh, ['enr', 'tec'], 'ENR_VEH')
         enr_cint = gmspy.df2param(self.db, fleet.enr_cint, ['enr', 'reg', 'year'], 'ENR_CINT')
 
-        veh_pay = gmspy.df2param(self.db, fleet.veh_pay, ['prodyear', 'age', 'year'], 'VEH_PAY')
+        veh_pay = gmspy.df2param(self.db, fleet.parameters.veh_pay, ['prodyear', 'age', 'year'], 'VEH_PAY')
 
-        #age_par = gmspy.df2param(self.db,self.age_par, ['age'], 'AGE_PAR')
         year_par = gmspy.df2param(self.db, fleet.year_par, ['year'], 'YEAR_PAR')
         veh_partab = gmspy.df2param(self.db, fleet.veh_partab, ['veheq', 'tec', 'seg', 'sigvar'], 'VEH_PARTAB')
 
@@ -163,11 +162,11 @@ class GAMSRunner:
 
         gro_cnstrnt = gmspy.df2param(self.db, fleet.gro_cnstrnt, ['year'], 'GRO_CNSTRNT')
 
-        manuf_cnstrnt = gmspy.df2param(self.db, fleet.manuf_cnstrnt, ['year'], 'MANUF_CNSTRNT')
+        manuf_cnstrnt = gmspy.df2param(self.db, fleet.parameters.manuf_cnstrnt, ['year'], 'MANUF_CNSTRNT')
 
-        mat_content = gmspy.df2param(self.db, fleet.mat_content, ['year','mat_cats'], 'MAT_CONTENT')
-        mat_cint = gmspy.df2param(self.db, fleet.mat_cint, ['year', 'mat_prods'], 'MAT_CINT')
-        virg_mat= gmspy.df2param(self.db, fleet.virg_mat, ['year','mat_prod'], 'VIRG_MAT_SUPPLY')
+        mat_content = gmspy.df2param(self.db, fleet.parameters.mat_content, ['year','mat_cats'], 'MAT_CONTENT')
+        mat_cint = gmspy.df2param(self.db, fleet.parameters.mat_cint, ['year', 'mat_prods'], 'MAT_CINT')
+        virg_mat = gmspy.df2param(self.db, fleet.parameters.virg_mat_supply, ['year','mat_prod'], 'VIRG_MAT_SUPPLY')
         recovery_pct = gmspy.df2param(self.db, fleet.recovery_pct, ['year','mat_cats'], 'RECOVERY_PCT')
 
         # enr_partab = gmspy.df2param(self.db, fleet.enr_partab,['enr', 'enreq', 'sigvar'], 'ENR_PARTAB')
@@ -234,24 +233,24 @@ class GAMSRunner:
 
         """ tec_add_gradient --> veh_add_grd """
         fleet.veh_add_grd = dict()
-        for element in itertools.product(*[fleet.grdeq, fleet.tecs]):
-            fleet.veh_add_grd[element] = fleet.tec_add_gradient
+        for element in itertools.product(*[fleet.sets.grdeq, fleet.sets.tecs]):
+            fleet.veh_add_grd[element] = fleet.parameters.tec_add_gradient
 
         """ occupancy_rate --> veh_oper_dist """
-        fleet.fleet_vkm = fleet.passenger_demand/fleet.occupancy_rate
-        fleet.veh_oper_dist = fleet.fleet_vkm/fleet.veh_stck_tot
+        fleet.fleet_vkm = fleet.passenger_demand/fleet.parameters.occupancy_rate
+        fleet.veh_oper_dist = fleet.fleet_vkm/fleet.parameters.veh_stck_tot
 
         """ recalculate age functions"""
-        fleet.veh_lift_cdf = pd.Series(norm.cdf(fleet.age_int, fleet.avg_age, fleet.std_dev_age), index=fleet.age)#pd.Series(pd.read_pickle(fleet.import_fp+'input.pkl'))#pd.DataFrame()  # [age] TODO Is it this one we feed to gams?
+        fleet.veh_lift_cdf = pd.Series(norm.cdf(fleet.sets.age_int, fleet.avg_age, fleet.std_dev_age), index=fleet.sets.age)#pd.Series(pd.read_pickle(fleet.import_fp+'input.pkl'))#pd.DataFrame()  # [age] TODO Is it this one we feed to gams?
         fleet.veh_lift_cdf.index = fleet.veh_lift_cdf.index.astype('str')
 
         fleet.veh_lift_age = pd.Series(1 - fleet.veh_lift_cdf)     # [age] # probability of car of age x to die in current year
 
         #lifetime = [1-fleet.veh_lift_age[i+1]/fleet.veh_lift_age[i] for i in range(len(fleet.age)-1)]
-        fleet.veh_lift_pdf = pd.Series(fleet_model.calc_steadystate_vehicle_age_distributions(fleet.age_int, fleet.avg_age, fleet.std_dev_age), index = fleet.age)   # idealized age PDF given avg fleet age and std dev
+        fleet.veh_lift_pdf = pd.Series(fleet_model.calc_steadystate_vehicle_age_distributions(fleet.sets.age_int, fleet.avg_age, fleet.std_dev_age), index = fleet.sets.age)   # idealized age PDF given avg fleet age and std dev
         fleet.veh_lift_pdf.index = fleet.veh_lift_pdf.index.astype('str')
 
-        fleet.veh_lift_mor = pd.Series(fleet_model.calc_probability_of_vehicle_retirement(fleet.age_int, fleet.veh_lift_pdf),  index=fleet.age)
+        fleet.veh_lift_mor = pd.Series(fleet_model.calc_probability_of_vehicle_retirement(fleet.sets.age_int, fleet.veh_lift_pdf),  index=fleet.sets.age)
         fleet.veh_lift_mor.index = fleet.veh_lift_mor.index.astype('str')
 
     def run_GAMS(self, fleet, run_tag, filename, timestamp):

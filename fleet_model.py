@@ -25,7 +25,7 @@ import itertools
 
 import gams
 import gmspy
-from fleet_model_init import SetsClass
+from fleet_model_init import SetsClass, ParametersClass
 
 class FleetModel:
     """
@@ -84,17 +84,18 @@ class FleetModel:
 
     def __init__(self,
                  sets: SetsClass=None,
-                 veh_stck_int_seg=None,
-                 tec_add_gradient=None,
-                 seg_batt_caps=None,
-                 B_term_prod=None,
-                 B_term_oper_EOL=None,
-                 r_term_factors=0.2,
-                 u_term_factors=2025,
+                 parameters: ParametersClass=None,
+                 # veh_stck_int_seg=None,
+                 # tec_add_gradient=None,
+                 # seg_batt_caps=None,
+                 # B_term_prod=None,
+                 # B_term_oper_EOL=None,
+                 # r_term_factors=0.2,
+                 # u_term_factors=2025,
                  pkm_scenario='iTEM2-Base',
-                 eur_batt_share=0.5,
-                 occupancy_rate=1.643,
-                 recycle_rate=0.6,
+                 # eur_batt_share=0.5,
+                 # occupancy_rate=1.643,
+                 # recycle_rate=0.6,
                  data_from_message=None,
                  gdx_file=None
                  ):
@@ -157,10 +158,12 @@ class FleetModel:
             self._from_gdx(gdx_file)
         else:
             self.sets = sets
+            self.parameters = parameters
             try:
-                self._from_python(veh_stck_int_seg, tec_add_gradient, seg_batt_caps,
+                self._from_python(data_from_message)
+                """self._from_python(veh_stck_int_seg, tec_add_gradient, seg_batt_caps,
                                   B_term_prod, B_term_oper_EOL, r_term_factors, u_term_factors,
-                                  pkm_scenario, eur_batt_share, occupancy_rate, recycle_rate, data_from_message)
+                                  pkm_scenario, eur_batt_share, occupancy_rate, recycle_rate, data_from_message)"""
 #                self.B_prod = B_term_prod # not currently used
 #                self.B_oper = B_term_oper_EOL # not currently used
             except AttributeError as err:
@@ -168,9 +171,10 @@ class FleetModel:
                 print(traceback.format_exc())
                 print("Generating empty fleet object")
 
-    def _from_python(self, veh_stck_int_seg, tec_add_gradient, seg_batt_caps,
+    """def _from_python(self, veh_stck_int_seg, tec_add_gradient, seg_batt_caps,
                      B_term_prod, B_term_oper_EOL, r_term_factors, u_term_factors,
-                     pkm_scenario, eur_batt_share, occupancy_rate, recycle_rate, data_from_message):
+                     pkm_scenario, eur_batt_share, occupancy_rate, recycle_rate, data_from_message):"""
+    def _from_python(self, data_from_message):
         """
         Instantiate FleetModel object from scratch via Excel input files
 
@@ -216,7 +220,7 @@ class FleetModel:
         # self.fuelcell_specs = pd.DataFrame() # possible fuel cell powers (and acceptable segment assignments, CO2 production emissions, critical material content, fuel efficiency(?), mass)
         # self.lightweighting = pd.DataFrame() # lightweighting data table - lightweightable materials and coefficients for corresponding lightweighting material(s)
 
-        self.tec_add_gradient = tec_add_gradient
+        """self.tec_add_gradient = tec_add_gradient"""
 
         if data_from_message is not None:
             # Not currently implemented
@@ -251,10 +255,12 @@ class FleetModel:
 
         """ Currently uses smoothed total vehicle stock instead of stock from MESSAGE-Transport, which swings widely """
         # self.veh_stck_tot = pd.DataFrame(pd.read_excel(self.import_fp, sheet_name='VEH_STCK_TOT', header=None, usecols='A,C', skiprows=[0])) # usecols='A:B' for MESSAGE data, usecols='A,C' for old data
+        """
         sheet = 'stock_tot'#'temp_veh_stck_tot'  #'temp_veh_stck_tot__old'
         self.veh_stck_tot = pd.DataFrame(pd.read_excel(self.import_fp, sheet_name=sheet, header=[0], index_col=0, usecols='A:F'))
         self.veh_stck_tot.index = self.veh_stck_tot.index.map(str)  # convert years to string
         self.veh_stck_tot = self.veh_stck_tot.stack()
+        """
         # self.veh_stck_tot = self._process_df_to_series(self.veh_stck_tot)
 
         "Functional unit"  # TODO: this is redundant
@@ -262,9 +268,10 @@ class FleetModel:
         # Eurostat road_tf_vehage [vkm, cohort] NB: very limited geographic spectrum
         # Eurostat road_pa_mov [pkm]
         # http://www.odyssee-mure.eu/publications/efficiency-by-sector/transport/distance-travelled-by-car.html
-        self.occupancy_rate = occupancy_rate or 1.643 #convert to time-dependent parameter #None # vkm -> pkm conversion
-        self.all_pkm_scenarios = pd.DataFrame(pd.read_excel(self.import_fp, sheet_name='pkm', header=[0], index_col=[0])).T
-        self.passenger_demand = self.all_pkm_scenarios[pkm_scenario] # retrieve pkm demand from selected scenario
+        "self.occupancy_rate = occupancy_rate or 1.643 #convert to time-dependent parameter #None # vkm -> pkm conversion"
+        "self.all_pkm_scen = pd.DataFrame(pd.read_excel(self.import_fp, sheet_name='pkm', header=[0], index_col=[0])).T"
+        # TODO: introduce if/else for passenger demand calculated oper_dist vs explicitly defined
+        self.passenger_demand = self.parameters.all_pkm_scen.T[self.parameters.pkm_scenario] # retrieve pkm demand from selected scenario
         self.passenger_demand.reset_index()
 #        self.passenger_demand = pd.DataFrame(pd.read_excel(self.import_fp,sheet_name='VEH_STCK_TOT',header=None,usecols='A,G',skiprows=[0])) #hardcoded retrieval of pkm demand
 #        self.passenger_demand = self._process_df_to_series(self.passenger_demand)
@@ -272,19 +279,20 @@ class FleetModel:
         self.passenger_demand.name = ''
         # self.passenger_demand.index = self.veh_stck_tot.index
 
-        self.fleet_vkm = self.passenger_demand/self.occupancy_rate
+        self.fleet_vkm = self.passenger_demand/self.parameters.occupancy_rate
 
 #        self.veh_oper_dist = self.fleet_vkm/self.veh_stck_tot
-        self.veh_oper_dist = pd.Series([10000 for i in range(0,len(self.fleet_vkm))], index=[str(i) for i in range(2000,2081)])
+        # self.veh_oper_dist = pd.Series([10000 for i in range(0, len(self.fleet_vkm))], index=[str(i) for i in range(2000, 2081)])
+        self.parameters.veh_oper_dist = pd.Series([self.parameters.veh_oper_dist for i in range(0, len(self.fleet_vkm))], index=self.sets.modelyear)
 #        self.veh_oper_dist = pd.Series([-97.052*i+207474 for i in range(2000,2051)],index=[str(i) for i in range(2000,2051)])
-        self.veh_oper_dist.index.name='year'
+        self.parameters.veh_oper_dist.index.name='year'
         # [years] driving distance each year # TODO: rename?
 
-        self.veh_stck_int_seg = veh_stck_int_seg or [0.08, 0.21, 0.27, 0.08, 0.03, 0.34]  # Shares from 2017, ICCT report
-        self.veh_stck_int_seg = pd.Series(self.veh_stck_int_seg, index=self.sets.seg)
+        """self.veh_stck_int_seg = veh_stck_int_seg or [0.08, 0.21, 0.27, 0.08, 0.03, 0.34]  # Shares from 2017, ICCT report"""
+        self.parameters.veh_stck_int_seg = pd.Series(self.parameters.veh_stck_int_seg, index=self.sets.seg)
 
-        self.seg_batt_caps = pd.Series(seg_batt_caps, index=self.sets.seg)  # For battery manufacturing capacity constraint
-        self.eur_batt_share = eur_batt_share or 0.5
+        self.parameters.seg_batt_caps = pd.Series(self.parameters.seg_batt_caps, index=self.sets.seg)  # For battery manufacturing capacity constraint
+        "self.eur_batt_share = eur_batt_share or 0.5"
 
         #### Life cycle intensities ####
 #        """These factors are usually calculated using the general logistic function"""
@@ -318,6 +326,7 @@ class FleetModel:
         """VEH_LIFT_CDF(age) = cdfnormal(AGE_PAR(age),LFT_PARTAB('mean'),LFT_PARTAB('stdv'));
         VEH_LIFT_AGE(age) = (1 - VEH_LIFT_CDF(age))/sum(agej, VEH_LIFT_CDF(agej)) ;
         VEH_LIFT_MOR(age)$(ord(age)< 20) = 1 - VEH_LIFT_AGE(age+1)/VEH_LIFT_AGE(age);
+
         VEH_LIFT_MOR(age)$(ord(age)= 20) = 1"""
         self.avg_age = 11.1 # From ACEA 2019-2020 report
         self.std_dev_age = 2.21
@@ -340,35 +349,36 @@ class FleetModel:
         # Eurostat road_eqs_carage [age - <2, 2-5, 5-10, 10-20];
         # ACEA [age in year divisions up to 10 years]
         # Also check pb2018-section2016.xls for more cohesive, EU28++ data"""
-        self.veh_stck_int = pd.DataFrame(pd.read_excel(self.import_fp, sheet_name='VEH_STCK_INT', header=None, usecols='A:D', skiprows=[0]))  # [tec, age]
-        self.veh_stck_int = self._process_df_to_series(self.veh_stck_int)
+        # self.veh_stck_int = pd.DataFrame(pd.read_excel(self.import_fp, sheet_name='VEH_STCK_INT', header=None, usecols='A:D', skiprows=[0]))  # [tec, age]
+        "self.parameters.veh_stck_int = self._process_df_to_series(self.parameters.veh_stck_int)"
 
-        BEV_int_shr = 0.0018  # from Eurostat; assume remaining is ICE
-        self.veh_stck_int_tec = pd.Series([1-BEV_int_shr, BEV_int_shr], index=['ICE', 'BEV'])
+        "self.bev_int_shr = 0.0018  # from Eurostat; assume remaining is ICE"
+        self.veh_stck_int_tec = pd.Series([1-self.parameters.bev_int_shr, self.parameters.bev_int_shr], index=['ICE', 'BEV'])
 
         #### filters and parameter aliases ####
-        self.enr_veh = pd.DataFrame(pd.read_excel(self.import_fp, sheet_name='ENR_VEH', header=None, usecols='A:C', skiprows=[0]))            # [enr, tec]
-        self.enr_veh = self._process_df_to_series(self.enr_veh)
+        "self.enr_veh = pd.DataFrame(pd.read_excel(self.import_fp, sheet_name='ENR_VEH', header=None, usecols='A:C', skiprows=[0]))            # [enr, tec]"
+        "self.parameters.enr_veh.set_index(['enr', 'tec'], inplace=True)"
+        self.parameters.enr_veh = self._process_df_to_series(self.parameters.enr_veh)
 
-        self.veh_pay = pd.DataFrame(pd.read_excel(self.import_fp, sheet_name='VEH_PAY', header=None, usecols='A:D', skiprows=[0]))            # [cohort, age, year]
-        self.veh_pay = self._process_df_to_series(self.veh_pay)
-
-        self.age_par = pd.Series([float(i) for i in self.sets.age])
-        self.age_par.index = self.age_par.index.astype('str')
+        "self.veh_pay = pd.DataFrame(pd.read_excel(self.import_fp, sheet_name='VEH_PAY', header=None, usecols='A:D', skiprows=[0]))            # [cohort, age, year]"
+        # TODO: merge parameters.py to FleetModel
+        "self.veh_pay.set_index(['cohort', 'age', 'year'], inplace=True)"
+        self.parameters.veh_pay = self._process_df_to_series(self.parameters.veh_pay)
 
         self.year_par = pd.Series([float(i) for i in self.sets.cohort], index=self.sets.cohort)
         self.year_par.index = self.year_par.index.astype('str')
 
-        self.prodyear_par = pd.Series([int(i) for i in self.sets.cohort], index=self.sets.cohort)
-        self.prodyear_par.index = self.prodyear_par.index.astype('str')
-
         # Temporary introduction of seg-specific VEH_PARTAB from Excel; will later be read in from YAML
 #        self.veh_partab = pd.DataFrame(pd.read_excel(self.import_fp,sheet_name = 'genlogfunc',usecols='A:G',index_col=[0,1,2],skipfooter=6)).stack()
-        if type(r_term_factors) == float:
-            r_term_factors = {'BEV': r_term_factors, 'ICE': r_term_factors}
-        if type(u_term_factors) == float or type(u_term_factors) == int:
-            u_term_factors = {'BEV': u_term_factors, 'ICE': u_term_factors}
-        self.veh_partab = self.build_veh_partab(B_term_prod, B_term_oper_EOL, r_term_factors, u_term_factors)#.stack()
+        if type(self.parameters.r_term_factors) == float:
+            self.parameters.r_term_factors = {'BEV': self.parameters.r_term_factors, 'ICE': self.parameters.r_term_factors}
+        if type(self.parameters.u_term_factors) == float or type(self.parameters.u_term_factors) == int:
+            self.parameters.u_term_factors = {'BEV': self.parameters.u_term_factors, 'ICE': self.parameters.u_term_factors}
+
+        self.veh_partab = self.build_veh_partab(self.parameters.B_term_prod,
+                                                self.parameters.B_term_oper_EOL,
+                                                self.parameters.r_term_factors,
+                                                self.parameters.u_term_factors)#.stack()
         """" if modify_b_ice or modify_b_bev:
                 self.veh_partab.loc[:, 'ICE',:, 'B']=self.veh_partab.loc[:, 'ICE',:, 'A'].values*modify_b_ice
                 self.veh_partab.loc[:, 'BEV',:, 'B'] = self.veh_partab.loc[:, 'BEV',:, 'A'].values*modify_b_bev"""
@@ -382,41 +392,47 @@ class FleetModel:
         # https://www.acea.be/statistics/tag/category/segments-body-country
         # More detailed age distribution (https://www.acea.be/uploads/statistic_documents/ACEA_Report_Vehicles_in_use-Europe_2018.pdf)"""
 
-        self.tec_add_gradient = tec_add_gradient or 0.2
-        self.recycle_rate = recycle_rate or 0.75
+        "self.tec_add_gradient = tec_add_gradient or 0.2"
+        "self.recycle_rate = recycle_rate or 0.75"
 
-        self.growth_constraint = 0  #growth_constraint
+        self.growth_constraint = 0  # growth_constraint
         self.gro_cnstrnt = [self.growth_constraint for i in range(len(self.sets.modelyear))]
         self.gro_cnstrnt = pd.Series(self.gro_cnstrnt, index=self.sets.modelyear)
         self.gro_cnstrnt.index = self.gro_cnstrnt.index.astype('str')
 
-        self.manuf_cnstrnt = pd.read_excel(self.import_fp, sheet_name='MANUF_CONSTR', header=None, usecols='A,B', skiprows=[0])  # Assumes stabilized manufacturing capacity post-2030ish; in GWh
+        "self.manuf_cnstrnt = pd.read_excel(self.import_fp, sheet_name='MANUF_CONSTR', header=None, usecols='A,B', skiprows=[0])  # Assumes stabilized manufacturing capacity post-2030ish; in GWh"
 #        self.manuf_cnstrnt = pd.read_excel(self.import_fp,sheet_name='MANUF_CONSTR',header=None,usecols='A,C',skiprows=[0]) # Assumes continued (linear) growth in manufacturing capacity until end of model period
 #        self.manuf_cnstrnt = pd.read_excel(self.import_fp,sheet_name='MANUF_CONSTR',header=None,usecols='A,D',skiprows=[0]) # Assumes continued (linear) growth in manufacturing capacity until 2050
 
-        self.manuf_cnstrnt = self._process_df_to_series(self.manuf_cnstrnt)
+        self.manuf_cnstrnt = self._process_df_to_series(self.parameters.manuf_cnstrnt)
 #        self.manuf_cnstrnt.index = self.manuf_cnstrnt.index.astype('str')
-        self.manuf_cnstrnt = self.manuf_cnstrnt * self.eur_batt_share
+        self.parameters.manuf_cnstrnt = self.parameters.manuf_cnstrnt * self.parameters.eur_batt_share
 
         self.mat_content = [[0.11, 0.05] for year in range(len(self.sets.modelyear))]
-        self.mat_content = pd.DataFrame(self.mat_content, index=self.sets.modelyear, columns=self.sets.mat_cats)
+        self.mat_content = pd.DataFrame(self.parameters.mat_content, index=self.sets.modelyear, columns=self.sets.mat_cats)
         self.mat_content.index = self.mat_content.index.astype('str')
 
-        self.recovery_pct = [[recycle_rate]*len(self.sets.mat_cats) for year in range(len(self.sets.modelyear))]
+        self.parameters.mat_cint.columns = self.parameters.mat_cint.columns.astype(str)
+        self.parameters.mat_cint = self.parameters.mat_cint.T
+        self.parameters.mat_cint.columns = self.parameters.mat_cint.columns.droplevel(['mat_cat'])
+
+        self.recovery_pct = [[self.parameters.recycle_rate]*len(self.sets.mat_cats) for year in range(len(self.sets.modelyear))]
         self.recovery_pct = pd.DataFrame(self.recovery_pct, index=self.sets.modelyear, columns=self.sets.mat_cats)
         self.recovery_pct.index = self.recovery_pct.index.astype('str')
 
-        self.virg_mat = pd.read_excel(self.import_fp, sheet_name='virg_mat', header=[0], usecols='A:E', index_col=[0], skiprows=[0,1])
+        "self.virg_mat = pd.read_excel(self.import_fp, sheet_name='virg_mat', header=[0], usecols='A:E', index_col=[0], skiprows=[0,1])"
         #TODO: remove hardcoding of European share
-        self.virg_mat = self.virg_mat * 0.4
+        self.parameters.virg_mat_supply = self.parameters.virg_mat_supply.T * 0.4
         # self.virg_mat = [[5e8, 1e8] for year in range(len(self.modelyear))]
         # self.virg_mat = pd.DataFrame(self.virg_mat, index=self.modelyear, columns=self.mat)
-        self.virg_mat.index = self.virg_mat.index.astype('str')
+        self.parameters.virg_mat_supply.index = self.parameters.virg_mat_supply.index.astype('str')
+        self.parameters.virg_mat_supply.columns = self.parameters.virg_mat_supply.columns.droplevel(['mat_cat'])
 
-        self.mat_cint = pd.read_excel(self.import_fp, sheet_name='mat_cint', header=[0], usecols='A:E', index_col=[0], skiprows=[0,1])
-        self.mat_cint.index = self.mat_cint.index.astype('str')
+        "self.mat_cint = pd.read_excel(self.import_fp, sheet_name='mat_cint', header=[0], usecols='A:E', index_col=[0], skiprows=[0,1])"
+        "self.mat_cint.index = self.mat_cint.index.astype('str')"
 
-        self.enr_partab = pd.read_excel(self.import_fp, sheet_name='ENR_PARTAB', usecols='A:G', index_col=[0, 1, 2]) #enr,reg,X
+        "self.enr_partab = pd.read_excel(self.import_fp, sheet_name='ENR_PARTAB', usecols='A:G', index_col=[0, 1, 2]) #enr,reg,X"
+        "self.enr_partab.set_index(['enr', 'reg', 'enreq'], inplace=True)"
 
         # read in electricity pathways from electricity_clustering.py (from MESSSAGE)
         self.enr_cint = pd.read_csv(os.path.join(self.home_fp, 'Data', 'el_footprints_pathways.csv'), index_col=[0, 1])
@@ -433,7 +449,7 @@ class FleetModel:
 
         # complete enr_cint parameter with fossil fuel chain and electricity in production regions
         # using terms for general logisitic function
-        for label, row in self.enr_partab.iterrows():
+        for label, row in self.parameters.enr_partab.iterrows():
             A = row['A']
             B = row['B']
             r = row['r']
@@ -442,7 +458,6 @@ class FleetModel:
             enr = label[0]
             for t in [((2000)+i) for i in range(81)]:
                 self.enr_cint.loc[(reg, enr, str(t))] = A + (B - A) / (1 + np.exp(- r*(t - u)))
-        print(self.enr_cint)
 
         self.enr_cint = self.enr_cint.swaplevel(0, 1) # enr, reg, year
 
@@ -460,14 +475,6 @@ class FleetModel:
 
         self.battery_density = None # time series of battery energy densities
         self.lightweighting_scenario = None # lightweighting scenario - yes/no (or gradient, e.g., none/mild/aggressive?)
-
-        """ Optimization Initialization """
-        """self.ws = gams.GamsWorkspace(working_directory=self.current_path,debug=2)
-        self.db = self.ws.add_database()#database_name='pyGAMSdb')
-        self.opt = self.ws.add_options()
-#        self.opt.DumpParms = 2
-        self.opt.ForceWork = 1"""
-#        self.opt.SysOut = 1
 
     @classmethod
     def _from_gdx(self, gdx_file):
@@ -514,9 +521,7 @@ class FleetModel:
 
     @staticmethod
     def _process_df_to_series(df):
-        """
-        Process DataFrames to MultIndexed Series for exporting to GAMS
-
+        """ Process DataFrames to MultIndexed Series for exporting to GAMS
 
         Parameters
         ----------
@@ -530,19 +535,31 @@ class FleetModel:
         """
 
         dims = df.shape[1] - 1 # assumes unstacked format
-        indices = df.columns[:-1].tolist()
-        df.set_index(indices, inplace=True)
+        if dims > 0:
+            if isinstance(df.columns, pd.MultiIndex):
+                df = df.stack(level=[i for i in range(df.columns.nlevels)])
+            else:
+                # make MultiIndex from columns
+                indices = df.columns[:-1].tolist()
+                df.set_index(indices, inplace=True)
 
-        temp = []
-        for i in range(dims):
-            temp.append(df.index.get_level_values(i).astype(str))
-        df.index = temp
-        df.columns = ['']
-        df.index.names = [''] * dims
-        df = pd.Series(df.iloc[:, 0])
-        return df
+                temp = []
+                # convert index values to string (requirement for GAMS)
+                for i in range(dims):
+                    temp.append(df.index.get_level_values(i).astype(str))
+                df.index = temp
+                df.index.names = [''] * dims
+
+                df.columns = ['']
+                df = pd.Series(df.iloc[:, 0])
+            return df
+        else:
+            # case of df is DataFrame with 1 column in series form (nx1)
+            df.columns = ['']
+            return df
 
     def sets_from_excel(self, fp, sheet=0):
+        """ Deprecated. Using SetsClass instead """
         """
         Assign GAMS set values from Excel file.
 
@@ -611,7 +628,7 @@ class FleetModel:
         self._p_dict = {}
         for p in parameters:
             # Skip model status and solver status scalar parameters
-            if (p != 'ms') or (p != 'ss'):
+            if (p != 'ms') and (p != 'ss'):
                 try:
                     self._p_dict[p] = gmspy.param2df(p, db=gams_db)
                 except ValueError as e:
@@ -705,7 +722,7 @@ class FleetModel:
 
         # Import post-processing parameters
         self.veh_oper_cohort = self._p_dict['VEH_OPER_COHORT']
-        self.veh_oper_cohort.index.rename(['tec', 'seg', 'reg', 'prodyear', 'modelyear'], inplace=True)
+        self.veh_oper_cohort.index.rename(['tec', 'seg', 'reg', 'prodyear', 'modelyear' 'age'], inplace=True)
         self.veh_stock_cohort = self._p_dict['VEH_STCK_CHRT']
 
         # Import model results
@@ -795,12 +812,13 @@ class FleetModel:
         """
 
         # Specify battery size for each segment and calculate resulting production emissions
-        self.lookup_table = pd.read_excel(self.import_fp, sheet_name='Sheet6', header=[0, 1], index_col=0, nrows=3)  # fetch battery portfolio
+        "self.batt_portfolio = pd.read_excel(self.import_fp, sheet_name='Sheet6', header=[0, 1], index_col=0, nrows=3)  # fetch battery portfolio"
+        self.parameters.batt_portfolio = self.parameters.batt_portfolio.T
         self.prod_df = pd.DataFrame()
 
         # assemble production emissions for battery for defined battery capacities
-        for key, value in self.seg_batt_caps.items():
-            self.prod_df[key] = self.lookup_table[key, value]
+        for key, value in self.parameters.seg_batt_caps.items():
+            self.prod_df[key] = self.parameters.batt_portfolio[key, str(value)]
         mi = pd.MultiIndex.from_product([self.prod_df.index.to_list(), ['BEV'], ['batt']])
         self.prod_df.index = mi
         self.prod_df = self.prod_df.stack()
@@ -842,14 +860,15 @@ class FleetModel:
         # TO DO: separate A-terms for battery and rest-of-vehicle and apply different b-factors
 
         # Read sigmoid A terms from Excel
-        self.A_terms_raw = pd.read_excel(self.import_fp, sheet_name='genlogfunc', header=[0], index_col=[0,1,2], usecols='A:F', nrows=48)
-        self.A_terms_raw.columns.names = ['comp']
-        self.A_terms_raw = self.A_terms_raw.stack().to_frame('a')
+        "self.glf_terms = pd.read_excel(self.import_fp, sheet_name='genlogfunc', header=[0], index_col=[0,1,2], usecols='A:F', nrows=48)"
+        "self.glf_terms.set_index(['veheq', 'tec', 'seg'])"
+        self.parameters.glf_terms.columns.names = ['comp']
+        self.parameters.glf_terms = self.parameters.glf_terms.stack().to_frame('a')
 
         # Retrieve production emission factors for chosen battery capacities and place in raw A factors (with component resolution)
         self.build_BEV()  # update self.prod_df with selected battery capacities
         for index, value in self.prod_df.iteritems():
-            self.A_terms_raw.loc[index, 'a'] = value
+            self.parameters.glf_terms.loc[index, 'a'] = value
 
         # Get input for B-multiplication factors (relative to A) from YAML file
         reform = {(firstKey, secondKey, thirdKey): values for firstKey, secondDict in B_term_prod.items() for secondKey, thirdDict in secondDict.items() for thirdKey, values in thirdDict.items()}
@@ -862,7 +881,7 @@ class FleetModel:
         self.b_prod.index.names = ['veheq', 'tec', 'comp']
 
         # Apply B-multiplication factors to production A-factors (with component resolution)
-        self.temp_a = self.A_terms_raw.join(self.b_prod, on=['veheq', 'tec', 'comp'], how='left')
+        self.temp_a = self.parameters.glf_terms.join(self.b_prod, on=['veheq', 'tec', 'comp'], how='left')
         self.temp_prod_df['B'] = self.temp_a['a'] * self.temp_a[0]
         self.temp_prod_df.dropna(how='any', axis=0, inplace=True)
 
@@ -871,14 +890,14 @@ class FleetModel:
         self.b_oper = pd.DataFrame(reform.values(), index=mi, columns=['b'])
 
         # Apply B-multiplication factors for operation and EOL A-factors
-        self.temp_oper_df = self.A_terms_raw.join(self.b_oper, on=['veheq', 'tec'], how='left')
+        self.temp_oper_df = self.parameters.glf_terms.join(self.b_oper, on=['veheq', 'tec'], how='left')
         self.temp_oper_df['B'] = self.temp_oper_df['a'] * self.temp_oper_df['b']
         self.temp_oper_df.dropna(how='any', axis=0, inplace=True)
         self.temp_oper_df.drop(columns=['a', 'b'], inplace=True)
 
 
         # Aggregate component A values for VEH_PARTAB parameter
-        self.A = self.A_terms_raw.sum(axis=1)
+        self.A = self.parameters.glf_terms.sum(axis=1)
         self.A = self.A.unstack(['comp']).sum(axis=1)
         self.A.columns = ['A']
 
@@ -1708,13 +1727,16 @@ def vis_GAMS(fleet, fp, filename, param_values, export_png, export_pdf=True, max
         div_page = plt.figure(figsize=(25, 8))
         ax = plt.subplot(111)
         ax.axis('off')
-        df_param = pd.DataFrame.from_dict(param_values)
-        df_param = df_param.T
+        for i, (key, value) in enumerate(param_values.items()):
+            plt.text(0.05, 0.9-i*(0.05), key, fontsize=14)
+            plt.text(0.15, 0.9-i*(0.05), str(value), fontsize=14)
+        "df_param = pd.DataFrame.from_dict(param_values)"
+        "df_param = df_param.T"
 
-        param_table = plt.table(cellText=df_param.values, colLabels=['scenario \n name', 'values'], rowLabels=df_param.index, colWidths=[0.1, 0.9], cellLoc='left', loc=8)
-        param_table.auto_set_font_size(False)
-        param_table.set_fontsize(14)
-        param_table.scale(1, 2.5)
+        # param_table = plt.table(cellText=df_param.values, colLabels=['scenario \n name', 'values'], rowLabels=df_param.index, colWidths=[0.1, 0.9], cellLoc='left', loc=8)
+        # param_table.auto_set_font_size(False)
+        # param_table.set_fontsize(14)
+        # param_table.scale(1, 2.5)
         export_fig('tec-seg-cohort')
     else:
         print('Could not make parameter table in export PDF')
