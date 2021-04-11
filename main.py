@@ -173,7 +173,7 @@ def run_experiment():
         run_id_list.append(run_id)
 
         sets = SetsClass.from_file(r'C:\Users\chrishun\Box Sync\YSSP_temp\Data\load_data\sets.xlsx')
-        params = ParametersClass.from_file(r'C:\Users\chrishun\Box Sync\YSSP_temp\Data\load_data\GAMS_input_demo.xls', experiment=experiment)
+        params = ParametersClass.from_file(r'C:\Users\chrishun\Box Sync\YSSP_temp\Data\load_data\GAMS_input_demo.xlsx', experiment=experiment)
         fm = fleet_model.FleetModel(sets,
                                     params
                                     )

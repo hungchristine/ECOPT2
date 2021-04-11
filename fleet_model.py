@@ -171,7 +171,7 @@ class FleetModel:
                 print(traceback.format_exc())
                 print("Generating empty fleet object")
 
-    """def _from_python(self, veh_stck_int_seg, tec_add_gradient, seg_batt_caps,
+        """def _from_python(self, veh_stck_int_seg, tec_add_gradient, seg_batt_caps,
                      B_term_prod, B_term_oper_EOL, r_term_factors, u_term_factors,
                      pkm_scenario, eur_batt_share, occupancy_rate, recycle_rate, data_from_message):"""
     def _from_python(self, data_from_message):
@@ -226,6 +226,9 @@ class FleetModel:
             # Not currently implemented
             self.el_intensity = data_from_message # regional el-mix intensities as time series from MESSAGE
             self.trsp_dem = data_from_message # EUR transport demand as time series from MESSAGE
+
+        self.parameters.calculate_from_raw_data(self.sets)  # calculate parameters from intermediate/raw data
+        self.parameters.validate_data(self.sets)
         """ boundary conditions for constraints, e.g., electricity market supply constraints, crit. material reserves? could possibly belong in experiment specifications as well..."""
 
         """ GAMS-relevant attributes"""
@@ -271,27 +274,27 @@ class FleetModel:
         "self.occupancy_rate = occupancy_rate or 1.643 #convert to time-dependent parameter #None # vkm -> pkm conversion"
         "self.all_pkm_scen = pd.DataFrame(pd.read_excel(self.import_fp, sheet_name='pkm', header=[0], index_col=[0])).T"
         # TODO: introduce if/else for passenger demand calculated oper_dist vs explicitly defined
-        self.passenger_demand = self.parameters.all_pkm_scen.T[self.parameters.pkm_scenario] # retrieve pkm demand from selected scenario
-        self.passenger_demand.reset_index()
+        "self.passenger_demand = self.parameters.all_pkm_scen.T[self.parameters.pkm_scenario] # retrieve pkm demand from selected scenario"
+        "self.passenger_demand.reset_index()"
 #        self.passenger_demand = pd.DataFrame(pd.read_excel(self.import_fp,sheet_name='VEH_STCK_TOT',header=None,usecols='A,G',skiprows=[0])) #hardcoded retrieval of pkm demand
 #        self.passenger_demand = self._process_df_to_series(self.passenger_demand)
-        self.passenger_demand = self.passenger_demand * 1e9
-        self.passenger_demand.name = ''
+        "self.passenger_demand = self.passenger_demand * 1e9"
+        "self.passenger_demand.name = ''"
         # self.passenger_demand.index = self.veh_stck_tot.index
 
-        self.fleet_vkm = self.passenger_demand/self.parameters.occupancy_rate
+        "self.fleet_vkm = self.passenger_demand/self.parameters.occupancy_rate"
 
 #        self.veh_oper_dist = self.fleet_vkm/self.veh_stck_tot
         # self.veh_oper_dist = pd.Series([10000 for i in range(0, len(self.fleet_vkm))], index=[str(i) for i in range(2000, 2081)])
-        self.parameters.veh_oper_dist = pd.Series([self.parameters.veh_oper_dist for i in range(0, len(self.fleet_vkm))], index=self.sets.modelyear)
+        "self.parameters.veh_oper_dist = pd.Series([self.parameters.veh_oper_dist for i in range(0, len(self.fleet_vkm))], index=self.sets.modelyear)"
 #        self.veh_oper_dist = pd.Series([-97.052*i+207474 for i in range(2000,2051)],index=[str(i) for i in range(2000,2051)])
-        self.parameters.veh_oper_dist.index.name='year'
+        "self.parameters.veh_oper_dist.index.name='year'"
         # [years] driving distance each year # TODO: rename?
 
         """self.veh_stck_int_seg = veh_stck_int_seg or [0.08, 0.21, 0.27, 0.08, 0.03, 0.34]  # Shares from 2017, ICCT report"""
-        self.parameters.veh_stck_int_seg = pd.Series(self.parameters.veh_stck_int_seg, index=self.sets.seg)
+        "self.parameters.veh_stck_int_seg = pd.Series(self.parameters.veh_stck_int_seg, index=self.sets.seg)"
 
-        self.parameters.seg_batt_caps = pd.Series(self.parameters.seg_batt_caps, index=self.sets.seg)  # For battery manufacturing capacity constraint
+        "self.parameters.seg_batt_caps = pd.Series(self.parameters.seg_batt_caps, index=self.sets.seg)  # For battery manufacturing capacity constraint"
         "self.eur_batt_share = eur_batt_share or 0.5"
 
         #### Life cycle intensities ####
@@ -328,21 +331,20 @@ class FleetModel:
         VEH_LIFT_MOR(age)$(ord(age)< 20) = 1 - VEH_LIFT_AGE(age+1)/VEH_LIFT_AGE(age);
 
         VEH_LIFT_MOR(age)$(ord(age)= 20) = 1"""
-        self.avg_age = 11.1 # From ACEA 2019-2020 report
-        self.std_dev_age = 2.21
+        "self.avg_age = 11.1 # From ACEA 2019-2020 report"
+        "self.std_dev_age = 2.21"
 #        self.avg_age = 11
 #        self.std_dev_age = 0
-        self.veh_lift_cdf = pd.Series(norm.cdf(self.sets.age_int, self.avg_age, self.std_dev_age), index=self.sets.age)#pd.Series(pd.read_pickle(self.import_fp+'input.pkl'))#pd.DataFrame()  # [age] TODO Is it this one we feed to gams?
-        self.veh_lift_cdf.index = self.veh_lift_cdf.index.astype('str')
-
-        self.veh_lift_age = pd.Series(1 - self.veh_lift_cdf)     # [age] # probability of car of age x to die in current year
+        "self.veh_lift_cdf = pd.Series(norm.cdf(self.sets.age_int, self.avg_age, self.std_dev_age)," "index=self.sets.age)#pd.Series(pd.read_pickle(self.import_fp+'input.pkl'))#pd.DataFrame()  # [age] TODO Is it this one we feed to gams?"
+        "self.veh_lift_cdf.index = self.veh_lift_cdf.index.astype('str')"
+        "self.veh_lift_age = pd.Series(1 - self.veh_lift_cdf)     # [age] # probability of car of age x to die in current year"
 
         #lifetime = [1-self.veh_lift_age[i+1]/self.veh_lift_age[i] for i in range(len(self.age)-1)]
-        self.veh_lift_pdf = pd.Series(calc_steadystate_vehicle_age_distributions(self.sets.age_int, self.avg_age, self.std_dev_age), index=self.sets.age)   # idealized age PDF given avg fleet age and std dev
-        self.veh_lift_pdf.index = self.veh_lift_pdf.index.astype('str')
+        "self.veh_lift_pdf = pd.Series(calc_steadystate_vehicle_age_distributions(self.sets.age_int, self.avg_age, self.std_dev_age), index=self.sets.age)   # idealized age PDF given avg fleet age and std dev"
+        "self.veh_lift_pdf.index = self.veh_lift_pdf.index.astype('str')"
 
-        self.veh_lift_mor = pd.Series(calc_probability_of_vehicle_retirement(self.sets.age_int, self.veh_lift_pdf), index=self.sets.age)
-        self.veh_lift_mor.index = self.veh_lift_mor.index.astype('str')
+        "self.veh_lift_mor = pd.Series(calc_probability_of_vehicle_retirement(self.sets.age_int, self.veh_lift_pdf), index=self.sets.age)"
+        "self.veh_lift_mor.index = self.veh_lift_mor.index.astype('str')"
 
         # Initial stocks
         """# Eurostat road_eqs_carpda[tec]
@@ -353,7 +355,7 @@ class FleetModel:
         "self.parameters.veh_stck_int = self._process_df_to_series(self.parameters.veh_stck_int)"
 
         "self.bev_int_shr = 0.0018  # from Eurostat; assume remaining is ICE"
-        self.veh_stck_int_tec = pd.Series([1-self.parameters.bev_int_shr, self.parameters.bev_int_shr], index=['ICE', 'BEV'])
+        "self.veh_stck_int_tec = pd.Series([1-self.parameters.bev_int_shr, self.parameters.bev_int_shr], index=['ICE', 'BEV'])"
 
         #### filters and parameter aliases ####
         "self.enr_veh = pd.DataFrame(pd.read_excel(self.import_fp, sheet_name='ENR_VEH', header=None, usecols='A:C', skiprows=[0]))            # [enr, tec]"
@@ -365,20 +367,20 @@ class FleetModel:
         "self.veh_pay.set_index(['cohort', 'age', 'year'], inplace=True)"
         self.parameters.veh_pay = self._process_df_to_series(self.parameters.veh_pay)
 
-        self.year_par = pd.Series([float(i) for i in self.sets.cohort], index=self.sets.cohort)
-        self.year_par.index = self.year_par.index.astype('str')
+        "self.year_par = pd.Series([float(i) for i in self.sets.cohort], index=self.sets.cohort)"
+        "self.parameters.year_par.index = self.parameters.year_par.index.astype('str')"
 
         # Temporary introduction of seg-specific VEH_PARTAB from Excel; will later be read in from YAML
 #        self.veh_partab = pd.DataFrame(pd.read_excel(self.import_fp,sheet_name = 'genlogfunc',usecols='A:G',index_col=[0,1,2],skipfooter=6)).stack()
-        if type(self.parameters.r_term_factors) == float:
-            self.parameters.r_term_factors = {'BEV': self.parameters.r_term_factors, 'ICE': self.parameters.r_term_factors}
-        if type(self.parameters.u_term_factors) == float or type(self.parameters.u_term_factors) == int:
-            self.parameters.u_term_factors = {'BEV': self.parameters.u_term_factors, 'ICE': self.parameters.u_term_factors}
+        if type(self.parameters.raw_data.r_term_factors) == float:
+            self.parameters.raw_data.r_term_factors = {'BEV': self.parameters.raw_data.r_term_factors, 'ICE': self.parameters.raw_data.r_term_factors}
+        if type(self.parameters.raw_data.u_term_factors) == float or type(self.parameters.raw_data.u_term_factors) == int:
+            self.parameters.raw_data.u_term_factors = {'BEV': self.parameters.raw_data.u_term_factors, 'ICE': self.parameters.raw_data.u_term_factors}
 
-        self.veh_partab = self.build_veh_partab(self.parameters.B_term_prod,
+        """self.veh_partab = self.build_veh_partab(self.parameters.B_term_prod,
                                                 self.parameters.B_term_oper_EOL,
                                                 self.parameters.r_term_factors,
-                                                self.parameters.u_term_factors)#.stack()
+                                                self.parameters.u_term_factors)#.stack()"""
         """" if modify_b_ice or modify_b_bev:
                 self.veh_partab.loc[:, 'ICE',:, 'B']=self.veh_partab.loc[:, 'ICE',:, 'A'].values*modify_b_ice
                 self.veh_partab.loc[:, 'BEV',:, 'B'] = self.veh_partab.loc[:, 'BEV',:, 'A'].values*modify_b_bev"""
@@ -406,7 +408,7 @@ class FleetModel:
 
         self.manuf_cnstrnt = self._process_df_to_series(self.parameters.manuf_cnstrnt)
 #        self.manuf_cnstrnt.index = self.manuf_cnstrnt.index.astype('str')
-        self.parameters.manuf_cnstrnt = self.parameters.manuf_cnstrnt * self.parameters.eur_batt_share
+        "self.parameters.manuf_cnstrnt = self.parameters.manuf_cnstrnt * self.parameters.eur_batt_share"
 
         self.mat_content = [[0.11, 0.05] for year in range(len(self.sets.modelyear))]
         self.mat_content = pd.DataFrame(self.parameters.mat_content, index=self.sets.modelyear, columns=self.sets.mat_cats)
@@ -416,13 +418,13 @@ class FleetModel:
         self.parameters.mat_cint = self.parameters.mat_cint.T
         self.parameters.mat_cint.columns = self.parameters.mat_cint.columns.droplevel(['mat_cat'])
 
-        self.recovery_pct = [[self.parameters.recycle_rate]*len(self.sets.mat_cats) for year in range(len(self.sets.modelyear))]
-        self.recovery_pct = pd.DataFrame(self.recovery_pct, index=self.sets.modelyear, columns=self.sets.mat_cats)
-        self.recovery_pct.index = self.recovery_pct.index.astype('str')
+        "self.recovery_pct = [[self.parameters.recycle_rate]*len(self.sets.mat_cats) for year in range(len(self.sets.modelyear))]"
+        "self.recovery_pct = pd.DataFrame(self.recovery_pct, index=self.sets.modelyear, columns=self.sets.mat_cats)"
+        self.parameters.recovery_pct.index = self.parameters.recovery_pct.index.astype('str')
 
         "self.virg_mat = pd.read_excel(self.import_fp, sheet_name='virg_mat', header=[0], usecols='A:E', index_col=[0], skiprows=[0,1])"
         #TODO: remove hardcoding of European share
-        self.parameters.virg_mat_supply = self.parameters.virg_mat_supply.T * 0.4
+        "self.parameters.virg_mat_supply = self.parameters.virg_mat_supply.T * 0.4"
         # self.virg_mat = [[5e8, 1e8] for year in range(len(self.modelyear))]
         # self.virg_mat = pd.DataFrame(self.virg_mat, index=self.modelyear, columns=self.mat)
         self.parameters.virg_mat_supply.index = self.parameters.virg_mat_supply.index.astype('str')
@@ -435,31 +437,32 @@ class FleetModel:
         "self.enr_partab.set_index(['enr', 'reg', 'enreq'], inplace=True)"
 
         # read in electricity pathways from electricity_clustering.py (from MESSSAGE)
-        self.enr_cint = pd.read_csv(os.path.join(self.home_fp, 'Data', 'el_footprints_pathways.csv'), index_col=[0, 1])
-        self.enr_cint.columns = self.enr_cint.columns.astype('int64')
-        # insert years and interpolate between decades to get annual resolution
-        for decade in self.enr_cint.columns:
-            for i in np.arange(1, 10):
-                self.enr_cint[decade + i] = np.nan
-        self.enr_cint[2019] = self.enr_cint[2020]  # # to-do: fill with historical data
-        self.enr_cint = self.enr_cint.astype('float64').sort_index(axis=1).interpolate(axis=1) # sort year orders and interpolate
-        self.enr_cint.columns = self.enr_cint.columns.astype(str)  # set to strings for compatibility with GAMS
+        # self.enr_cint = pd.read_csv(os.path.join(self.home_fp, 'Data', 'el_footprints_pathways.csv'), index_col=[0, 1])
+        # self.enr_cint.columns = self.enr_cint.columns.astype('int64')
+        # # insert years and interpolate between decades to get annual resolution
+        # for decade in self.enr_cint.columns:
+        #     for i in np.arange(1, 10):
+        #         self.enr_cint[decade + i] = np.nan
+        # self.enr_cint[2019] = self.enr_cint[2020]  # # to-do: fill with historical data
+        # self.enr_cint = self.enr_cint.astype('float64').sort_index(axis=1).interpolate(axis=1) # sort year orders and interpolate
+        # self.enr_cint.columns = self.enr_cint.columns.astype(str)  # set to strings for compatibility with GAMS
 
-        self.enr_cint = self.enr_cint.stack()  # reg, enr, year
+        # self.enr_cint = self.enr_cint.stack()  # reg, enr, year
 
         # complete enr_cint parameter with fossil fuel chain and electricity in production regions
         # using terms for general logisitic function
-        for label, row in self.parameters.enr_partab.iterrows():
-            A = row['A']
-            B = row['B']
-            r = row['r']
-            u = row['u']
-            reg = label[1]
-            enr = label[0]
-            for t in [((2000)+i) for i in range(81)]:
-                self.enr_cint.loc[(reg, enr, str(t))] = A + (B - A) / (1 + np.exp(- r*(t - u)))
+        """
+        "for label, row in self.parameters.enr_partab.iterrows():"
+            "A = row['A']"
+            "B = row['B']"
+            "r = row['r']"
+            "u = row['u']"
+            "reg = label[1]"
+            "enr = label[0]"
+            "for t in [((2000)+i) for i in range(81)]:"
+                "self.enr_cint.loc[(reg, enr, str(t))] = A + (B - A) / (1 + np.exp(- r*(t - u)))"
 
-        self.enr_cint = self.enr_cint.swaplevel(0, 1) # enr, reg, year
+        "self.enr_cint = self.enr_cint.swaplevel(0, 1) # enr, reg, year" """
 
         # --------------- Expected GAMS Outputs ------------------------------
         self.totc = None
@@ -860,16 +863,17 @@ class FleetModel:
         # TO DO: separate A-terms for battery and rest-of-vehicle and apply different b-factors
 
         # Read sigmoid A terms from Excel
-        "self.glf_terms = pd.read_excel(self.import_fp, sheet_name='genlogfunc', header=[0], index_col=[0,1,2], usecols='A:F', nrows=48)"
-        "self.glf_terms.set_index(['veheq', 'tec', 'seg'])"
-        self.parameters.glf_terms.columns.names = ['comp']
-        self.parameters.glf_terms = self.parameters.glf_terms.stack().to_frame('a')
+        "self.veh_factors = pd.read_excel(self.import_fp, sheet_name='genlogfunc', header=[0], index_col=[0,1,2], usecols='A:F', nrows=48)"
+        "self.veh_factors.set_index(['veheq', 'tec', 'seg'])"
+        self.parameters.veh_factors.columns.names = ['comp']
+        self.parameters.veh_factors = self.parameters.veh_factors.stack().to_frame('a')
 
         # Retrieve production emission factors for chosen battery capacities and place in raw A factors (with component resolution)
-        self.build_BEV()  # update self.prod_df with selected battery capacities
-        for index, value in self.prod_df.iteritems():
-            self.parameters.glf_terms.loc[index, 'a'] = value
-
+        "self.build_BEV()  # update self.prod_df with selected battery capacities"
+        """
+        "for index, value in self.prod_df.iteritems():"
+            "self.parameters.veh_factors.loc[index, 'a'] = value"
+        """
         # Get input for B-multiplication factors (relative to A) from YAML file
         reform = {(firstKey, secondKey, thirdKey): values for firstKey, secondDict in B_term_prod.items() for secondKey, thirdDict in secondDict.items() for thirdKey, values in thirdDict.items()}
         mi = pd.MultiIndex.from_tuples(reform.keys())
@@ -881,7 +885,7 @@ class FleetModel:
         self.b_prod.index.names = ['veheq', 'tec', 'comp']
 
         # Apply B-multiplication factors to production A-factors (with component resolution)
-        self.temp_a = self.parameters.glf_terms.join(self.b_prod, on=['veheq', 'tec', 'comp'], how='left')
+        self.temp_a = self.parameters.veh_factors.join(self.b_prod, on=['veheq', 'tec', 'comp'], how='left')
         self.temp_prod_df['B'] = self.temp_a['a'] * self.temp_a[0]
         self.temp_prod_df.dropna(how='any', axis=0, inplace=True)
 
@@ -890,14 +894,14 @@ class FleetModel:
         self.b_oper = pd.DataFrame(reform.values(), index=mi, columns=['b'])
 
         # Apply B-multiplication factors for operation and EOL A-factors
-        self.temp_oper_df = self.parameters.glf_terms.join(self.b_oper, on=['veheq', 'tec'], how='left')
+        self.temp_oper_df = self.parameters.veh_factors.join(self.b_oper, on=['veheq', 'tec'], how='left')
         self.temp_oper_df['B'] = self.temp_oper_df['a'] * self.temp_oper_df['b']
         self.temp_oper_df.dropna(how='any', axis=0, inplace=True)
         self.temp_oper_df.drop(columns=['a', 'b'], inplace=True)
 
 
         # Aggregate component A values for VEH_PARTAB parameter
-        self.A = self.parameters.glf_terms.sum(axis=1)
+        self.A = self.parameters.veh_factors.sum(axis=1)
         self.A = self.A.unstack(['comp']).sum(axis=1)
         self.A.columns = ['A']
 
