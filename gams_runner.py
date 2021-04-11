@@ -112,7 +112,7 @@ class GAMSRunner:
         fleetreg = gmspy.list2set(self.db, fleet.sets.fleetreg, 'fleetreg')
         # mat = gmspy.list2set(self.db, fleet.mat, 'mat')
         demeq =  gmspy.list2set(self.db, fleet.sets.demeq, 'demeq')
-        dstvar = gmspy.list2set(self.db, fleet.sets.dstvar, 'dstvar')
+        # dstvar = gmspy.list2set(self.db, fleet.sets.dstvar, 'dstvar')
         enreq = gmspy.list2set(self.db, fleet.sets.enreq, 'enreq')
         grdeq = gmspy.list2set(self.db, fleet.sets.grdeq, 'grdeq')
         lfteq = gmspy.list2set(self.db, fleet.sets.lfteq, 'lfteq')

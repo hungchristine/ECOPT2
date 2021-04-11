@@ -31,7 +31,7 @@ class SetsClass:
 
     new: list = field(default_factory=lambda: ['0'])
     demeq: list = field(default_factory=lambda: ['STCK_TOT', 'OPER_DIST', 'OCUP'])
-    dstvar: list = field(default_factory=lambda: ['mean', 'stdv'])
+    # dstvar: list = field(default_factory=lambda: ['mean', 'stdv'])
     enreq: list = field(default_factory=lambda: ['CINT'])
     grdeq: list = field(default_factory=lambda: ['IND', 'ALL'])
     veheq: list = field(default_factory=lambda: ['PROD_EINT', 'PROD_CINT_CSNT', 'OPER_EINT', 'EOLT_CINT'])
@@ -84,7 +84,7 @@ class SetsClass:
 
 @dataclass
 class ParametersClass:
-    enr_partab: pd.DataFrame
+    # enr_partab: pd.DataFrame
     # enr_cint: pd.DataFrame
     enr_veh: pd.DataFrame
     # veh_prod_eint: pd.DataFrame

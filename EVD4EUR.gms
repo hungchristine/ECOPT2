@@ -29,7 +29,7 @@ seg             segment or size class
 mat_prod        producers or sources for all critical materials 
 mat_cats        critical material categories
 sigvar          variables for sigmoid equations
-dstvar          variables for statistical distributions
+*dstvar          variables for statistical distributions
 enreq           equations for energy (electricity and fuels) system
 veheq           equations for vehicle parameters
 demeq           equations for demand parameters
@@ -121,7 +121,7 @@ $LOAD mat_prod
 $LOAD mat
 
 $LOAD sigvar
-$LOAD dstvar
+*$LOAD dstvar
 $LOAD enreq
 $LOAD veheq
 $LOAD demeq
@@ -169,7 +169,7 @@ YEAR_PAR(year)                   year
 *VEH_PARTAB(tec,veheq,sigvar)     variables for each tech and veh equation
 VEH_PARTAB(veheq,tec,seg,sigvar)     variables for each tech and veh equation
 * DEM_PARTAB(demeq,sigvar)         variables for demand equations
-ENR_PARTAB(enr,reg,enreq,sigvar)     variables for each energy (fos or elc) equation
+*ENR_PARTAB(enr,reg,enreq,sigvar)     variables for each energy (fos or elc) equation
 *LFT_PARTAB(dstvar)               variables for fleet lifetime equations
 
 ***ENERGY (ELECTRICITY GENERATION and FUEL) ------------------------------------------
