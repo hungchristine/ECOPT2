@@ -34,11 +34,8 @@ class SetsClass:
 
     new: list = field(default_factory=lambda: ['0'])
     demeq: list = field(default_factory=lambda: ['STCK_TOT', 'OPER_DIST', 'OCUP'])
-    # dstvar: list = field(default_factory=lambda: ['mean', 'stdv'])
-    enreq: list = field(default_factory=lambda: ['CINT'])
     grdeq: list = field(default_factory=lambda: ['IND', 'ALL'])
     veheq: list = field(default_factory=lambda: ['PROD_EINT', 'PROD_CINT_CSNT', 'OPER_EINT', 'EOLT_CINT'])
-    lfteq: list = field(default_factory=lambda: ['LFT_DISTR', 'AGE_DISTR'])
     sigvar: list = field(default_factory=lambda: ['A', 'B', 'r', 'u'])
 
     @classmethod
@@ -112,17 +109,6 @@ class RawDataClass:
 
     # enr_cint_src: str = os.path.join('Data','load_data','el_footprints_pathways.csv')
 
-    def __post_init__(self):
-        # if isinstance(self.seg_batt_caps, list):
-        #     # check len(seg_batt_caps) == len(sets.segs)
-        #     pass
-        # if isinstance(self.seg_batt_caps, dict):
-        #     # convert battery capacities to float
-        #     self.seg_batt_caps = {key: float(value) for key, value in self.seg_batt_caps.items()}
-        # else:
-        #     self.seg_batt_caps = [float(value) for value in self.seg_batt_caps]
-        pass
-
     @classmethod
     def from_dict(cls, src_dict:dict):
         return cls(**src_dict)
@@ -178,9 +164,6 @@ class ParametersClass:
     veh_oper_dist: Union[float, list, dict, pd.DataFrame] = 10000
     veh_stck_int_seg: list = field(default_factory=lambda:[0.08, 0.21, 0.27, 0.08, 0.03, 0.34])
 
-    # sort these two things out
- #     "veh_add_grd"
-
     bev_capac: Union[dict, list] = field(default_factory=lambda:{'A': 26.6, 'B': 42.2, 'C': 59.9, 'D': 75., 'E':95., 'F':100.})
 
     def __post_init__(self):
@@ -189,8 +172,6 @@ class ParametersClass:
             self.bev_capac = {key: float(value) for key, value in self.bev_capac.items()}
         else:
             self.bev_capac = [float(value) for value in self.bev_capac]
-
-
 
     @classmethod
     def from_exp(cls, experiment:dict):
@@ -348,7 +329,12 @@ class ParametersClass:
                                              index=sets.modelyear,
                                              columns=sets.mat_cats)
         if self.raw_data.enr_glf_terms is not None:
-            self.build_enr_cint()
+            if self.enr_cint:
+                # for building enr_cint from IAM pathways
+                self.build_enr_cint()
+            else:
+                mi = pd.MultiIndex.from_product([sets.reg, sets.enr, sets.modelyear], names=['reg', 'enr', 'modelyear'])
+                self.enr_cint = pd.Series(index=mi)
             # NB: we only need enr_cint from electricity pathways, OR we can build enr_cint from enr_partab.
             # TODO: run a check for which one to do in post_init
 
@@ -365,6 +351,8 @@ class ParametersClass:
                     self.enr_cint.loc[(reg, enr, str(t))] = A + (B - A) / (1 + np.exp(- r*(t - u)))
 
             self.enr_cint = self.enr_cint.swaplevel(0, 1) # enr, reg, year"
+            self.enr_cint = self.enr_cint.to_frame()
+            self.enr_cint.dropna(how='all', axis=0, inplace=True)
 
         if isinstance(self.raw_data.tec_add_gradient, float) and (self.veh_add_grd is None):
             self.veh_add_grd = {}
@@ -467,15 +455,15 @@ class ParametersClass:
 
 
         # Aggregate component A values for VEH_PARTAB parameter
-        self.A = self.raw_data.veh_factors.sum(axis=1)
-        self.A = self.A.unstack(['comp']).sum(axis=1)
-        self.A.columns = ['A']
+        A = self.raw_data.veh_factors.sum(axis=1)
+        A = A.unstack(['comp']).sum(axis=1)
+        A.columns = ['A']
 
         # Begin building final VEH_PARTAB parameter table
-        temp_df['A'] = self.A
-        self.B = pd.concat([temp_prod_df, temp_oper_df], axis=0).dropna(how='any', axis=1)
-        self.B = self.B.unstack(['comp']).sum(axis=1)
-        temp_df['B'] = self.B
+        temp_df['A'] = A
+        B = pd.concat([temp_prod_df, temp_oper_df], axis=0).dropna(how='any', axis=1)
+        B = B.unstack(['comp']).sum(axis=1)
+        temp_df['B'] = B
 
         # Add same r values across all technologies...can add BEV vs ICE resolution here
         temp_r = pd.DataFrame.from_dict(self.raw_data.r_term_factors, orient='index', columns=['r'])
