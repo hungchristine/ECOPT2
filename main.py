@@ -10,6 +10,7 @@ import sys
 import fleet_model
 import gams_runner
 from fleet_model_init import SetsClass, ParametersClass
+import visualization as vis
 
 #import sigmoid
 #import test_gams
@@ -303,7 +304,7 @@ def run_experiment():
 
         try:
             fm.figure_calculations()  # run extra calculations for cross-experiment figures
-            fleet_model.vis_GAMS(fm, fp, run_id, experiment, export_png=False)
+            vis.vis_GAMS(fm, fp, run_id, experiment, export_png=False)
         except Exception:
             log.warning("Failed visualization, deleting folder")
             traceback.print_exc()
