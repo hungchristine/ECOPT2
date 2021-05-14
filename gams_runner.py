@@ -60,12 +60,13 @@ class GAMSRunner:
         self.ws = gams.GamsWorkspace(working_directory=self.current_path, debug=2)
 #        self.db = self.ws.add_database()#database_name='pyGAMSdb')
         self.opt = self.ws.add_options()
-        self.opt.LogLine = 2
-        self.opt.TraceOpt = 3
+        self.opt.Keep = 0  # Controls keeping or deletion of process directory and scratch files.
+        self.opt.LogLine = 2  # Amount of line tracing to the log file
+        self.opt.TraceOpt = 3  # Trace file format option
 #        self.opt.DumpParms = 2
-        self.opt.ForceWork = 1
+        self.opt.ForceWork = 1  # Force GAMS to process a save file created with a newer GAMS version or with execution errors.
         self.opt.trace = os.path.join(os.path.curdir, 'trace.txt')
-        # gams.execution.SymbolUpdateType = 1
+        # gams.execution.SymbolUpdateType = 1  # if record does not exist, use values from instantiation
 
     def _load_input_to_gams(self, fleet, filename, timestamp): # will become unnecessary as we start calculating/defining sets and/or parameters within the class
         """
@@ -87,48 +88,36 @@ class GAMSRunner:
         -------
         None.
         """
-        # Clear database for new run
-        # self.db.clear() # need to add functionality to gmspy --> check if Symbol exists in database, write over
+
+        # TODO: add functionality to gmspy --> check if Symbol exists in database, write over
+        # TODO: related: refactor to just use gams.execution.GamsModifier and/or GamsModelInstance (see documentation)
+
         try:
             if hasattr(self.db, 'name'):
                 print('Database exists, clearing values from previous run')
                 self.db.clear()  # remove entry values from database for subsequent runs
         except AttributeError:
             # for first run, add database to GAMS workspace
-            self.db = self.ws.add_database()#database_name='pyGAMS_input')#database_name='pyGAMSdb')
-        # TODO: sort of this bit below
-        if filename.find('unit_test') >= 0:
-            print('do not need anything here?')
-            # fleet.veh_add_grd = dict()
-            # for element in itertools.product(*[fleet.sets.grdeq, fleet.sets.tecs]):
-            #     fleet.veh_add_grd[element] = fleet.tec_add_gradient
-        else:
-            self.update_fleet(fleet)  # NB: does nothing!
+            self.db = self.ws.add_database(database_name='pyGAMS_input')
 
         years = gmspy.list2set(self.db, fleet.sets.year,'year')
         modelyear = gmspy.list2set(self.db, fleet.sets.modelyear,'modelyear')
         optyear = gmspy.list2set(self.db, fleet.sets.optyear, 'optyear')
         inityear = gmspy.list2set(self.db, fleet.sets.inityear, 'inityear')
         tecs = gmspy.list2set(self.db, fleet.sets.tecs, 'tec')
-        #cohort = gmspy.list2set(self.db, self.cohort, 'prodyear') ## prodyear is an alias of year, not a set of its own
         age = gmspy.list2set(self.db, fleet.sets.age, 'age')
         new = gmspy.list2set(self.db, fleet.sets.new, 'new')
         enr = gmspy.list2set(self.db, fleet.sets.enr, 'enr')
         seg = gmspy.list2set(self.db, fleet.sets.seg, 'seg')
         reg = gmspy.list2set(self.db, fleet.sets.reg, 'reg')
         fleetreg = gmspy.list2set(self.db, fleet.sets.fleetreg, 'fleetreg')
-        # mat = gmspy.list2set(self.db, fleet.mat, 'mat')
         demeq =  gmspy.list2set(self.db, fleet.sets.demeq, 'demeq')
-        # dstvar = gmspy.list2set(self.db, fleet.sets.dstvar, 'dstvar')
-        # enreq = gmspy.list2set(self.db, fleet.sets.enreq, 'enreq')
         grdeq = gmspy.list2set(self.db, fleet.sets.grdeq, 'grdeq')
-        # lfteq = gmspy.list2set(self.db, fleet.sets.lfteq, 'lfteq')
         sigvar = gmspy.list2set(self.db, fleet.sets.sigvar, 'sigvar')
         veheq = gmspy.list2set(self.db, fleet.sets.veheq, 'veheq')
 
         mat_cats = gmspy.list2set(self.db, fleet.sets.mat_cats, 'mat_cats')
         mat_prods = gmspy.list2set(self.db, sum(fleet.sets.mat_prod.values(), []), 'mat_prod')  # concatenate all material producers
-        # mat_prods = gmspy.list2set(self.db, sum(fleet.mat_dict.values(), []), 'mat_prod')  # concatenate all material producers
         try:
             mat = self.db.get_set('mat')
         except:
@@ -137,7 +126,6 @@ class GAMSRunner:
         for key, item in fleet.sets.mat_prod.items():
             for producer in item:
                 mat.add_record((key, producer))
-
 
         veh_oper_dist = gmspy.df2param(self.db, fleet.parameters.veh_oper_dist, ['year'], 'VEH_OPER_DIST')
         veh_stck_tot = gmspy.df2param(self.db, fleet.parameters.veh_stck_tot, ['year', 'fleetreg'], 'VEH_STCK_TOT')
@@ -149,8 +137,6 @@ class GAMSRunner:
         veh_lift_age = gmspy.df2param(self.db, fleet.parameters.veh_lift_age, ['age'], 'VEH_LIFT_AGE')
         veh_lift_mor = gmspy.df2param(self.db, fleet.parameters.veh_lift_mor, ['age'], 'VEH_LIFT_MOR')
 
-        ######  OBS: Originally calculated using VEH_STCK_INT_TEC, VEH_LIFT_AGE, VEH_STCK_TOT
-        # veh_stck_int = gmspy.df2param(self.db, fleet.veh_stck_int, ['tec','seg', 'age'], 'VEH_STCK_INT')
         veh_stck_int_tec = gmspy.df2param(self.db, fleet.parameters.veh_stck_int_tec,['tec'],'VEH_STCK_INT_TEC')
 
         enr_veh = gmspy.df2param(self.db, fleet.parameters.enr_veh, ['enr', 'tec'], 'ENR_VEH')
@@ -172,8 +158,6 @@ class GAMSRunner:
         for keys, value in iter(fleet.parameters.veh_add_grd.items()):
             veh_add_grd.add_record(keys).value = value
 
-#        veh_add_grd = gmspy.df2param(self.db,self.veh_add_grd, ['grdeq','tec'], 'VEH_ADD_GRD')
-
         gro_cnstrnt = gmspy.df2param(self.db, fleet.gro_cnstrnt, ['year'], 'GRO_CNSTRNT')
 
         manuf_cnstrnt = gmspy.df2param(self.db, fleet.parameters.manuf_cnstrnt, ['year'], 'MANUF_CNSTRNT')
@@ -182,9 +166,6 @@ class GAMSRunner:
         mat_cint = gmspy.df2param(self.db, fleet.parameters.mat_cint, ['year', 'mat_prods'], 'MAT_CINT')
         virg_mat = gmspy.df2param(self.db, fleet.parameters.virg_mat_supply, ['year','mat_prod'], 'VIRG_MAT_SUPPLY')
         recovery_pct = gmspy.df2param(self.db, fleet.parameters.recovery_pct, ['year','mat_cats'], 'RECOVERY_PCT')
-
-        # enr_partab = gmspy.df2param(self.db, fleet.enr_partab,['enr', 'enreq', 'sigvar'], 'ENR_PARTAB')
-        # el_cint = gmspy.df2param(self.db, fleet.enr_cint, ['reg','enr','year'], 'ENR_CINT')
 
         print('\n exporting database...' + filename + '_input')
         #TODO: remove export, redundant with first line of this method??
@@ -199,7 +180,8 @@ class GAMSRunner:
 
 
     def get_output_from_GAMS(self, gams_db, output_var):
-        """ Retrieve symbol values from gams_db.
+        """
+        Retrieve symbol values from gams_db.
 
         Parameters
         ----------
@@ -214,7 +196,6 @@ class GAMSRunner:
             Contains results from GAMS experiment.
 
         """
-
         temp_GMS_output = []
         temp_index_list = []
 
@@ -233,41 +214,6 @@ class GAMSRunner:
 
         return temp_output_df
 
-    def update_fleet(self, fleet):
-        """
-        Update FleetModel instantiation.
-
-        Parameters
-        ----------
-        fleet : FleetModel
-            FleetModel instantiation to be updated with new parameter results.
-
-        Returns
-        -------
-        None.
-        """
-
-        # """ tec_add_gradient --> veh_add_grd """
-        # fleet.veh_add_grd = dict()
-        # for element in itertools.product(*[fleet.sets.grdeq, fleet.sets.tecs]):
-        #     fleet.veh_add_grd[element] = fleet.parameters.tec_add_gradient
-
-        # """ occupancy_rate --> veh_oper_dist """
-        # fleet.fleet_vkm = fleet.passenger_demand/fleet.parameters.occupancy_rate
-        # fleet.veh_oper_dist = fleet.fleet_vkm/fleet.parameters.veh_stck_tot
-
-        # """ recalculate age functions"""
-        # fleet.veh_lift_cdf = pd.Series(norm.cdf(fleet.sets.age_int, fleet.avg_age, fleet.std_dev_age), index=fleet.sets.age)#pd.Series(pd.read_pickle(fleet.import_fp+'input.pkl'))#pd.DataFrame()  # [age] TODO Is it this one we feed to gams?
-        # fleet.veh_lift_cdf.index = fleet.veh_lift_cdf.index.astype('str')
-
-        # fleet.veh_lift_age = pd.Series(1 - fleet.veh_lift_cdf)     # [age] # probability of car of age x to die in current year
-
-        # #lifetime = [1-fleet.veh_lift_age[i+1]/fleet.veh_lift_age[i] for i in range(len(fleet.age)-1)]
-        # fleet.veh_lift_pdf = pd.Series(fleet_model.calc_steadystate_vehicle_age_distributions(fleet.sets.age_int, fleet.avg_age, fleet.std_dev_age), index = fleet.sets.age)   # idealized age PDF given avg fleet age and std dev
-        # fleet.veh_lift_pdf.index = fleet.veh_lift_pdf.index.astype('str')
-
-        # fleet.veh_lift_mor = pd.Series(fleet_model.calc_probability_of_vehicle_retirement(fleet.sets.age_int, fleet.veh_lift_pdf),  index=fleet.sets.age)
-        # fleet.veh_lift_mor.index = fleet.veh_lift_mor.index.astype('str')
 
     def run_GAMS(self, fleet, run_tag, filename, timestamp):
         """
@@ -288,33 +234,26 @@ class GAMSRunner:
         ------
         exceptions
             Print all GamsDatabaseDomainViolations, including relevant symbols
-        """
 
+        """
         # Pass to GAMS all necessary sets and parameters
         print('Loading GAMS data to database')
         self._load_input_to_gams(fleet, filename, timestamp)
 
         # Run GAMS Optimization
-
-        """"    # create a GAMSModelInstance and solve it with single links in the network blocked
-    mi = cp.add_modelinstance()
-    x = mi.sync_db.add_variable("x", 2, VarType.Positive)
-    xup = mi.sync_db.add_parameter("xup", 2, "upper bound on x")
-    # instantiate the GAMSModelInstance and pass a model definition and GAMSModifier to declare upper bound of X mutable
-    mi.instantiate("transport use lp min z", GamsModifier(x, UpdateAction.Upper, xup))
-    mi.solve() """
         try:
+            # TODO: refactor to
             model_run = self.ws.add_job_from_file(fleet.gms_file, job_name='EVD4EUR_'+run_tag) # model_run is type GamsJob
             opt = self.ws.add_options()
             opt.defines["gdxincname"] = self.db.name  # for auto-loading of database in GAMS model
             print('\n' + f'Using input gdx file: {self.db.name}')
-            print('running GAMS model, please wait...')
+            print('Running GAMS model, please wait...')
             model_run.run(gams_options=opt, output=sys.stdout, databases=self.db)  # ,create_out_db = True)
             self.ms = model_run.out_db['ms'].find_record().value
             self.ss = model_run.out_db['ss'].find_record().value
 
-            model_stat_dict = {1: 'Optimal',
-                               2: 'Locally Optimal',
+            model_stat_dict = {1 : 'Optimal',
+                               2 : 'Locally Optimal',
                                3 : 'Unbounded',
                                4 : 'Infeasible',
                                5 : 'Locally Infeasible',
@@ -357,28 +296,16 @@ class GAMSRunner:
 
             fleet.read_gams_db(gams_db)  # retrieve results from GAMS run (.gdx file)
             fleet.import_model_results()  # load key results as FleetModel attributes
+
             # Fetch model outputs
-#            fleet.totc = self.get_output_from_GAMS(gams_db,'TOTC')
-#            fleet.totc_opt = self.get_output_from_GAMS(gams_db,'TOTC_OPT')
-
             fleet.LC_emissions_avg = [self.quality_check(fleet, i) for i in range(0, 28)]
-
-    #            fleet.LC_emissions_avg = fleet.op_emissions_avg.add(fleet.veh_prod_cint)
-
-    #        with pd.ExcelWriter('troubleshooting_output_1.xlsx') as writer:
-    #            fleet.veh_oper_dist.to_excel(writer,sheet_name='veh_oper_dist')
-    #            fleet.veh_oper_cint.to_excel(writer,sheet_name='veh_oper_cint')
-    #            fleet.veh_prod_cint.to_excel(writer,sheet_name='veh_prod_cint')
-    #            fleet.LC_emissions.to_excel(writer,sheet_name='LC_emissions')
-
-    #        fleet.enr_cint = fleet._p_dict['ENR_CINT'].stack()
-    #        fleet.enr_cint.index.rename(['enr', 'reg', 'year'], inplace=True)
 
             add_gpby = fleet.stock_add.sum(axis=1).unstack('seg').unstack('tec')
             fleet.add_share = add_gpby.div(add_gpby.sum(axis=1), axis=0)
             fleet.add_share.dropna(how='all', axis=0, inplace=True) # drop production country (no fleet)
+
             """ Export technology shares in 2030 to evaluate speed of uptake"""
-            fleet.shares_2030 = fleet.add_share.loc(axis=0)[:,'2030']#.to_string()
+            fleet.shares_2030 = fleet.add_share.loc(axis=0)[:,'2030']
             fleet.shares_2050 = fleet.add_share.loc(axis=0)[:,'2050']
 
             try:
@@ -391,9 +318,6 @@ class GAMSRunner:
             tec_shares = fleet.add_share.stack().stack().sum(level=['prodyear', 'tec','reg'])
             temp_full_year = ((tec_shares.unstack('reg').loc(axis=0)[:, 'BEV']==1).idxmax()).tolist()
             fleet.full_BEV_year = [int(i[0]) if int(i[0])>1999 else np.nan for i in temp_full_year]
-    #        if fleet.full_BEV_year == 1999:
-    #            fleet.full_BEV_year = np.nan
-            temp = fleet.veh_stck.unstack(['year', 'tec']).sum()
 
         except Exception as e:
             print('\n *****************************************')
@@ -412,8 +336,7 @@ class GAMSRunner:
 
 
     def quality_check(self, fleet, age=12):
-        # TODO: move out of class?
-        """ Test calculation for average lifetime vehicle (~12 years)"""
+        """Test calculation for average lifetime vehicle (~12 years)."""
         fleet.veh_oper_cint_avg = fleet.veh_oper_cint.index.levels[4].astype(int)
         ind = fleet.veh_oper_cint.index
         fleet.veh_oper_cint.index = fleet.veh_oper_cint.index.set_levels(ind.levels[4].astype(int), level=4) #set ages as int
@@ -431,7 +354,6 @@ class GAMSRunner:
         fleet.avg_oper_dist = fleet.avg_oper_dist.set_index([fleet.avg_oper_dist.index, fleet.avg_oper_dist.age]) # make same index for joining with fleet.veh_oper_cint_avg
         fleet.avg_oper_dist.drop(columns='age', inplace=True)
         fleet.avg_oper_dist = fleet.avg_oper_dist.reorder_levels(['tec','enr','seg','reg','age','modelyear','prodyear'])
-#        fleet.op_emissions_avg = fleet.veh_oper_cint_avg.multiply(fleet.avg_oper_dist)
         fleet.d = fleet.avg_oper_dist.join(fleet.veh_oper_cint_avg, lsuffix='_dist')
         fleet.d.columns=['dist','intensity']
         fleet.op_emissions_avg = fleet.d.dist * fleet.d.intensity
@@ -439,7 +361,6 @@ class GAMSRunner:
         fleet.op_emissions_avg.to_csv('op_emiss_avg_with_duplicates.csv')
         fleet.op_emissions_avg = fleet.op_emissions_avg.reset_index().drop_duplicates().set_index(['tec','seg','reg','age','modelyear','prodyear'])
         fleet.op_emissions_avg.to_csv('op_emiss_avg_without_duplicates.csv')
-#            fleet.op_emissions_avg = fleet.op_emissions_avg.drop_duplicates() # replaced by reset_index/drop_duplicates/set_index above
         fleet.op_emissions_avg = fleet.op_emissions_avg.sum(level=['tec','seg','reg','prodyear']) # sum the operating emissions over all model years
         fleet.op_emissions_avg = fleet.op_emissions_avg.reorder_levels(order=['tec','seg','reg','prodyear']) # reorder MultiIndex to add production emissions
         fleet.op_emissions_avg.columns = ['']
