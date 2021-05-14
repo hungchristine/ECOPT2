@@ -154,7 +154,7 @@ class RawDataClass:
     veh_avg_age: Union[float, dict] = 11.1 # From ACEA 2019-2020 report
     veh_age_stdev: Union[float, dict] = 2.21
 
-    bev_int_shr: float = 0.02
+    bev_int_shr: float = 0.0018  # from Eurostat; assume remaining is ICE
     pkm_scenario: str = None
 
     recycle_rate: float = 0.75
@@ -176,20 +176,9 @@ class RawDataClass:
 class ParametersClass:
     """Contains all parameter values for GAMS model (in ready-to-insert form)."""
 
-    # enr_partab: pd.DataFrame
-    # enr_cint: pd.DataFrame
     veh_stck_tot: pd.DataFrame
     enr_veh: pd.DataFrame
-    # veh_prod_eint: pd.DataFrame
-    # veh_prod_cint_csnt: pd.DataFrame
-    # veh_oper_eint: pd.DataFrame
-    # veh_eolt_cint: pd.DataFrame
-
-    # veh_oper_dist: pd.DataFrame
     veh_pay: pd.DataFrame
-    # veh_stck_int_tec: pd.DataFrame
-    # veh_stck_int: pd.DataFrame
-    # stock_tot: pd.DataFrame
 
     # constraints
     manuf_cnstrnt: pd.DataFrame
@@ -199,27 +188,12 @@ class ParametersClass:
     mat_cint: Union[list, pd.DataFrame]
     veh_add_grd: Union[float, pd.DataFrame] = None
 
-    # gro_cnstrnt: Any
-
-    # bev_capac: Any
-    # veh_lift_cdf: Any
-    # veh_lift_pdf: Any
-    # veh_lift_age: Any
-    # veh_lift_mor: Any
-    # veh_partab: Any
-    # veh_stck_int_seg: Any
-
-    # veh_stck_int_tec: Any
-    # "year_par"
-
-    # recovery_pct: Any
-
     enr_cint: pd.DataFrame = None
 
     raw_data: RawDataClass = None
 
     veh_oper_dist: Union[float, list, dict, pd.DataFrame] = 10000
-    veh_stck_int_seg: Union[dict, list] = field(default_factory=lambda:[0.08, 0.21, 0.27, 0.08, 0.03, 0.34])
+    veh_stck_int_seg: Union[dict, list] = field(default_factory=lambda:[0.08, 0.21, 0.27, 0.08, 0.03, 0.34])  # Shares from 2017, ICCT report
 
     bev_capac: Union[dict, list] = field(default_factory=lambda:{'A': 26.6, 'B': 42.2, 'C': 59.9, 'D': 75., 'E':95., 'F':100.})
 
@@ -302,6 +276,7 @@ class ParametersClass:
         -------
         ParametersClass
             Initialized ParametersClass object.
+
         """
         with open(filepath, 'r') as stream:
             try:
@@ -341,6 +316,7 @@ class ParametersClass:
         -------
         my_obj : ParametersClass
             Initialized ParametersClass object.
+
         """
         mi_dict = {
                    'enr_glf_terms':['enr', 'reg', 'enreq'],
@@ -361,14 +337,12 @@ class ParametersClass:
         param_attrs = [f.name for f in fields(cls)]
         for param, value in all_params.items():
             if (param != 'readme') and (not param.startswith('_')):
-                # if param.lower() in param_attrs:
                 if param.lower() in mi_dict.keys():
                     # special case: MultiIndex index
                     # fill in nan values for columns that will be the index
                     value.loc(axis=1)[mi_dict[param.lower()]] = value.loc(axis=1)[mi_dict[param.lower()]].fillna(method='ffill')
                     value = value.astype({cat: str for cat in mi_dict[param.lower()]})
                     value.set_index(mi_dict[param.lower()], inplace=True, drop=True)
-                    # params_dict[param.lower()] = value  # ensure case-insensitivity; FleetModel uses all lower case
                 elif value.shape[0] == 0:
                     print(f"Empty values for {param} in Excel file.")
                 elif value.shape == (1,2):
@@ -377,21 +351,10 @@ class ParametersClass:
                     # single-level Index
                     value.set_index(value.iloc(axis=1)[0].name, inplace=True, drop=True)
                     value.index = value.index.astype(str)  # ensure all indices are strings (required to work for GAMS)
-                    # params_dict[param.lower()] = value  # ensure case-insensitivity; FleetModel uses all lower case
                 if param.lower() in param_attrs:
                     params_dict[param.lower()] = value
-                    # if value.shape == (1,2):
-                    # # special case: scalar value
-                    #     params_dict[param.lower()] = value.iloc[0,1]  # special case of scalars in Excel file
-                    # else:
-                    #     params_dict[param.lower()] = value
                 else:
                     raw_data_dict[param.lower()] = value
-                    # if value.shape == (1,2):
-                    # # special case: scalar value
-                    #     raw_data_dict[param.lower()] = value.iloc[0,1]  # special case of scalars in Excel file
-                    # else:
-                    #     raw_data_dict[param.lower()] = value
 
         # add user-specified values in experiment dict to params_dict and raw_data_dict
         for exp_param, value in experiment.items():
@@ -422,6 +385,7 @@ class ParametersClass:
         Returns
         -------
         None.
+
         """
         attrs = dir(self.raw_data)
 
@@ -526,6 +490,7 @@ class ParametersClass:
         Returns
         -------
         None.
+
         """
         # build vehicle impacts table from batt_portfolio
         self.raw_data.batt_portfolio = self.raw_data.batt_portfolio.T
@@ -568,12 +533,11 @@ class ParametersClass:
         Returns
         -------
         None.
+
         """
         # TO DO: separate A-terms for battery and rest-of-vehicle and apply different b-factors
 
-        # Read sigmoid A terms from Excel
-        "self.veh_factors = pd.read_excel(self.import_fp, sheet_name='genlogfunc', header=[0], index_col=[0,1,2], usecols='A:F', nrows=48)"
-        "self.veh_factors.set_index(['veheq', 'tec', 'seg'])"
+        # Fetch sigmoid A terms from RawDataClass
         self.raw_data.veh_factors.columns.names = ['comp']
         self.raw_data.veh_factors = self.raw_data.veh_factors.stack().to_frame('a')
 
@@ -622,14 +586,11 @@ class ParametersClass:
         # Add same r values across all technologies...can add BEV vs ICE resolution here
         temp_r = pd.DataFrame.from_dict(self.raw_data.r_term_factors, orient='index', columns=['r'])
         temp_df = temp_df.join(temp_r, on=['tec'], how='left')
-        #        self.temp_df['r'] = r_term_factors
 
         # Add technology-specific u values
         temp_u = pd.DataFrame.from_dict(self.raw_data.u_term_factors, orient='index', columns=['u'])
         temp_df = temp_df.join(temp_u, on=['tec'], how='left')
 
-        #        self.temp_df.drop(labels=0,axis=1,inplace=True)
-        #        self.temp_df.index.names=[None,None,None]
         return temp_df
 
 
@@ -818,15 +779,18 @@ class ParametersClass:
         Returns
         -------
         None.
+
         """
         # electricity_clustering.py produces electricity pathways with decade resolution
         # this method interpolates between decades for an annual resolution
         self.enr_cint.columns = self.enr_cint.columns.astype('int64')
+
         # insert year headers
         for decade in self.enr_cint.columns:
             for i in np.arange(1, 10):
                 self.enr_cint[decade + i] = np.nan
         self.enr_cint[2019] = self.enr_cint[2020]  # TODO: fill with historical data for pre-2020 period
+
         # interpolate between decades to get annual resolution
         self.enr_cint = self.enr_cint.astype('float64').sort_index(axis=1).interpolate(axis=1) # sort year orders and interpolate
         self.enr_cint.columns = self.enr_cint.columns.astype(str)  # set to strings for compatibility with GAMS
@@ -845,8 +809,8 @@ class ParametersClass:
         Returns
         -------
         None.
+
         """
-        # check_sum(self.veh_stck_int_seg)
         # TODO: move conversion of list to dict to post_init?
         if isinstance(self.veh_stck_int_seg, list):
             # convert to dict with explicit connection to segments
