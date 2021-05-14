@@ -69,18 +69,28 @@ class SetsClass:
             #TODO: below raises this error: TypeError: exceptions must derive from BaseException
             raise(f'Set(s) {err} not found in Excel file')
 
+        # generate dict of sets (remove nan from dataframe due to differing set lengths)
         mat_dict = {}
+        mat_checklist = all_sets['mat_cats'].dropna(how='all', axis=0).values  # used to validate materials
         sets_dict = {}
         for ind in all_sets.columns:
             if '_prod' in ind:
+                # manually generate set of primary material producers
                 key = ind.capitalize().split('_prod')[0]
                 mat_dict[key] = all_sets[ind].dropna().to_list()
+                if key in mat_checklist:
+                    mat_checklist = mat_checklist[mat_checklist != key]  # remove material from checklist
+                else:
+                    warnings.warn(f'Critical material {key} not in mat_cats, but has primary producers')
             else:
                 sets_dict[ind] = all_sets[ind].dropna().to_list()
+        if len(mat_checklist) > 0:
+            warnings.warn(f'Critical materials {mat_checklist} do not have primary producers defined')
         sets_dict['mat_prod'] = mat_dict
-        return cls(**sets_dict)
 
-        # TODO: build check to make sure there are no orphan materials or producer lists in mat_dict
+        # TODO: validation method: e.g., check overlap between inityear and modelyear
+
+        return cls(**sets_dict)
 
 
 @dataclass
@@ -98,7 +108,6 @@ class RawDataClass:
     veh_age_stdev: Union[float, dict] = 2.21
 
     bev_int_shr: float = 0.02
-    # seg_batt_caps: Union[dict, list] = field(default_factory=lambda:{'A': 26.6, 'B': 42.2, 'C': 59.9, 'D': 75., 'E':95., 'F':100.})
     pkm_scenario: str = None
 
     recycle_rate: float = 0.75
@@ -141,7 +150,6 @@ class ParametersClass:
     mat_cint: Union[list, pd.DataFrame]
     veh_add_grd: Union[float, pd.DataFrame] = None
 
-
     # gro_cnstrnt: Any
 
     # bev_capac: Any
@@ -162,7 +170,7 @@ class ParametersClass:
     raw_data: RawDataClass = None
 
     veh_oper_dist: Union[float, list, dict, pd.DataFrame] = 10000
-    veh_stck_int_seg: list = field(default_factory=lambda:[0.08, 0.21, 0.27, 0.08, 0.03, 0.34])
+    veh_stck_int_seg: Union[dict, list] = field(default_factory=lambda:[0.08, 0.21, 0.27, 0.08, 0.03, 0.34])
 
     bev_capac: Union[dict, list] = field(default_factory=lambda:{'A': 26.6, 'B': 42.2, 'C': 59.9, 'D': 75., 'E':95., 'F':100.})
 
@@ -201,24 +209,6 @@ class ParametersClass:
 
         params_dict.update(experiment)  # override duplicate entries with experiment values
         return cls(**params_dict)
-
-        # all_exp_list = []  # list of all exp_dicts
-        # exp_dict = {}  # dict containing current experiment parameters
-        # param_vals = [params_dict[p].items() for p in params_dict.keys()]  # list containing all parameter experiment values (for Cartesian product)
-        # exp_id_list = []  # list of experiment IDs
-
-        # # create all experiments as Cartesian product of all parameter options, and iterate
-        # for i, experiment in enumerate(product(*param_vals)):
-        #     id_string = "run"
-        #     for key, exp in zip(params_dict.keys(), experiment):
-        #         # build dict describing each dictionary: {parameter: experiment value}
-        #         exp_dict[key] = exp[1]
-        #         id_string = id_string + "_" + exp[0]
-        #     all_exp_list.append(exp_dict.copy())
-        #     exp_id_list.append(id_string)
-        # print(all_exp_list)
-        # return cls(**exp_dict)
-        # return cls(**params_dict)
 
     @classmethod
     def from_excel(cls, filepath, experiment):
@@ -329,7 +319,7 @@ class ParametersClass:
                                              index=sets.modelyear,
                                              columns=sets.mat_cats)
         if self.raw_data.enr_glf_terms is not None:
-            if self.enr_cint:
+            if self.enr_cint is not None:
                 # for building enr_cint from IAM pathways
                 self.build_enr_cint()
             else:
@@ -361,8 +351,8 @@ class ParametersClass:
 
         self.virg_mat_supply = self.virg_mat_supply.T
         self.veh_stck_int_tec = pd.Series([1-self.raw_data.bev_int_shr, self.raw_data.bev_int_shr], index=['ICE', 'BEV'])  # TODO: generalize
-        self.year_par = pd.Series([float(i) for i in sets.cohort], index=sets.cohort)
-        self.calc_veh_liftime(sets)
+        self.year_par = pd.Series([float(i) for i in sets.year], index=sets.year)
+        self.calc_veh_lifetime(sets)
 
 
     def build_veh_pay(self):
@@ -660,22 +650,52 @@ class ParametersClass:
         self.enr_cint = self.enr_cint.stack()  # reg, enr, year
 
     def validate_data(self, sets):
+        # check_sum(self.veh_stck_int_seg)
         if isinstance(self.veh_stck_int_seg, list):
+            # convert to dict with explicit connection to segments
             self.veh_stck_int_seg = {seg: share for seg, share in zip(sets.seg, self.veh_stck_int_seg)}
-
+        if isinstance(self.veh_stck_int_seg, dict):
+            if sum(self.veh_stck_int_seg.values()) != 1:\
+                warnings.warn('Vehicle segment shares (VEH_STCK_INT_SEG) do not sum to 1!')
+        if (isinstance(self.veh_stck_int_tec, list) or isinstance(self.veh_stck_int_tec, pd.Series)):
+            tec_sum = sum(self.veh_stck_int_tec)
+        elif (isinstance(self.veh_stck_int_tec, dict)):
+            tec_sum = sum(self.veh_stck_int_tec.values())
+        else:
+            warnings.warn(f'veh_stck_int_tec is an invalid format. It is {type(self.veh_stck_int_tec)}; only dict or list allowed')
+            tec_sum = np.nan
+        if tec_sum != 1:
+            warnings.warn('Vehicle powertrain technology shares (VEH_STCK_INT_TEC) do not sum to 1!')
+            print(self.veh_stck_int_tec)
         if (self.veh_oper_dist is not None) and (self.raw_data.pkm_scenario is not None):
             warnings.warn('Vehicle operating distance over specified. Both an annual vehicle mileage and an IAM scenario are specified.')
+
+
+    # @staticmethod
+    # def check_sum(it):
+    #     """
+
+
+    #     Parameters
+    #     ----------
+    #     it : list or dict
+    #         iterable of values to check sum of.
+
+    #     Returns
+    #     -------
+    #     None.
+
+    #     """
+    #     if isinstance(it, list):
+
+    #     return True
+    #     return False
+        # Check all regions are populated
+        # Check all vehicles are populated
+        # Shares sum to 1
+        #
 
 @dataclass
 class VariablesClass:
     answer1: list = None
     answer2: list = None
-
-
-# p = ParametersClass.from_file(r"C:\Users\chrishun\Box Sync\YSSP_temp\GAMS_input_test.yml")
-# pp = ParametersClass.from_exp({'veh_stck_int_seg': [0.08, 0.21, 0.26, 0.08, 0.03, 0.34], 'tec_add_gradient': 1.2, 'seg_batt_caps': {'A': 17.6, 'B': 42.2, 'C': 42.2, 'D': 59.9, 'E': 75, 'F': 95}})
-#######
-# experiment = {'veh_stck_int_seg': [0.08, 0.21, 0.26, 0.08, 0.03, 0.34],
-#               # 'tec_add_gradient': 1.2,
-#               'seg_batt_caps': {'A': 17.6, 'B': 42.2, 'C': 42.2, 'D': 59.9, 'E': 75, 'F': 95}}
-# p = ParametersClass.from_file(r"C:\Users\chrishun\Box Sync\YSSP_temp\GAMS_input_demo.xls", experiment)
