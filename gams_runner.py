@@ -191,6 +191,8 @@ class GAMSRunner:
         try:
             self.db.export(os.path.join(self.current_path, filename + '_'+timestamp))
         except Exception as e:
+            print('\n *****************************************')
+            print('Error in exporting input database')
             print(e)
             self.db.suppress_auto_domain_checking = 1
             self.db.export(os.path.join(self.current_path, filename + '_FAILED_'+timestamp))
@@ -289,6 +291,7 @@ class GAMSRunner:
         """
 
         # Pass to GAMS all necessary sets and parameters
+        print('Loading GAMS data to database')
         self._load_input_to_gams(fleet, filename, timestamp)
 
         # Run GAMS Optimization

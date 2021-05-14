@@ -53,6 +53,15 @@ import traceback
 ##fleet.run_GAMS('run_x')
 ##fleet.vis_GAMS('run_x')
 
+demo = True
+# unit test consists of static LCA factors
+# (straight line in lieu of logistic function)
+if demo:
+    yaml_name = 'GAMS_input_demo'
+else:
+    #yaml_name = 'unit_test'#.yaml'
+    yaml_name = 'GAMS_input'#.yaml'
+    # yaml_name = 'GAMS_input_demo'
 
 # Log to screen
 logging.basicConfig(stream=sys.stdout, level=logging.INFO)
@@ -63,11 +72,7 @@ yaml.SafeDumper.ignore_aliases = lambda *args: True
 
 # Make timestamp and directory for scenario run results for output files
 now = datetime.now().isoformat(timespec='minutes').replace(':','_')
-# unit test consists of static LCA factors
-# (straight line in lieu of logistic function)
-#yaml_name = 'unit_test'#.yaml'
-yaml_name = 'GAMS_input'#.yaml'
-# yaml_name = 'GAMS_input_demo'
+
 
 if 'unit_test' in yaml_name:
     fp = r'C:\Users\chrishun\Box Sync\YSSP_temp\visualization output\unit_test_' + now
@@ -80,6 +85,7 @@ try:
     os.mkdir(fp)
     os.chdir(fp)
 except:
+    print('\n *****************************************')
     print("cannot make folder!")
 
 
@@ -101,6 +107,7 @@ def run_experiment():
             params = yaml.safe_load(stream)
             print('finished reading parameter values')
         except yaml.YAMLError as exc:
+            print('\n *****************************************')
             print(exc)
 
     params_dict = {}  # dict with parameter names key values, and dict of experiments as values
@@ -161,23 +168,26 @@ def run_experiment():
         for key, exp in zip(params_dict.keys(), experiment):
             # build dict describing each experiment - {parameter: experiment value}
             exp_dict[key] = exp[1]
-            id_string = id_string + "_" + exp[0]  # make run ID
+            id_string = id_string + '_' + exp[0]  # make run ID
         all_exp_list.append(exp_dict.copy())
-        exp_id_list.append(id_string + now)
+        exp_id_list.append(id_string + '_' + now)
 
     # start iterating and running experiments
     for i, experiment in enumerate(all_exp_list):
         print('Starting run ' + str(i+1) + ' of ' + str(count) + '\n\n')
         log.info(f'Starting run {exp_id_list[i]}')
         run_tag = exp_id_list[i]
-        run_id = f'run{i}'
+        run_id = f'{exp_id_list[i]}'
         run_id_list.append(run_id)
 
-        sets = SetsClass.from_file(r'C:\Users\chrishun\Box Sync\YSSP_temp\Data\load_data\sets.xlsx')
-        params = ParametersClass.from_file(r'C:\Users\chrishun\Box Sync\YSSP_temp\Data\load_data\GAMS_input_demo.xlsx', experiment=experiment)
-        fm = fleet_model.FleetModel(sets,
-                                    params
-                                    )
+        if demo:
+            sets = SetsClass.from_file(r'C:\Users\chrishun\Box Sync\YSSP_temp\Data\load_data\sets_demo.xlsx')
+            params = ParametersClass.from_file(r'C:\Users\chrishun\Box Sync\YSSP_temp\Data\load_data\GAMS_input_demo.xlsx', experiment=experiment)
+        else:
+            sets = SetsClass.from_file(r'C:\Users\chrishun\Box Sync\YSSP_temp\Data\load_data\sets.xlsx')
+            params = ParametersClass.from_file(r'C:\Users\chrishun\Box Sync\YSSP_temp\Data\load_data\GAMS_input_demo_test.xlsx', experiment=experiment)
+
+        fm = fleet_model.FleetModel(sets, params)
 
         """
     for i, run_params in enumerate(product(*id_and_value)):
@@ -241,6 +251,7 @@ def run_experiment():
         try:
             gams_run.run_GAMS(fm, run_tag, yaml_name, now)  # run the GAMS model
         except Exception:
+            print('\n *****************************************')
             log.warning("Failed run")
             traceback.print_exc()
             os.chdir('..')
@@ -307,6 +318,7 @@ def run_experiment():
             fm.figure_calculations()  # run extra calculations for cross-experiment figures
             vis.vis_GAMS(fm, fp, run_id, experiment, export_png=False)
         except Exception:
+            print('\n *****************************************')
             log.warning("Failed visualization, deleting folder")
             traceback.print_exc()
             os.chdir('..')

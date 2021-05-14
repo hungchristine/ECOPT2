@@ -167,6 +167,7 @@ class FleetModel:
 #                self.B_prod = B_term_prod # not currently used
 #                self.B_oper = B_term_oper_EOL # not currently used
             except AttributeError as err:
+                print('\n *****************************************')
                 print(f"Exception: {err}")
                 print(traceback.format_exc())
                 print("Generating empty fleet object")
@@ -635,6 +636,7 @@ class FleetModel:
                 try:
                     self._p_dict[p] = gmspy.param2df(p, db=gams_db)
                 except ValueError as e:
+                    print('\n *****************************************')
                     print(f'p_dict ValueError in {p}')
     #                try:
     #                    self._p_dict[p] = gmspy.param2series(p, db=gams_db)
@@ -644,6 +646,7 @@ class FleetModel:
     #                print(f'Warning!: p_dict ValueError in {p}!')
     #                pass
                 except AttributeError:
+                    print('\n *****************************************')
                     print(f'Warning!: p_dict AttributeError in {p}! Probably no records for this parameter.')
                     pass
 
@@ -662,6 +665,7 @@ class FleetModel:
                     print(f'Warning!: v_dict ValueError in {v}!')
                 pass
             except TypeError: # This error is specifically for seg_add
+                print('\n *****************************************')
                 print(f'Warning! v-dict TypeError in {v}! Probably no records for this variable.')
                 pass
 
@@ -675,6 +679,7 @@ class FleetModel:
                 else:
                     print(f'Warning!: e_dict ValueError in {e}!')
             except:
+                print('\n *****************************************')
                 print(f'Warning!: Error in {e}')
                 print(sys.exc_info()[0])
                 pass

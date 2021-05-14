@@ -1,9 +1,11 @@
 # -*- coding: utf-8 -*-
 """
-Created on Sun Apr  4 13:30:42 2021
-
-@author: chrishun
+This file contains the definition of three dataclasses: SetsClass,
+ParametersClass and RawDataClass.  The former two caontain the sets and
+parameters forwarded to GAMS, respectively. RawDataClass contains the
+intermediate data used to calculate parameters.
 """
+
 from dataclasses import dataclass, field, fields
 from typing import List, Dict, Any, Union
 from itertools import product
@@ -16,6 +18,8 @@ import yaml
 
 @dataclass
 class SetsClass:
+    """Default values initialize with a two-region system with three size segments."""
+
     tecs: list = field(default_factory=lambda:['BEV', 'ICEV'])
     enr: list = field(default_factory=lambda: ['FOS', 'ELC'])
     seg: list = field(default_factory=lambda: ['A', 'C', 'F'])
@@ -32,7 +36,7 @@ class SetsClass:
     age: list = field(default_factory=lambda: [str(i) for i in range(29)])
     age_int: list = field(default_factory=lambda: [i for i in range(29)])
 
-    new: list = field(default_factory=lambda: ['0'])
+    new: list = field(default_factory=lambda: ['0'])  # static set for new vehicles
     demeq: list = field(default_factory=lambda: ['STCK_TOT', 'OPER_DIST', 'OCUP'])
     grdeq: list = field(default_factory=lambda: ['IND', 'ALL'])
     veheq: list = field(default_factory=lambda: ['PROD_EINT', 'PROD_CINT_CSNT', 'OPER_EINT', 'EOLT_CINT'])
@@ -40,6 +44,27 @@ class SetsClass:
 
     @classmethod
     def from_file(cls, filepath):
+        """
+        Create SetsClass with user input file.
+
+        Distinguishes between Excel or YAML input files, and raises an error
+        with other filetypes
+
+        Parameters
+        ----------
+        filepath : str
+            Filepath for user-defined set and index declerations.
+
+        Raises
+        ------
+        ValueError
+            Raises error on invalid (non-Excel or -YAML) filetypes.
+
+        Returns
+        -------
+        SetsClass
+            Initialized SetsClass from file.
+        """
         if filepath.endswith('xlsx') or filepath.endswith('.xls'):
             return cls.from_excel(filepath)
         elif filepath.endswith('yml') or filepath.endswith('.yaml'):
@@ -53,10 +78,30 @@ class SetsClass:
 
     @classmethod
     def from_excel(cls, filepath, sheet=0):
+        """
+        Read user-defined sets and indices from Excel Worksheet.
+
+        The first row of the sheet is assumed to be the set names,
+        with the valid index values below
+
+        Parameters
+        ----------
+        filepath : str
+            Filepath to Excel workbook containing user-defined sets and indices.
+        sheet : str, optional
+            Sheetname in Excel workbook to read sets and indices from.
+            The default is 0 (first worksheet).
+
+        Returns
+        -------
+        SetsClass
+            Initialized SetsClass from Excel file.
+        """
         set_list = ['tecs', 'enr', 'seg', 'mat_cats', 'reg', 'fleetreg',
                     'year', 'modelyear', 'inityear',
                     'cohort', 'optyear', 'age']
 
+        # DataFrame containing all user-defined sets
         all_sets = pd.read_excel(filepath, sheet, dtype='str')
         all_sets.columns = all_sets.columns.str.lower()
 
@@ -95,6 +140,8 @@ class SetsClass:
 
 @dataclass
 class RawDataClass:
+    """Contains any raw data used to further calculate or construct parameters."""
+
     all_pkm_scen: pd.DataFrame = None
     batt_portfolio: pd.DataFrame = None
     veh_factors: pd.DataFrame = None
@@ -127,6 +174,8 @@ class RawDataClass:
 
 @dataclass
 class ParametersClass:
+    """Contains all parameter values for GAMS model (in ready-to-insert form)."""
+
     # enr_partab: pd.DataFrame
     # enr_cint: pd.DataFrame
     veh_stck_tot: pd.DataFrame
@@ -175,18 +224,59 @@ class ParametersClass:
     bev_capac: Union[dict, list] = field(default_factory=lambda:{'A': 26.6, 'B': 42.2, 'C': 59.9, 'D': 75., 'E':95., 'F':100.})
 
     def __post_init__(self):
+        """
+        Post-initialization processing of parameters.
+
+        Returns
+        -------
+        None.
+        """
+        # convert battery capacities to float
         if isinstance(self.bev_capac, dict):
-            # convert battery capacities to float
             self.bev_capac = {key: float(value) for key, value in self.bev_capac.items()}
         else:
             self.bev_capac = [float(value) for value in self.bev_capac]
 
     @classmethod
     def from_exp(cls, experiment:dict):
+        """
+        Initialize parameters from experiment dict.
+
+        Parameters
+        ----------
+        experiment : dict
+            Parameter names and values.
+
+        Returns
+        -------
+        ParametersClass
+            Initialized ParametersClass object.
+        """
         return cls(**experiment)
 
     @classmethod
     def from_file(cls, filepath: str, experiment: dict = None):
+        """
+        Initialize parameters from user-defined file.
+
+        Parameters
+        ----------
+        filepath : str
+            Filepath for user-defined parameter declerations.
+        experiment : dict, optional
+            Contains experiment-specific parameter values. The default is None.
+
+        Raises
+        ------
+        ValueError
+            Raises error on invalid (non-Excel or -YAML) filetypes.
+
+        Returns
+        -------
+        ParametersClass
+            Initialized collection of parameters.
+
+        """
         if filepath.endswith('xlsx') or filepath.endswith('.xls'):
             return cls.from_excel(filepath, experiment)
         elif filepath.endswith('yml') or filepath.endswith('.yaml'):
@@ -196,6 +286,23 @@ class ParametersClass:
 
     @classmethod
     def from_yaml(cls, filepath, experiment):
+        """
+        Initialize ParametersClass object from YAML file.
+
+        YAML should contain
+
+        Parameters
+        ----------
+        filepath : str
+            Filepath for user-defined parameter declerations.
+        experiment : dict
+            Contains all experiment-specific parameter values.
+
+        Returns
+        -------
+        ParametersClass
+            Initialized ParametersClass object.
+        """
         with open(filepath, 'r') as stream:
             try:
                 params = yaml.safe_load(stream)
@@ -212,6 +319,29 @@ class ParametersClass:
 
     @classmethod
     def from_excel(cls, filepath, experiment):
+        """
+        Initialize ParametersClass object from Excel file.
+
+        Read all sheets in the provided Excel sheet, performs some level of
+        data validation and sets ParametersClass attributes based on sheet
+        names (case-insensitive).
+
+        Creates RawData object with data that needs further manipulating.
+
+        Initialize experiment-specific parameter values.
+
+        Parameters
+        ----------
+        filepath : str
+            Filepath for user-defined parameter declerations.
+        experiment : dict
+            Contains all experiment-specific parameter values.
+
+        Returns
+        -------
+        my_obj : ParametersClass
+            Initialized ParametersClass object.
+        """
         mi_dict = {
                    'enr_glf_terms':['enr', 'reg', 'enreq'],
                    'virg_mat_supply': ['mat_cat', 'mat_prod'],
@@ -271,13 +401,28 @@ class ParametersClass:
             else:
                 raw_data_dict[exp_param] = value
 
-        # params_dict.update(experiment)  # add experiment values and override duplicate entries with experiment values
+        # add experiment values and override duplicate entries with experiment values
         my_obj = cls(**params_dict)
         my_obj.raw_data = RawDataClass.from_dict(raw_data_dict)
 
         return my_obj
 
     def calculate_from_raw_data(self, sets):
+        """
+        Set up input data structures for parameters from RawData object.
+
+        Set up data structures (DataFrames) and, where necessary, performs
+        basic calculations for insertion in GAMS database as model input.
+
+        Parameters
+        ----------
+        sets : SetsClass
+            For setting up DataFrame indices.
+
+        Returns
+        -------
+        None.
+        """
         attrs = dir(self.raw_data)
 
         # self.build_veh_pay()  # establish self.veh_pay
@@ -340,7 +485,7 @@ class ParametersClass:
                 for t in [((2000)+i) for i in range(81)]:
                     self.enr_cint.loc[(reg, enr, str(t))] = A + (B - A) / (1 + np.exp(- r*(t - u)))
 
-            self.enr_cint = self.enr_cint.swaplevel(0, 1) # enr, reg, year"
+            self.enr_cint = self.enr_cint.swaplevel(0, 1) # enr, reg, year
             self.enr_cint = self.enr_cint.to_frame()
             self.enr_cint.dropna(how='all', axis=0, inplace=True)
 
@@ -356,12 +501,32 @@ class ParametersClass:
 
 
     def build_veh_pay(self):
+        """
+
+
+        Returns
+        -------
+        None.
+
+        """
         # get this from parameters.py
         # self.veh_pay = stuff
         pass
 
 
     def build_BEV(self):
+        """
+        Fetch BEV production emissions based on battery size.
+
+        Select battery size by segment from size-segment combinations,
+        fetch and sum production emissions for battery and rest-of-vehicle.
+        Update DataFrame with total production emissions and energy use for
+        BEVs by segment.
+
+        Returns
+        -------
+        None.
+        """
         # build vehicle impacts table from batt_portfolio
         self.raw_data.batt_portfolio = self.raw_data.batt_portfolio.T
         self.raw_data.prod_df = pd.DataFrame()
@@ -385,7 +550,7 @@ class ParametersClass:
         DataFrame. Upper asymptote (B term values) for production and EOL
         phases and all inflection (r-term) and slope (u-term)
         from YAML file (experiment parameter). Aggregate all values in a
-        DataFrame for export to GAMS workspace.
+        DataFrame for export to GAMS database.
 
         Parameters
         ----------
@@ -404,7 +569,6 @@ class ParametersClass:
         -------
         None.
         """
-
         # TO DO: separate A-terms for battery and rest-of-vehicle and apply different b-factors
 
         # Read sigmoid A terms from Excel
@@ -469,7 +633,20 @@ class ParametersClass:
         return temp_df
 
 
-    def calc_veh_liftime(self, sets):
+    def calc_veh_lifetime(self, sets):
+        """
+        Calculate survival curve from vehicle average age and standard deviation.
+
+        Parameters
+        ----------
+        sets : SetsClass
+            Used to retrieve desired age indices.
+
+        Returns
+        -------
+        None.
+
+        """
         # TODO: introduce Weibull survival curve estimation?
         self.veh_lift_cdf = pd.Series(norm.cdf(sets.age_int, self.raw_data.veh_avg_age, self.raw_data.veh_age_stdev), index=sets.age)
         self.veh_lift_cdf.index = self.veh_lift_cdf.index.astype('str')
@@ -484,7 +661,7 @@ class ParametersClass:
 
     def calc_steadystate_vehicle_age_distributions(self, ages, average_expectancy=10.0, standard_dev=3.0):
         """
-        Calc a steady-state age distribution consistent with a normal distribution around an average life expectancy
+        Calculate a steady-state age distribution consistent with a normal distribution around an average life expectancy.
 
         Parameters
         ----------
@@ -538,7 +715,6 @@ class ParametersClass:
              0      2      4      6      8       10     12     14     16     18     20
                                             VEHICLE AGE
         """
-
         # The total (100%) minus the cumulation of all the cars retired by the time they reach a certain age
         h = 1 - norm.cdf(ages, loc=average_expectancy, scale=standard_dev)
 
@@ -566,7 +742,6 @@ class ParametersClass:
         age_distribution: 1-dimensional numpy array
             The fraction of vehicles that have a certain age
 
-
         Returns
         -------
         g : 1-dimensional numpy array
@@ -574,12 +749,10 @@ class ParametersClass:
 
         See Also
         --------
-
         `calc_steadystate_vehicle_age_distributions()`
 
         Example
         --------
-
         Given an age distribution consistent with an average life expectancy of
         10 years (SD 3 years), we get the following
 
@@ -635,6 +808,17 @@ class ParametersClass:
         return g
 
     def build_enr_cint(self):
+        """
+        Construct DataFrame based on energy carbon intensities time series.
+
+        Interpolate output from electricity carbon intensities (in decades)
+        for annual time-step resolution. Set up DataFrame for GAMS database
+        insertion.
+
+        Returns
+        -------
+        None.
+        """
         # electricity_clustering.py produces electricity pathways with decade resolution
         # this method interpolates between decades for an annual resolution
         self.enr_cint.columns = self.enr_cint.columns.astype('int64')
@@ -650,7 +834,20 @@ class ParametersClass:
         self.enr_cint = self.enr_cint.stack()  # reg, enr, year
 
     def validate_data(self, sets):
+        """
+        Perform simple checks to validate input data.
+
+        Parameters
+        ----------
+        sets : SetsClass
+            Initialized SetsClass object.
+
+        Returns
+        -------
+        None.
+        """
         # check_sum(self.veh_stck_int_seg)
+        # TODO: move conversion of list to dict to post_init?
         if isinstance(self.veh_stck_int_seg, list):
             # convert to dict with explicit connection to segments
             self.veh_stck_int_seg = {seg: share for seg, share in zip(sets.seg, self.veh_stck_int_seg)}
