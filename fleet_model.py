@@ -751,6 +751,10 @@ class FleetModel:
         self.recycled_batt = self._v_dict['RECYCLED_BATT']
         self.mat_req_virg = self._p_dict['MAT_REQ_VIRG']
         self.mat_req_virg = pd.concat([self.mat_req_virg], axis=1, keys=['primary'])
+        # self.mat_req_virg.loc[self.mat_req_virg['primary'] < 0] = np.nan # replace negative values with np.nan
+        self.mat_req_virg.where(cond=self.mat_req_virg>=0, other=np.nan, inplace=True)
+        if self.mat_req_virg.isnull().sum().sum() > 0:
+            print('Warning: supply of secondary materials greater than demand of materials')
         self.mat_recycled = self._p_dict['MAT_RECYCLED']
         self.mat_recycled = pd.concat([self.mat_recycled], axis=1, keys=['recycled'])
         self.mat_demand = self._p_dict['MAT_REQ_TOT']
@@ -771,11 +775,20 @@ class FleetModel:
 
         self.stock_df_plot_grouped = self.stock_df_plot.groupby(['tec', 'seg'])
 
-        self.stock_cohort = self._p_dict['VEH_STCK_CHRT']
-        self.stock_cohort.index.rename(['tec', 'seg', 'fleetreg', 'prodyear', 'age'], inplace=True)
-        self.stock_cohort.columns.rename('modelyear', inplace=True)
-        self.stock_cohort = self.stock_cohort.droplevel(level='age', axis=0)
-        self.stock_cohort = self.stock_cohort.stack().unstack('prodyear').sum(axis=0, level=['tec', 'fleetreg', 'modelyear'])#.unstack('modelyear')
+        # Import post-processing parameters
+        try:
+            self.veh_oper_cohort = self._p_dict['VEH_OPER_COHORT']
+            self.veh_oper_cohort.index.rename(['tec', 'seg', 'reg', 'prodyear', 'modelyear' 'age'], inplace=True)
+            self.stock_cohort = self._p_dict['VEH_STCK_COHORT']
+            self.stock_cohort.index.rename(['tec', 'seg', 'fleetreg', 'prodyear', 'age'], inplace=True)
+            self.stock_cohort.columns.rename('modelyear', inplace=True)
+            self.stock_cohort = self.stock_cohort.droplevel(level='age', axis=0)
+            self.stock_cohort = self.stock_cohort.stack().unstack('prodyear').sum(axis=0, level=['tec', 'fleetreg', 'modelyear'])#.unstack('modelyear')
+            self.bau_emissions = self._p_dict['BAU_EMISSIONS']
+            self.bau_emissions.index.rename(['modelyear'], inplace=True)
+        except TypeError:
+            print("Could not find post-processing parameter(s)")
+
 
         self.veh_oper_dist = self._p_dict['VEH_OPER_DIST']
         self.veh_oper_dist.index = self.veh_oper_dist.index.get_level_values(0) # recast MultiIndex as single index

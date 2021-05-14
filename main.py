@@ -263,7 +263,8 @@ def run_experiment():
 #        os.chdir(fp)
 
         # with open('run_' + run_tag + '.pkl', 'wb') as f:
-        with gzip.GzipFile('run_' + run_tag + '.pkl', 'w') as f:
+        pickle_fp = os.path.join(fp, run_tag + '.pkl')
+        with gzip.GzipFile(pickle_fp, 'wb') as f:
             pickle.dump(fm, f)
 
         # Save log info
@@ -319,24 +320,24 @@ def run_experiment():
         fm.veh_stck.name = run_id
 
         if shares_2030 is None:
-            shares_2030 = pd.DataFrame(fm.shares_2030)
+            shares_2030 = pd.DataFrame(fm.shares_2030.stack().stack(), columns=[run_id])
         else:
-            shares_2030[run_id] = fm.shares_2030
+            shares_2030[run_id] = fm.shares_2030.stack().stack()
 
         if shares_2050 is None:
-            shares_2050 = pd.DataFrame(fm.shares_2050)
+            shares_2050 = pd.DataFrame(fm.shares_2050.stack().stack(), columns=[run_id])
         else:
-            shares_2050[run_id] = fm.shares_2050
+            shares_2050[run_id] = fm.shares_2050.stack().stack()
 
         if add_share is None:
-            add_share = pd.DataFrame(fm.add_share.stack().stack())
+            add_share = pd.DataFrame(fm.add_share.stack().stack(), columns=[run_id])
         else:
             add_share[run_id] = fm.add_share.stack().stack()
 
         if stock_comp is None:
-            stock_comp = pd.DataFrame(fm.veh_stck)
+            stock_comp = pd.DataFrame(fm.veh_stck.stack(), columns=[run_id])
         else:
-            stock_comp[run_id] = fm.veh_stck
+            stock_comp[run_id] = fm.veh_stck.stack()
 
         full_BEV_yr_df.append(fm.full_BEV_year, ignore_index=True)
         totc_list.append(fm.totc_opt)
@@ -347,7 +348,8 @@ def run_experiment():
 
 
     # Write log to file
-    with open(f'output_{now}.yaml', 'w') as f:
+    output_fp = os.path.join(fp, f'output_{now}.yaml')
+    with open(output_fp, 'w') as f:
         yaml.safe_dump(info, f)
 
     # Return last fleet object for troubleshooting
@@ -367,18 +369,34 @@ scenario_totcs = pd.DataFrame(totc_list, index=run_id_list)
 scenario_totcs = pd.DataFrame(totc_list, index=run_id_list, columns=['totc_opt'])
 
 # Load a "baseline" fleet and extract parameters for comparison
+baseline_file = None
+for i, exp in enumerate(run_id_list):
+    new_list = [j for j in exp.split('_')]
+    if len(set(new_list))==1:
+        new_list[0] =='def'
+        print(exp)
+        print(os.path.abspath(os.path.curdir))
+        baseline_file = 'run_' + run_id_list[i] + '.pkl'
+
+if baseline_file is None:
+    baseline_file = run_id_list[0] + '.pkl' # use first experiment performed as baseline experiment
+
+with gzip.open(baseline_file, 'rb') as f:
+    d = pickle.load(f)
+    default_totc_opt = d.totc_opt
 #with open('run_2019-09-22T14_50.pkl','rb') as f:
 #    d=pickle.load(f)
 #    default_totc_opt = d[0][run_id_list[0]].totc_opt
 
 try:
     scenario_totcs['Abs. difference from totc_opt'] = default_totc_opt - scenario_totcs['totc_opt']
-    scenario_totcs['%_change_in_totc_opt'] = scenario_totcs['totc_opt']/default_totc_opt
+    scenario_totcs['%_change_in_totc_opt'] = (default_totc_opt - scenario_totcs['totc_opt'])/default_totc_opt
 except:
+    print('\n *****************************************')
     print("No comparison to default performed")
 
 # Export potentially helpful output for analyzing across scenarios
-with open('run_' + now + '.pkl', 'wb') as f:
+with open('overview_run_' + now + '.pkl', 'wb') as f:
     pickle.dump([shares_2030, shares_2050, add_share, stock_comp, full_BEV_yr_df, scenario_totcs], f)
 
 """with open('run_2019-09-22T14_50.pkl','rb') as f:
@@ -389,16 +407,31 @@ d[0][run_id_list[0]].add_share"""
     fm=pickle.load(f)
 """
 
-#with pd.ExcelWriter('cumulative_scenario_output'+now+'.xlsx') as writer:
-#    shares_2030.to_excel(writer,sheet_name='tec_shares_in_2030')
-#    shares_2050.to_excel(writer,sheet_name='tec_shares_in_2050')
-#    add_share.to_excel(writer,sheet_name='add_shares')
-#    stock_comp.to_excel(writer,sheet_name='total_stock')
-#    full_BEV_yr.to_excel(writer,sheet_name='1st_year_full_BEV')
-#    scenario_totcs.to_excel(writer,sheet_name='totc')
+with pd.ExcelWriter('cumulative_scenario_output'+now+'.xlsx') as writer:
+    shares_2030.to_excel(writer,sheet_name='tec_shares_in_2030')
+    shares_2050.to_excel(writer,sheet_name='tec_shares_in_2050')
+    add_share.to_excel(writer,sheet_name='add_shares')
+    stock_comp.to_excel(writer,sheet_name='total_stock')
+    full_BEV_yr.to_excel(writer,sheet_name='1st_year_full_BEV')
+    scenario_totcs.to_excel(writer,sheet_name='totc')
 
-#full_BEV_yr.plot()
+# plotting
+rename = {baseline_file.split('.pkl')[0]: 'baseline'}
+shares_2030.rename(columns=rename, inplace=True)
+shares_2050.rename(columns=rename, inplace=True)
+add_share.rename(columns=rename, inplace=True)
+stock_comp.rename(columns=rename, inplace=True)
+full_BEV_yr.rename(index=rename, inplace=True)
+scenario_totcs.rename(index=rename, inplace=True)
 
+try:
+    full_BEV_yr.plot()
+except TypeError:
+    print('Regions do not reach 100% market share during model period')
+
+(scenario_totcs['%_change_in_totc_opt']*100).plot(kind='bar')
+import numpy as np
+(shares_2030.replace(0, np.nan).dropna(how='all', axis=0)).unstack(['reg', 'tec']).T.plot(kind='bar', stacked=True)
 #os.remove(fp+'\failed.txt')
 
 

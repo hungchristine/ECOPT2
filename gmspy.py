@@ -34,10 +34,11 @@ def list2set(db, var, name, comment='', verbose=True):
     """
 
     ### Try something like:
-    ## if isinstance(db.get_symbol(name), GamsSet):
-    ##  db.merge_record(name)
-    ## else:
-    a_set = db.add_set(name, 1, comment)
+    try:
+    # if isinstance(db.get_symbol(name), GamsSet):
+      a_set = db.get_set(name)
+    except:
+        a_set = db.add_set(name, 1, comment)
     try:
         for v in var:
             a_set.add_record(v)
@@ -95,7 +96,10 @@ def df2param(db, df, domains, name, comment=''):
     """
 
     ## if df is a single-column dataframe (i.e., series cast as dataframe), the below doesn't work; keys uses the index-column name pair...
-    a_param = db.add_parameter_dc(name, domains, comment)
+    try:
+        a_param = db.get_parameter(name)
+    except:
+        a_param = db.add_parameter_dc(name, domains, comment)
     if isinstance(df, pd.DataFrame) or isinstance(df, pd.Series):
         if df.ndim > 1 and df.shape[1] > 1:
             # if dataframe with more than one column, stack (to make series)
