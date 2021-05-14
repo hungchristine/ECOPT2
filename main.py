@@ -117,24 +117,6 @@ def run_experiment():
     # Dictionary for logging
     info = {}
 
-    # Explicit list of parameters
-    """
-    param_names = ['veh_stck_int_seg',
-                   'tec_add_gradient',
-                   'seg_batt_caps',
-                   'B_term_prod',
-                   'B_term_oper_EOL',
-                   'r_term_factors',
-                   'u_term_factors',
-                   'eur_batt_share',
-                   'pkm_scenario']#,'seg_batt_caps']
-
-    # Run experiments
-    # list of dict items for each parameter
-    id_and_value = [params[p].items() for p in param_names]
-    """
-    # NB could also change the names here
-
     # Calculate total number of runs, for progress updates
     count = 1
     for x in params:
@@ -190,63 +172,10 @@ def run_experiment():
         fm = fleet_model.FleetModel(sets, params)
 
         """
-    for i, run_params in enumerate(product(*id_and_value)):
-        print('Starting run ' + str(i+1) + ' of ' + str(count) + '\n\n')
-        #        veh_seg_shr, tec_add_gradient, seg_batt_caps = run_params
-        # Unpack the defined run parameters from YAML file
-        veh_stck_int_seg, tec_add_gradient, seg_batt_caps, B_term_prod, B_term_oper_EOL, r_term_factors, u_term_factors, eur_batt_share, pkm_scenario = run_params
-
-        # Make run ID
-        now = datetime.now().isoformat(timespec='minutes').replace(':', '_')
-        run_id = f'run_{tec_add_gradient[0]}_{seg_batt_caps[0]}_{B_term_prod[0]}_{B_term_oper_EOL[0]}_{r_term_factors[0]}_{u_term_factors[0]}_{eur_batt_share[0]}_{pkm_scenario[1]}' #'_{seg_batt_caps[0]}'
-        run_tag = run_id + now
-        run_id_list.append(run_id)
-
-        # run_id = f'run_{i}'  # alternate tag format
-
-        # Run the appropriate function to make sigmoid parameters/values
-        #        sigm = sigmoid.Sigmoid
-        #        fun = getattr(sigm, 'batt_cap')(seg_batt_caps[1])
-        #        values = fun()
-
-        #        values = sigmoid.make_values(**sigmoid_case[1])
-        #        values = sigmoid.make_values(A_batt_size=30, F_batt_size=100)
-
-
-        log.info(f'Starting run {run_id}')
-        """
-        """
         # need to pass in run ID tag for saving gdx/csv
         # instantiate FleetModel object
         # NB here, use explicit names to avoid any confusion """
         # sets = SetsClass.from_file(r'C:\Users\chrishun\Box Sync\YSSP_temp\Data\load_data\sets.xlsx')
-
-        """
-        fm = fleet_model.FleetModel(sets,
-                                    veh_stck_int_seg = veh_stck_int_seg[1],
-                                    tec_add_gradient = tec_add_gradient[1],
-                                    seg_batt_caps = seg_batt_caps[1],
-                                    B_term_prod = B_term_prod[1],
-                                    B_term_oper_EOL = B_term_oper_EOL[1],
-                                    r_term_factors = r_term_factors[1],
-                                    u_term_factors = u_term_factors[1],
-                                    eur_batt_share = eur_batt_share[1],
-                                    pkm_scenario = pkm_scenario[1])#,
-        #                                    growth_constraint = growth_constraint[1])
-        # fm = fleet_model.FleetModel(veh_stck_int_seg = veh_stck_int_seg[1],
-        #                             tec_add_gradient = tec_add_gradient[1],
-        #                             seg_batt_caps = seg_batt_caps[1],
-        #                             B_term_prod = B_term_prod[1],
-        #                             B_term_oper_EOL = B_term_oper_EOL[1],
-        #                             r_term_factors = r_term_factors[1],
-        #                             u_term_factors = u_term_factors[1],
-        #                             eur_batt_share = eur_batt_share[1],
-        #                             pkm_scenario = pkm_scenario[1])#,
-        #                                    growth_constraint = growth_constraint[1])
-
-    """
-
-        """fm.run_GAMS(run_tag)"""
 
         try:
             gams_run.run_GAMS(fm, run_tag, yaml_name, now)  # run the GAMS model
