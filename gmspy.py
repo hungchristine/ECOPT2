@@ -12,7 +12,8 @@ import warnings
 from gams import *
 
 def list2set(db, var, name, comment='', verbose=True):
-    """ Insert GAMS set based on python list
+    """
+    Insert GAMS set based on python list.
 
     Parameters
     ----------
@@ -32,10 +33,7 @@ def list2set(db, var, name, comment='', verbose=True):
     a_set : GamsSet instance
 
     """
-
-    ### Try something like:
     try:
-    # if isinstance(db.get_symbol(name), GamsSet):
       a_set = db.get_set(name)
     except:
         a_set = db.add_set(name, 1, comment)
@@ -50,8 +48,8 @@ def list2set(db, var, name, comment='', verbose=True):
     return a_set
 
 def df2set(db, var, name, comment=''):
-    """ Insert GAMS multidimensional set based on DataFrame.
-
+    """
+    Insert GAMS multidimensional set based on DataFrame.
 
     Parameters
     ----------
@@ -69,12 +67,13 @@ def df2set(db, var, name, comment=''):
     a_set : GamsSet instance
 
     """
-    #TODO: implement
+    #TODO: implement multidimensional sets
     a_set = None
     return a_set
 
 def df2param(db, df, domains, name, comment=''):
-    """ Insert pandas dataframe as Parameter in a GAMS database. Revision: also accepts dictionaries.
+    """
+    Insert pandas dataframe as Parameter in a GAMS database. Revision: also accepts dictionaries.
 
     Parameters
     ----------
@@ -94,7 +93,6 @@ def df2param(db, df, domains, name, comment=''):
     a_param : GamsParameter instance
 
     """
-
     ## if df is a single-column dataframe (i.e., series cast as dataframe), the below doesn't work; keys uses the index-column name pair...
     try:
         a_param = db.get_parameter(name)
@@ -106,13 +104,14 @@ def df2param(db, df, domains, name, comment=''):
             df = df.stack()
         df = df.squeeze()
         df = df.to_dict()
-    for keys, data in iter(df.items()):#iter(df.items()):
+    for keys, data in iter(df.items()):
         a_param.add_record(keys).value = data
     return a_param
 
 
 def ls(db=None, ws=None, gdx_filepath=None, entity=None):
-    """ List either all content or selected entities within a GAMS database or gdx file
+    """
+    List either all content or selected entities within a GAMS database or gdx file.
 
     Can list everything, or all instances of 'Set', 'Parameter', 'Equation' or 'Variable'
 
@@ -132,7 +131,6 @@ def ls(db=None, ws=None, gdx_filepath=None, entity=None):
     out: list of strings
         Names of entities in db or gdx file
     """
-
     # Sort out database access or file reading
     db = _iwantitall(db, ws, gdx_filepath)
 
@@ -151,7 +149,8 @@ def ls(db=None, ws=None, gdx_filepath=None, entity=None):
 
 
 def set2list(name, db=None, ws=None, gdx_filepath=None):
-    """ Read in a Set from a GAMS database or gdx file
+    """
+    Read in a Set from a GAMS database or gdx file.
 
     Parameters
     ----------
@@ -179,7 +178,7 @@ def set2list(name, db=None, ws=None, gdx_filepath=None):
 def param2series(name, db=None, ws=None, gdx_filepath=None):
     """--- DEPRECATED ---"""
     """
-    Read in a parameter from a GAMS database or gdx file
+    Read in a parameter from a GAMS database or gdx file.
 
     Parameters
     ----------
@@ -205,7 +204,7 @@ def param2series(name, db=None, ws=None, gdx_filepath=None):
 
 def param2df(name, db=None, ws=None, gdx_filepath=None):
     """
-    Read in a parameter from a GAMS database or gdx file
+    Read in a parameter from a GAMS database or gdx file.
 
     Parameters
     ----------
@@ -227,38 +226,26 @@ def param2df(name, db=None, ws=None, gdx_filepath=None):
     db = _iwantitall(db, ws, gdx_filepath)
 
     # Read in data and recast as Pandas Series
-#    print(name)
-
     ds = pd.Series(dict((tuple(rec.keys), rec.value) for rec in db[name]))
 
     if ds.index.nlevels >1:
         df = ds.unstack()
-#        if name=='VEH_STCK_CHRT':
-##            print(ds)
-##            print(df)
-#            print(ds.count())
-#            print(df.count().sum())
-#            print(df.shape)
         # Ensure that the unstacked columns are ordered as in Data Series
         ix_len = len(ds.index.levels[-1])
         cols = ds.index.get_level_values(-1)[:ix_len]
 
         if len(cols) == len(ds):
             df = df.reindex(columns=cols)
-#        if name=='VEH_STCK_CHRT':
-##            print(df)
-#            print(df.count().sum())
-#            print(df.shape)
     else:
         df = ds.to_frame(0)
     return df
 
 
 def var2series(name, db=None, ws=None, gdx_filepath=None):
-    """--- DEPRECATED ---"""
-
     """
-    Read in a variable from a GAMS database or gdx file
+    DEPRECATED.
+
+    Read in a variable from a GAMS database or gdx file.
 
     Parameters
     ----------
@@ -287,7 +274,7 @@ def var2series(name, db=None, ws=None, gdx_filepath=None):
 
 def var2df(name, db=None, ws=None, gdx_filepath=None):
     """
-    Read in a variable from a GAMS database or gdx file
+    Read in a variable from a GAMS database or gdx file.
 
     Parameters
     ----------
@@ -298,7 +285,7 @@ def var2df(name, db=None, ws=None, gdx_filepath=None):
     ws : Gams WorkSpace or None
         If available, use that workspace to read a gdx file, otherwise generate one
     gdx_filepath : string or None
-        Path to gdx file,
+        Path to gdx file
 
     Returns
     -------
@@ -317,7 +304,7 @@ def var2df(name, db=None, ws=None, gdx_filepath=None):
     df = pd.Series(data)
     df.index.rename(db[name].domains_as_strings,inplace=True)
 
-    if df.index.nlevels >1:
+    if df.index.nlevels > 1:
         df = df.unstack()
     else:
         df = df.to_frame(0)
@@ -325,7 +312,7 @@ def var2df(name, db=None, ws=None, gdx_filepath=None):
 
 def eq2series(name, db=None, ws=None, gdx_filepath=None):
     """
-    Read in a equation from a GAMS database or gdx file
+    Read in a equation from a GAMS database or gdx file.
 
     Parameters
     ----------
@@ -347,7 +334,6 @@ def eq2series(name, db=None, ws=None, gdx_filepath=None):
     --------
     var2series
     """
-
     # Sort out database access or file reading
     db = _iwantitall(db, ws, gdx_filepath)
 
@@ -355,15 +341,15 @@ def eq2series(name, db=None, ws=None, gdx_filepath=None):
     data = dict((tuple(rec.keys), rec.marginal) for rec in db[name])
     df = pd.Series(data)
     df.index.rename(db[name].domains_as_strings, inplace=True)
-#    if df.index.nlevels > 1:
-#        df = df.unstack()
+
     return df
 
 def _iwantitall(db, ws, gdx_filepath):
-    """ Internal method to read a pre-existing database, or setup one to read a gdx file
+    """
+    Read a pre-existing database, or setup one to read a gdx file. Internal method.
 
     Parameters
-    ------
+    ----------
     db : Gams Database or None
         If available, read from this pre-existing database
     ws : Gams WorkSpace or None
