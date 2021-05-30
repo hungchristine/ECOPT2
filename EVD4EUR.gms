@@ -655,16 +655,16 @@ $offtext
 
 *** Constraints -----------------------------------------------------------------------
 * New technology addition constraint ("Willingness to adopt")
-EQ_STCK_GRD(tec,seg,fleetreg,optyear)$(ord(optyear)>1)..     VEH_STCK_ADD(tec,seg,fleetreg,optyear,new)
-%SLACK_ADD% + SLACK_ADD(tec,seg,fleetreg,optyear,new)
-    =l= ((1 + VEH_ADD_GRD('IND',tec)) * VEH_STCK_ADD(tec,seg,fleetreg,optyear-1,new)) + 5000;
+EQ_STCK_GRD(tec,seg,fleetreg,modelyear)$(ord(modelyear)>card(inityear))..     VEH_STCK_ADD(tec,seg,fleetreg,modelyear,new)
+%SLACK_ADD% + SLACK_ADD(tec,seg,fleetreg,modelyear,new)
+    =l= ((1 + VEH_ADD_GRD('IND',tec)) * VEH_STCK_ADD(tec,seg,fleetreg,modelyear-1,new)) + 5000;
 *EQ_STCK_GRD(seg,fleetreg,optyear)$(ord(optyear)>1)..     VEH_STCK_ADD('BEV',seg,fleetreg,optyear,new) =l= ((1 + VEH_ADD_GRD('IND','BEV')) * sum(tec, VEH_STCK_ADD(tec,seg,fleetreg,optyear-1,new)))+ 5000;
 
 * Segment share constraint (segments kept constant)
 * try to remove - allow for ICEV smart cars (e.g.,) to be replaced by a BEV Model X...
-EQ_SEG_GRD(seg,fleetreg,optyear)$(ord(optyear)>1)..          sum(tec, VEH_STCK_ADD(tec,seg,fleetreg,optyear,new))
-%SLACK_ADD% + SLACK_ADD(tec,seg,fleetreg,optyear,new)
-    =l= VEH_STCK_INT_SEG(seg) * sum((tec,segj), VEH_STCK_ADD(tec,segj,fleetreg,optyear,new));
+EQ_SEG_GRD(seg,fleetreg,modelyear)$(ord(modelyear)>card(inityear))..          sum(tec, VEH_STCK_ADD(tec,seg,fleetreg,modelyear,new))
+%SLACK_ADD% + SLACK_ADD(tec,seg,fleetreg,modelyear,new)
+    =l= VEH_STCK_INT_SEG(seg) * sum((tec,segj), VEH_STCK_ADD(tec,segj,fleetreg,modelyear,new));
 
 
 *------ Battery manufacturing constraint;
@@ -779,10 +779,9 @@ Scalar ms 'model status', ss 'solve status';
 *
 *-----------------------------------------------------------------------------------
 
-*SOLVE EVD4EUR_Basic USING LP MINIMIZING TOTC_OPT;
-*ms = EVD4EUR_Basic.modelstat;
-*ss = EVD4EUR_Basic.solvestat;
-
+SOLVE EVD4EUR_Basic USING LP MINIMIZING TOTC_OPT;
+ms = EVD4EUR_Basic.modelstat;
+ss = EVD4EUR_Basic.solvestat;
 
 *SOLVE seg_test USING LP MINIMIZING TOTC_OPT;
 *ms = seg_test.modelstat;
@@ -809,9 +808,9 @@ Scalar ms 'model status', ss 'solve status';
 *ms = manuf_test.modelstat;
 *ss = manuf_test.solvestat;
 
-SOLVE no_constraints USING LP MINIMIZING TOTC_OPT;
-ms = no_constraints.modelstat;
-ss = no_constraints.solvestat;
+*SOLVE no_constraints USING LP MINIMIZING TOTC_OPT;
+*ms = no_constraints.modelstat;
+*ss = no_constraints.solvestat;
 
 *-----------------------------------------------------------------------------------
 *
