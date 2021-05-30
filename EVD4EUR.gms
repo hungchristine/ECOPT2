@@ -211,7 +211,8 @@ VEH_OPER_COHORT(tec,seg,fleetreg,prodyear,modelyear,age)    Total fleet operatin
 VEH_EOLT_COHORT(tec,seg,fleetreg,prodyear,modelyear,age)    Total end-of-life emissions by technology segment region and cohort
 *ANN_TOTC(modelyear)              Total CO2 emissions from LDVs by year                              [t CO2-eq]
 VEH_TOT_ADD(fleetreg, year)      Total vehicles added by region
-VEH_TOT_REM(tec, fleetreg, year)
+VEH_TOT_REM(fleetreg, year)
+VEH_STCK_CHK(fleetreg,year)
 VEH_STCK_GRD(tec,seg,fleetreg,optyear)
 BAU_PROD(modelyear)
 BAU_OPER(modelyear)
@@ -507,14 +508,6 @@ EQ_VEH_EOLT_TOTC
 
 * Initialize stock for first year
 $ontext
-VEH_STCK.fx(tec,seg,fleetreg,inityear,age)$(ord(inityear)=1) = VEH_STCK_TOT(inityear, fleetreg) * VEH_STCK_INT_TEC(tec) * VEH_LIFT_PDF(age) * VEH_STCK_INT_SEG(seg);
-VEH_STCK_DELTA.fx(inityear, fleetreg)$(ord(inityear)=1) = 0;
-VEH_STCK_REM.fx(tec,seg,fleetreg,inityear,age)$(ord(inityear)=1) = VEH_STCK.l(tec,seg,fleetreg,inityear,age) * VEH_LIFT_MOR(age);
-VEH_STCK_ADD.fx(tec,seg,fleetreg,inityear,new)$(ord(inityear)=1) = VEH_STCK.l(tec,seg,fleetreg,inityear,new);
-* Do not add "new" vehicles with age
-VEH_STCK_ADD.fx(tec,seg,fleetreg,modelyear,age)$(ord(age)>1) = 0;
-
-
 loop(inityear $ (ord(inityear)>1),
 VEH_STCK_DELTA.fx(inityear, fleetreg) = VEH_STCK_TOT(inityear, fleetreg) - VEH_STCK_TOT(inityear-1, fleetreg);
 VEH_STCK_ADD.fx(tec,seg,fleetreg,inityear,new) = sum(age, VEH_STCK_REM.l(tec,seg,fleetreg,inityear,age)) + (VEH_STCK_DELTA.l(inityear,fleetreg)*VEH_STCK_INT_TEC(tec) * VEH_STCK_INT_SEG(seg));
@@ -527,7 +520,9 @@ $offtext
 
 VEH_STCK.fx(tec,seg,fleetreg,modelyear,age)$(ord(modelyear)=1) = VEH_STCK_TOT(modelyear, fleetreg) * VEH_STCK_INT_TEC(tec) * VEH_LIFT_PDF(age) * VEH_STCK_INT_SEG(seg);
 VEH_STCK_DELTA.fx(modelyear, fleetreg)$(ord(modelyear)=1) = 0;
-VEH_STCK_REM.fx(tec,seg,fleetreg,modelyear,age)$(ord(modelyear)=1) = VEH_STCK.l(tec,seg,fleetreg,modelyear,age) * VEH_LIFT_MOR(age);
+VEH_STCK_REM.fx(tec,seg,fleetreg,modelyear,age)$(ord(modelyear)=1) = VEH_STCK.l(tec,seg,fleetreg,modelyear-1,age-1) * (1-VEH_LIFT_CDF(age));
+* VEH_LIFT_MOR(age);
+*VEH_STCK_REM.fx(tec,seg,fleetreg,inityear,age)$(ord(inityear)=1) = VEH_STCK.l(tec,seg,fleetreg,inityear,age) * VEH_LIFT_MOR(age);
 VEH_STCK_ADD.fx(tec,seg,fleetreg,modelyear,new)$(ord(modelyear)=1) = 0;
 *VEH_STCK.l(tec,seg,fleetreg,modelyear,new);
 * Do not add "new" vehicles with age
@@ -536,7 +531,7 @@ VEH_STCK_ADD.fx(tec,seg,fleetreg,modelyear,age)$(ord(age)>1) = 0;
 
 loop(modelyear $ (ord(modelyear)>1 and ord(modelyear)<= card(inityear)),
 VEH_STCK_DELTA.fx(modelyear, fleetreg) = VEH_STCK_TOT(modelyear, fleetreg) - VEH_STCK_TOT(modelyear-1, fleetreg);
-VEH_STCK_REM.fx(tec,seg,fleetreg,modelyear,age) = VEH_STCK.l(tec,seg,fleetreg,modelyear,age) * VEH_LIFT_MOR(age);
+VEH_STCK_REM.fx(tec,seg,fleetreg,modelyear,age) = VEH_STCK.l(tec,seg,fleetreg,modelyear-1,age-1) * VEH_LIFT_MOR(age);
 VEH_STCK_ADD.fx(tec,seg,fleetreg,modelyear,new) = sum(age, VEH_STCK_REM.l(tec,seg,fleetreg,modelyear,age)) + (VEH_STCK_DELTA.l(modelyear,fleetreg)*VEH_STCK_INT_TEC(tec) * VEH_STCK_INT_SEG(seg));
 VEH_STCK.fx(tec,seg,fleetreg,modelyear,age) = VEH_STCK.l(tec,seg,fleetreg,modelyear-1,age-1) - VEH_STCK_REM.l(tec,seg,fleetreg,modelyear,age) + VEH_STCK_ADD.l(tec,seg,fleetreg,modelyear,age);
 * calculate stock removals as per survival curves
@@ -564,13 +559,15 @@ $offtext
 $ontext
 EQ_STCK_BEV_CONSTRNT(inityear,fleetreg)..     sum((age,seg), VEH_STCK('BEV',seg,fleetreg,inityear,age)) =l= VEH_STCK_TOT(inityear,fleetreg)*0.005;
 $offtext
+
 ***  Main Model -----------------------------------------------
-EQ_STCK_REM(tec,seg,fleetreg,modelyear,age)$(ord(modelyear)>card(inityear))..    VEH_STCK_REM(tec,seg,fleetreg,modelyear,age) =e= VEH_STCK(tec,seg,fleetreg,modelyear,age)*VEH_LIFT_MOR(age);
+EQ_STCK_DELTA(modelyear,fleetreg)$(ord(modelyear)>card(inityear))..             VEH_STCK_DELTA(modelyear,fleetreg)  =e=  VEH_STCK_TOT(modelyear,fleetreg) - VEH_STCK_TOT(modelyear-1,fleetreg);
+
+EQ_STCK_REM(tec,seg,fleetreg,modelyear,age)$(ord(modelyear)>card(inityear))..    VEH_STCK_REM(tec,seg,fleetreg,modelyear,age) =e= VEH_STCK(tec,seg,fleetreg,modelyear-1,age-1)*VEH_LIFT_MOR(age);
 
 EQ_STCK_ADD(modelyear,fleetreg)$(ord(modelyear)>card(inityear))..               sum((tec,seg), VEH_STCK_ADD(tec,seg,fleetreg,modelyear,new)) =e= sum((tec,seg,age), VEH_STCK_REM(tec,seg,fleetreg,modelyear, age)) + VEH_STCK_DELTA(modelyear, fleetreg);
 *sum((tec,seg), (VEH_STCK_ADD(tec,seg,fleetreg,modelyear,new) - sum(age, VEH_STCK_REM(tec,seg,fleetreg,modelyear,age)))) =e= VEH_STCK_DELTA(modelyear,fleetreg);
 
-EQ_STCK_DELTA(modelyear,fleetreg)$(ord(modelyear)>card(inityear))..             VEH_STCK_DELTA(modelyear,fleetreg)  =e=  VEH_STCK_TOT(modelyear,fleetreg) - VEH_STCK_TOT(modelyear-1,fleetreg);
 
 EQ_STCK_BAL(tec,seg,fleetreg,modelyear,age)$(ord(modelyear) > 21)..      VEH_STCK(tec,seg,fleetreg,modelyear,age)  =e= VEH_STCK(tec,seg,fleetreg,modelyear-1,age-1) + VEH_STCK_ADD(tec,seg,fleetreg,modelyear,age) - VEH_STCK_REM(tec,seg,fleetreg,modelyear,age);
 
@@ -832,8 +829,9 @@ MAT_REQ_TOT(modelyear, mat_cats) = sum((seg, fleetreg), VEH_STCK_ADD.l('BEV',seg
 *(((VEH_STCK_TOT(inityear,fleetreg) * VEH_STCK_INT_TEC(tec) / tec.len) * VEH_LIFT_PDF(age)/age.len) * VEH_STCK_INT_SEG(seg)/seg.len);
 
 VEH_STCK_GRD(tec,seg,fleetreg,optyear) = ((1 + VEH_ADD_GRD('IND',tec)) * VEH_STCK_ADD.l(tec,seg,fleetreg,optyear-1,new));
-VEH_TOT_ADD(fleetreg,optyear) = sum((tec,seg), VEH_STCK_ADD.l(tec, seg, fleetreg, optyear, new));
-VEH_TOT_REM(tec, fleetreg, optyear) = sum((seg,age), VEH_STCK_REM.l(tec, seg, fleetreg, optyear, age));
+VEH_TOT_ADD(fleetreg,modelyear) = sum((tec,seg), VEH_STCK_ADD.l(tec, seg, fleetreg, modelyear, new));
+VEH_TOT_REM(fleetreg, modelyear) = sum((tec,seg,age), VEH_STCK_REM.l(tec, seg, fleetreg, modelyear, age));
+VEH_STCK_CHK(fleetreg, modelyear) = sum((tec,seg,age), VEH_STCK.l(tec,seg,fleetreg, modelyear, age));
 
 * summing the number of vehicles in fleet as check.
 VEH_STCK_TOT_CHECK(modelyear) = sum((tec,seg,fleetreg,age), VEH_STCK.l(tec,seg,fleetreg,modelyear,age));
