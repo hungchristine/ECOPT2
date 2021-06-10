@@ -608,16 +608,22 @@ class ParametersClass:
         None.
 
         """
+        # Weibull: alpha = scale, beta = shape
+        # self.raw_data.veh_avg_age = alpha * gamma(1+beta^-1)
+        # self.raw_data.veh_age_stdev^2 = alpha^2 * (gamma(1+2*beta^-1) - gamma(1+beta^-1)^2)
         # TODO: introduce Weibull survival curve estimation?
         self.veh_lift_cdf = pd.Series(norm.cdf(sets.age_int, self.raw_data.veh_avg_age, self.raw_data.veh_age_stdev), index=sets.age)
         self.veh_lift_cdf.index = self.veh_lift_cdf.index.astype('str')
 
-        self.veh_lift_age = pd.Series(1 - self.veh_lift_cdf)
-
-        self.veh_lift_pdf = pd.Series(self.calc_steadystate_vehicle_age_distributions(sets.age_int, self.raw_data.veh_avg_age, self.raw_data.veh_age_stdev), index=sets.age)
+        # self.veh_lift_age = pd.Series(1 - self.veh_lift_cdf)
+        self.veh_lift_age = pd.Series(self.calc_steadystate_vehicle_age_distributions(sets.age_int, self.raw_data.veh_avg_age, self.raw_data.veh_age_stdev), index=sets.age)
+        # self.veh_lift_pdf = pd.Series(self.calc_steadystate_vehicle_age_distributions(sets.age_int, self.raw_data.veh_avg_age, self.raw_data.veh_age_stdev), index=sets.age)
+        self.veh_lift_sc = pd.Series(norm.sf(sets.age_int, self.raw_data.veh_avg_age, self.raw_data.veh_age_stdev), index=sets.age)
+        self.veh_lift_pdf = pd.Series(norm.pdf(sets.age_int, self.raw_data.veh_avg_age, self.raw_data.veh_age_stdev), index=sets.age)
+        #
         self.veh_lift_pdf.index = self.veh_lift_pdf.index.astype('str')
 
-        self.veh_lift_mor = pd.Series(self.calc_probability_of_vehicle_retirement(sets.age_int, self.veh_lift_pdf), index=sets.age)
+        self.veh_lift_mor = pd.Series(self.calc_probability_of_vehicle_retirement(sets.age_int, self.veh_lift_age), index=sets.age)
         self.veh_lift_mor.index = self.veh_lift_mor.index.astype('str')
 
     def calc_steadystate_vehicle_age_distributions(self, ages, average_expectancy=10.0, standard_dev=3.0):
@@ -676,6 +682,9 @@ class ParametersClass:
              0      2      4      6      8       10     12     14     16     18     20
                                             VEHICLE AGE
         """
+
+        average_expectancy = average_expectancy - 0.5
+
         # The total (100%) minus the cumulation of all the cars retired by the time they reach a certain age
         h = 1 - norm.cdf(ages, loc=average_expectancy, scale=standard_dev)
 
