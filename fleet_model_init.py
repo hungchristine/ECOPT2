@@ -682,8 +682,8 @@ class ParametersClass:
              0      2      4      6      8       10     12     14     16     18     20
                                             VEHICLE AGE
         """
-
-        average_expectancy = average_expectancy - 0.5
+        # offset ages by half timestep for discrete age bins (non-continuous removal)
+        average_expectancy = average_expectancy  - (ages[1] - ages[0]) / 2
 
         # The total (100%) minus the cumulation of all the cars retired by the time they reach a certain age
         h = 1 - norm.cdf(ages, loc=average_expectancy, scale=standard_dev)
