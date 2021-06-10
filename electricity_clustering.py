@@ -21,6 +21,7 @@ import jenkspy
 import country_converter as coco
 import re
 import os
+import openpyxl
 
 data_fp = os.path.join(os.path.curdir, 'Data', 'load_data')
 
@@ -1413,8 +1414,18 @@ cluster_footprints.index = ['LOW', 'II', 'MID', 'IV', 'HIGH']
 cluster_footprints[''] = 'ELC'
 cluster_footprints = cluster_footprints.set_index('', append=True)
 cluster_footprints = cluster_footprints / 1000
-cluster_footprints.to_csv(os.path.join(os.path.curdir, 'Data', 'el_footprints_pathways.csv'))
 
+cluster_footprints.to_csv(os.path.join(data_fp, 'el_footprints_pathways.csv'))
+fp = os.path.join(data_fp, 'GAMS_input_demo.xlsx')
+with pd.ExcelWriter(fp, mode='a') as writer:
+    workBook = writer.book
+    try:
+        workBook.remove(workBook['enr_cint'])
+    except:
+            print("Worksheet does not exist")
+    finally:
+        cluster_footprints.to_excel(writer, 'enr_cint', startrow=1)
+        writer.save()
 
 #%%
 
