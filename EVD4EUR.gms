@@ -332,7 +332,7 @@ $offtext
 */;
 
 
-ENR_CINT('ELC',reg, inityear) = ENR_CINT('ELC',reg, '2019');
+ENR_CINT('ELC', reg, inityear) = ENR_CINT('ELC',reg, '2019');
 
 *----- Production-related emissions
 * Assume constant for all regions for now
@@ -397,7 +397,6 @@ POSITIVE VARIABLES
 VEH_STCK(tec,seg,fleetreg,year,age)              Number of vehicles of a given age in a given year
 VEH_STCK_REM(tec,seg,fleetreg,year,age)          Number of vehicles of a given age retired in a given year
 VEH_TOTC(tec,seg,fleetreg,year)                  Total CO2 emissions of vehicles per year by technology              [t CO2-eq]
-*VEH_STCK_ADD_OPTYEAR1(tec,seg,fleetreg,year,age)
 VEH_STCK_ADD(tec,seg,fleetreg,year,age)          Stock additions (new car sales)
 
 VEH_PROD_TOTC(tec,seg,fleetreg,year)             Total CO2 emissions from production of vehicles per year            [t CO2-eq]
@@ -406,7 +405,6 @@ VEH_EOLT_TOTC(tec,seg,fleetreg,year)             Total CO2 emissions from vehicl
 
 RECYCLED_BATT(year,fleetreg, age)           Total battery capacity sent to recycling per year                   [kWh]
 RECYCLED_MAT(year, mat_cats)                Materials recovered from recycled batteries
-*TOTAL_NEW_CAP(year)                        Total battery capacity added to fleet                               [MWh]
 MAT_REQ(year,mat_cats)                      Total amount of critical materials needed for new vehicles          [kg]
 
 MAT_MIX(year, mat_prod)                     Production mixes for virgin materials                           [kg]
@@ -416,7 +414,6 @@ MAT_CO2(year, mat_prod)                     Total CO2 emissions from virgin mate
 SLACK_ADD(tec,seg,fleetreg,year,age)        Slack variable for additions to stock
 SLACK_REM(tec,seg,fleetreg,year,age)        Slack variable for stock removals
 
-*veh_stck_test(tec,seg,fleetreg,year,age)
 ;
 
 
@@ -431,32 +428,14 @@ EQUATIONS
 
 ***VEHICLE STOCK MODEL  ------------------------------------------------------------
 
-***  Initiate stock in first year
-*EQ_STCK_REM_T1
-*stock additions
-*EQ_STCK_ADD_T1
-$ontext
-EQ_STCK_ADD_T11
-$offtext
-
-*stock
-*EQ_STCK_BAL_T1
-*EQ_STCK_DELTA_T1
-
-$ontext
-EQ_STCK_BEV_CONSTRNT
-$offtext
-***  Main Model
+***  Fleet model
 EQ_STCK_DELTA
-*EQ_STCK_DELTA_YR1
 *removals
 EQ_STCK_REM
 *stock additions
 EQ_STCK_ADD
-*EQ_STCK_ADD_YR1
 *calculating vehicle stock in a given year
 EQ_STCK_BAL
-*EQ_STCK_BAL_YR1
 
 *** Constraint equations
 * For technology-related additions
@@ -492,7 +471,6 @@ EQ_VEH_OPER_TOTC
 *eolt emissions
 EQ_VEH_EOLT_TOTC
 
-*eq_veh_stck_test
 ;
 
 *-----------------------------------------------------------------------------------
@@ -503,63 +481,24 @@ EQ_VEH_EOLT_TOTC
 
 
 ***VEHICLE STOCK MODEL  ------------------------------------------------------------
-
-***  Initiate stock in first year ----------------------------
-
-* Initialize stock for first year
-$ontext
-loop(inityear $ (ord(inityear)>1),
-VEH_STCK_DELTA.fx(inityear, fleetreg) = VEH_STCK_TOT(inityear, fleetreg) - VEH_STCK_TOT(inityear-1, fleetreg);
-VEH_STCK_ADD.fx(tec,seg,fleetreg,inityear,new) = sum(age, VEH_STCK_REM.l(tec,seg,fleetreg,inityear,age)) + (VEH_STCK_DELTA.l(inityear,fleetreg)*VEH_STCK_INT_TEC(tec) * VEH_STCK_INT_SEG(seg));
-VEH_STCK.fx(tec,seg,fleetreg,inityear,age) = VEH_STCK.l(tec,seg,fleetreg,inityear-1,age-1) - VEH_STCK_REM.l(tec,seg,fleetreg,inityear,age) + VEH_STCK_ADD.l(tec,seg,fleetreg,inityear,age);
-* calculate stock removals as per survival curves
-VEH_STCK_REM.fx(tec,seg,fleetreg,inityear,age) = VEH_STCK.l(tec,seg,fleetreg,inityear,age) * VEH_LIFT_MOR(age);
-);
-$offtext
-
 * First, initialize first year (boundary condition)
 VEH_STCK.fx(tec,seg,fleetreg,modelyear,age)$(ord(modelyear)=1) = VEH_STCK_TOT(modelyear, fleetreg) * VEH_STCK_INT_TEC(tec) * VEH_LIFT_AGE(age) * VEH_STCK_INT_SEG(seg);
 VEH_STCK_DELTA.fx(modelyear, fleetreg)$(ord(modelyear)=1) = 0;
 VEH_STCK_REM.fx(tec,seg,fleetreg,modelyear,age)$(ord(modelyear)=1) = VEH_STCK.l(tec,seg,fleetreg,modelyear,age) * VEH_LIFT_MOR(age);
-* VEH_LIFT_MOR(age);
-*VEH_STCK_REM.fx(tec,seg,fleetreg,inityear,age)$(ord(inityear)=1) = VEH_STCK.l(tec,seg,fleetreg,inityear,age) * VEH_LIFT_MOR(age);
 VEH_STCK_ADD.fx(tec,seg,fleetreg,modelyear,new)$(ord(modelyear)=1) = sum(age, VEH_STCK_REM.l(tec,seg,fleetreg,modelyear,age));
-*VEH_STCK.l(tec,seg,fleetreg,modelyear,new);
-* Do not add "new" vehicles with age
+* Do not add "new" vehicles with age (e.g., used cars from other regions)
 VEH_STCK_ADD.fx(tec,seg,fleetreg,modelyear,age)$(ord(age)>1) = 0;
 
-
+* Initiate stock in remaining initialization period
 loop(modelyear $ (ord(modelyear)>1 and ord(modelyear)<= card(inityear)),
 VEH_STCK_DELTA.fx(modelyear, fleetreg) = VEH_STCK_TOT(modelyear, fleetreg) - VEH_STCK_TOT(modelyear-1, fleetreg);
+* calculate stock removals as per survival curves
 VEH_STCK_REM.fx(tec,seg,fleetreg,modelyear,age) = VEH_STCK.l(tec,seg,fleetreg,modelyear-1,age-1) * VEH_LIFT_MOR(age-1);
 * in initialization period, assume that new vehicles maintain the status quo of tec and segment shares
 VEH_STCK_ADD.fx(tec,seg,fleetreg,modelyear,new) = sum(age, VEH_STCK_REM.l(tec,seg,fleetreg,modelyear,age)) + (VEH_STCK_DELTA.l(modelyear,fleetreg)*VEH_STCK_INT_TEC(tec) * VEH_STCK_INT_SEG(seg));
 VEH_STCK.fx(tec,seg,fleetreg,modelyear,age) = VEH_STCK.l(tec,seg,fleetreg,modelyear-1,age-1) - VEH_STCK_REM.l(tec,seg,fleetreg,modelyear,age) + VEH_STCK_ADD.l(tec,seg,fleetreg,modelyear,age);
-* calculate stock removals as per survival curves
-
 );
 
-$ontext
-EQ_STCK_REM_T1(tec,seg,fleetreg,inityear,age)$(ord(inityear)>1)..                VEH_STCK_REM(tec,seg,fleetreg,inityear,age) =e= VEH_STCK(tec,seg,fleetreg,inityear-1, age-1) * VEH_LIFT_MOR(age-1);
-*EQ_STCK_REM_T1(tec,seg,fleetreg, modelyear,age)$(ord(modelyear)=1 )..                    VEH_STCK_REM(tec,seg,fleetreg, modelyear,age) =e=  VEH_STCK_TOT(modelyear, fleetreg)*VEH_STCK_INT_TEC(tec)*VEH_STCK_INT_SEG(seg)*VEH_LIFT_PDF(age)*(1-VEH_LIFT_CDF(age));
-
-*EQ_STCK_REM_T1(tec,seg,fleetreg,inityear,age)..                VEH_STCK_REM(tec,seg,fleetreg,inityear,age) =e= VEH_STCK(tec,seg,fleetreg,inityear, age) * VEH_LIFT_MOR(age);
-
-* calculate stock additions as sum of stock removals from the same year and increase in total fleet (net stock growth)
-*-- Makes assumption that retired segments are replaced by the same segment
-*EQ_STCK_ADD_T1(seg,fleetreg,year)$(ord(year)=1 and ord(age)=1)..                    sum(tec, VEH_STCK_ADD(tec,seg,fleetreg,year,new)) =e=  sum((tec,agej), VEH_STCK_REM(tec,seg,fleetreg,year,agej))+ (VEH_STCK_DELTA(year,fleetreg)*VEH_STCK_INT_SEG(seg));
-
-EQ_STCK_ADD_T1(seg,fleetreg,inityear)..                    sum(tec, VEH_STCK_ADD(tec,seg,fleetreg,inityear,new)) =e=  sum((tec,agej), VEH_STCK_REM(tec,seg,fleetreg,inityear,agej));
-$offtext
-* calculate total stock per cohort, segement and technology
-*EQ_STCK_BAL_T1(tec,seg,fleetreg,inityear,age)..                VEH_STCK(tec,seg,fleetreg,inityear,age) =e=  VEH_STCK_TOT(inityear,fleetreg) * VEH_STCK_INT_TEC(tec) * VEH_LIFT_PDF(age) * VEH_STCK_INT_SEG(seg);
-
-* calculate total increase (or change) of total fleet (net stock growth)
-*EQ_STCK_DELTA_T1(inityear,fleetreg)$(ord(inityear)>1)..        VEH_STCK_DELTA(inityear,fleetreg)  =e=  VEH_STCK_TOT(inityear,fleetreg) - VEH_STCK_TOT(inityear-1,fleetreg);
-
-$ontext
-EQ_STCK_BEV_CONSTRNT(inityear,fleetreg)..     sum((age,seg), VEH_STCK('BEV',seg,fleetreg,inityear,age)) =l= VEH_STCK_TOT(inityear,fleetreg)*0.005;
-$offtext
 
 ***  Main Model -----------------------------------------------
 EQ_STCK_DELTA(modelyear,fleetreg)$(ord(modelyear)>card(inityear))..             VEH_STCK_DELTA(modelyear,fleetreg)  =e=  VEH_STCK_TOT(modelyear,fleetreg) - VEH_STCK_TOT(modelyear-1,fleetreg);
@@ -567,86 +506,10 @@ EQ_STCK_DELTA(modelyear,fleetreg)$(ord(modelyear)>card(inityear))..             
 EQ_STCK_REM(tec,seg,fleetreg,modelyear,age)$(ord(modelyear)>card(inityear))..    VEH_STCK_REM(tec,seg,fleetreg,modelyear,age) =e= VEH_STCK(tec,seg,fleetreg,modelyear-1,age-1)*VEH_LIFT_MOR(age-1);
 
 EQ_STCK_ADD(modelyear,fleetreg)$(ord(modelyear)>card(inityear))..               sum((tec,seg), VEH_STCK_ADD(tec,seg,fleetreg,modelyear,new)) =e= sum((tec,seg,age), VEH_STCK_REM(tec,seg,fleetreg,modelyear, age)) + VEH_STCK_DELTA(modelyear, fleetreg);
-*sum((tec,seg), (VEH_STCK_ADD(tec,seg,fleetreg,modelyear,new) - sum(age, VEH_STCK_REM(tec,seg,fleetreg,modelyear,age)))) =e= VEH_STCK_DELTA(modelyear,fleetreg);
 
 
 EQ_STCK_BAL(tec,seg,fleetreg,modelyear,age)$(ord(modelyear) > card(inityear))..      VEH_STCK(tec,seg,fleetreg,modelyear,age)  =e= VEH_STCK(tec,seg,fleetreg,modelyear-1,age-1) + VEH_STCK_ADD(tec,seg,fleetreg,modelyear,age) - VEH_STCK_REM(tec,seg,fleetreg,modelyear,age);
 
-* STUFF BELOW SUCKS
-$ontext
-*EQ_STCK_DELTA(modelyear,fleetreg)$(ord(modelyear)>card(inityear))..  VEH_STCK_DELTA(modelyear,fleetreg)  =e=  VEH_STCK_TOT(modelyear,fleetreg) - VEH_STCK_TOT(modelyear-1,fleetreg);
-
-*** this one infeasible...
-EQ_STCK_ADD(modelyear,fleetreg)$(ord(modelyear)>card(inityear))..    sum( (tec,seg), VEH_STCK_ADD(tec,seg,fleetreg, modelyear,new))- sum( (tec,seg,age), VEH_STCK_REM(tec,seg,fleetreg, modelyear,age) )  =e= VEH_STCK_DELTA(modelyear,fleetreg);
-
-EQ_STCK_REM(tec,seg,fleetreg,modelyear,age)$(ord(modelyear)>card(inityear))..    VEH_STCK_REM(tec,seg,fleetreg,modelyear,age) =e= VEH_STCK(tec,seg,fleetreg,modelyear-1,age-1)*VEH_LIFT_MOR(age);
-
-
-
-*sum((tec,seg), VEH_STCK_ADD(tec,seg,fleetreg, modelyear,new)) =e= VEH_STCK_DELTA(modelyear,fleetreg) + sum((tec,seg,age), VEH_STCK_REM(tec,seg,fleetreg,modelyear, age));
-* sum((tec,seg), VEH_STCK_ADD(tec,seg,fleetreg,modelyear,new)) =e= sum((tec,seg,age), VEH_STCK_REM(tec,seg,fleetreg,modelyear, age)) + VEH_STCK_DELTA(modelyear, fleetreg);
-**sum((tec,seg), (VEH_STCK_ADD(tec,seg,fleetreg,modelyear,new) - sum(age, VEH_STCK_REM(tec,seg,fleetreg,modelyear,age)))) =e= VEH_STCK_DELTA(modelyear,fleetreg);
-
-*VEH_STCK_REM(tec,seg,fleetreg,modelyear,age) =e= 1*ord(modelyear);
-
-EQ_STCK_BAL(tec,seg,fleetreg,modelyear,age)$(ord(modelyear) > 21)..      VEH_STCK(tec,seg,fleetreg,modelyear,age)  =e= VEH_STCK(tec,seg,fleetreg,modelyear-1,age-1)- VEH_STCK_REM(tec,seg,fleetreg,modelyear,age)+VEH_STCK_ADD(tec,seg,fleetreg,modelyear,new);
-* + VEH_STCK_ADD(tec,seg,fleetreg,modelyear,age) - VEH_STCK_REM(tec,seg,fleetreg,modelyear,age);
-$offtext
-$ontext
-EQ_STCK_REM(tec,seg,fleetreg,modelyear,age)$(ord(modelyear)>card(inityear))..    VEH_STCK_REM(tec,seg,fleetreg,modelyear,age) =e= VEH_STCK(tec,seg,fleetreg,modelyear,age)*VEH_LIFT_MOR(age);
-
-EQ_STCK_ADD(modelyear,fleetreg)$(ord(modelyear)>card(inityear))..               sum((tec,seg), VEH_STCK_ADD(tec,seg,fleetreg,modelyear,new)) =e= sum((tec,seg,age), VEH_STCK_REM(tec,seg,fleetreg,modelyear, age)) + VEH_STCK_DELTA(modelyear, fleetreg);
-*sum((tec,seg), (VEH_STCK_ADD(tec,seg,fleetreg,modelyear,new) - sum(age, VEH_STCK_REM(tec,seg,fleetreg,modelyear,age)))) =e= VEH_STCK_DELTA(modelyear,fleetreg);
-
-EQ_STCK_DELTA(modelyear,fleetreg)$(ord(modelyear)>card(inityear))..             VEH_STCK_DELTA(modelyear,fleetreg)  =e=  VEH_STCK_TOT(modelyear,fleetreg) - VEH_STCK_TOT(modelyear-1,fleetreg);
-
-EQ_STCK_BAL(tec,seg,fleetreg,modelyear,age)$(ord(modelyear) > 21)..      VEH_STCK(tec,seg,fleetreg,modelyear,age)  =e= VEH_STCK(tec,seg,fleetreg,modelyear-1,age-1) + VEH_STCK_ADD(tec,seg,fleetreg,modelyear,age) - VEH_STCK_REM(tec,seg,fleetreg,modelyear,age);
-$offtext
-
-*VEH_STCK(tec,seg,fleetreg,year-1,age-1) + VEH_STCK_ADD(tec,seg,fleetreg,year,age) ;
-* +  VEH_STCK_REM(tec,seg,fleetreg,year, age);
-*EQ_STCK_BAL_YR1(tec,seg,fleetreg,modelyear,age)$(ord(modelyear)=(card(inityear)+1))..      VEH_STCK(tec,seg,fleetreg,modelyear,age)  =e=  VEH_STCK(tec,seg,fleetreg,modelyear-1,age-1) + VEH_STCK_ADD(tec,seg,fleetreg,modelyear,age) - VEH_STCK_REM(tec,seg,fleetreg,modelyear, age);
-
-*veh_stck_test(tec,seg,fleetreg,modelyear,age)$(ord(modelyear)>(card(inityear))+1) = VEH_STCK.l(tec,seg,fleetreg,modelyear-1,age-1);
-*eq_veh_stck_test(tec,seg,fleetreg,modelyear,age)..        veh_stck(tec,seg,fleetreg,modelyear,age) =e= VEH_STCK(tec,seg,fleetreg,modelyear-1,age-1) + VEH_STCK_ADD(tec,seg,fleetreg,modelyear,age);
-
-*VEH_STCK_REM.l(tec,seg,fleetreg,modelyear-1,age-1);
-*EQ_STCK_DELTA_YR1(modelyear,fleetreg)$(ord(modelyear)=1)..             VEH_STCK_DELTA(modelyear,fleetreg)  =e=  VEH_STCK_TOT(modelyear,fleetreg) - VEH_STCK_TOT('2020',fleetreg);
-
-*EQ_STCK_BAL_YR1(tec,seg,fleetreg,modelyear,age)$(ord(modelyear)=1)..      VEH_STCK(tec,seg,fleetreg,modelyear,age)  =e=  VEH_STCK.l(tec,seg,fleetreg,'2020',age-1) + VEH_STCK_ADD(tec,seg,fleetreg,optyear,age) - VEH_STCK_REM.l(tec,seg,fleetreg,modelyear, age);
-$ontext
-EQ_STCK_REM(tec,seg,fleetreg,optyear,age)..    VEH_STCK_REM(tec,seg,fleetreg,optyear,age) =e= VEH_STCK(tec,seg,fleetreg,optyear,age)*VEH_LIFT_MOR(age);
-*EQ_STCK_REM(tec,seg,fleetreg,optyear,age)..    VEH_STCK_REM(tec,seg,fleetreg,optyear,age) =e= VEH_STCK(tec,seg,fleetreg,optyear,age)*VEH_LIFT_PDF(age)*(1-VEH_LIFT_CDF(age));
-
-EQ_STCK_ADD(optyear,fleetreg)..             sum((tec,seg), (VEH_STCK_ADD(tec,seg,fleetreg,optyear,new) - sum(age, VEH_STCK_REM(tec,seg,fleetreg,optyear,age)))) =e= VEH_STCK_DELTA(optyear,fleetreg);
-
-*EQ_STCK_ADD_YR1(optyear,fleetreg)$(ord(optyear)=1)..             sum((tec,seg), (VEH_STCK_ADD(tec,seg,fleetreg,optyear,new) - sum(age, VEH_STCK_REM(tec,seg,fleetreg,'2020',age-1)))) =e= VEH_STCK_DELTA(optyear,fleetreg);
-
-EQ_STCK_DELTA(optyear,fleetreg)$(ord(optyear)>1)..             VEH_STCK_DELTA(optyear,fleetreg)  =e=  VEH_STCK_TOT(optyear,fleetreg) - VEH_STCK_TOT(optyear-1,fleetreg);
-EQ_STCK_DELTA_YR1(optyear,fleetreg)$(ord(optyear)=1)..             VEH_STCK_DELTA(optyear,fleetreg)  =e=  VEH_STCK_TOT(optyear,fleetreg) - VEH_STCK_TOT('2020',fleetreg);
-
-
-EQ_STCK_BAL(tec,seg,fleetreg,optyear,age)..      VEH_STCK(tec,seg,fleetreg,optyear,age)  =e=  VEH_STCK(tec,seg,fleetreg,optyear-1,age-1) + VEH_STCK_ADD(tec,seg,fleetreg,optyear,age) - VEH_STCK_REM(tec,seg,fleetreg,optyear, age);
-****THIS IS INFEASIBLE....WHYYYYYY
-EQ_STCK_BAL_YR1(tec,seg,fleetreg,optyear,age)$(ord(optyear)=1)..      VEH_STCK(tec,seg,fleetreg,optyear,age)  =e=  VEH_STCK.l(tec,seg,fleetreg,'2020',age-1) + VEH_STCK_ADD(tec,seg,fleetreg,optyear,age) - VEH_STCK_REM.l(tec,seg,fleetreg,optyear, age);
-$offtext
-* calculate stock removals as per survival curves
-* assumes equal removal across technologies and segments
-*EQ_STCK_REM(tec,seg,fleetreg,optyear,age)$(ord(optyear)>1)..    VEH_STCK_REM(tec,seg,fleetreg,optyear,age) =e= VEH_STCK(tec,seg,fleetreg,optyear-1,age-1)*VEH_LIFT_MOR(age-1);
-$ontext
-EQ_STCK_REM(tec,seg,fleetreg,modelyear,age)$(ord(modelyear)>1)..    VEH_STCK_REM(tec,seg,fleetreg,modelyear,age) =e= VEH_STCK(tec,seg,fleetreg,modelyear,age)*VEH_LIFT_PDF(age)*(1-VEH_LIFT_CDF(age));
-
-* calculate stock additions as sum of stock removals from the same year and increase in total fleet (net stock growth)
-* assumes removed vehicles are replaced with like segment and technology
-EQ_STCK_ADD(modelyear,age,fleetreg)$(ord(modelyear)>1)..             sum((tec,seg), (VEH_STCK_ADD(tec,seg,fleetreg,modelyear,new) - sum(agej, VEH_STCK_REM(tec,seg,fleetreg,modelyear,agej)))) =e= VEH_STCK_DELTA(modelyear,fleetreg);
-
-* calculate total increase (or change) of total fleet (net stock growth)
-EQ_STCK_DELTA(modelyear,fleetreg)$(ord(modelyear)>1)..             VEH_STCK_DELTA(modelyear,fleetreg)  =e=  VEH_STCK_TOT(modelyear,fleetreg) - VEH_STCK_TOT(modelyear-1,fleetreg);
-
-***---***---***---***---***---***---***---***---***---***
-*calculating vehicle stock in a given year
-EQ_STCK_BAL(tec,seg,fleetreg,modelyear,age)$(ord(modelyear)>1)..      VEH_STCK(tec,seg,fleetreg,modelyear,age)  =e=  VEH_STCK(tec,seg,fleetreg,modelyear-1,age-1) + VEH_STCK_ADD(tec,seg,fleetreg,modelyear,age) - VEH_STCK_REM(tec,seg,fleetreg,modelyear,age);
-$offtext
 
 *-----calculate segment market shares-----
 *** What works:
@@ -655,11 +518,10 @@ $offtext
                                         
 
 *** Constraints -----------------------------------------------------------------------
-* New technology addition constraint ("Willingness to adopt")
+*------ New technology addition constraint ("Willingness to adopt")
 EQ_STCK_GRD(tec,seg,fleetreg,modelyear)$(ord(modelyear)>card(inityear))..     VEH_STCK_ADD(tec,seg,fleetreg,modelyear,new)
 %SLACK_ADD% + SLACK_ADD(tec,seg,fleetreg,modelyear,new)
     =l= ((1 + VEH_ADD_GRD('IND',tec)) * VEH_STCK_ADD(tec,seg,fleetreg,modelyear-1,new)) + 5000;
-*EQ_STCK_GRD(seg,fleetreg,optyear)$(ord(optyear)>1)..     VEH_STCK_ADD('BEV',seg,fleetreg,optyear,new) =l= ((1 + VEH_ADD_GRD('IND','BEV')) * sum(tec, VEH_STCK_ADD(tec,seg,fleetreg,optyear-1,new)))+ 5000;
 
 * Segment share constraint (segments kept constant)
 * try to remove - allow for ICEV smart cars (e.g.,) to be replaced by a BEV Model X...
@@ -673,7 +535,6 @@ EQ_SEG_GRD(seg,fleetreg,modelyear)$(ord(modelyear)>card(inityear))..          su
 * total capacity added per year must be less than the battery manufacturing capacity
 * MANUF_CNSTRNT input is in GWh; BEV_CAPAC is in kWh
 * dummy manufacturing constraint to trigger on dummy fleet...
-
 EQ_NEW_BATT_CAP(optyear)..                            MANUF_CNSTRNT(optyear)*1e6 =g= sum((seg, fleetreg),VEH_STCK_ADD('BEV',seg,fleetreg,optyear,new)*BEV_CAPAC(seg))
 %SLACK_ADD% + sum((seg, fleetreg), SLACK_ADD(tec,seg,fleetreg,optyear,new)*BEV_CAPAC(seg))
 ;
@@ -686,7 +547,6 @@ EQ_RECYCLED_BATT(optyear,fleetreg, age)..             RECYCLED_BATT(optyear,flee
 ;
 
 * Calculate amount of materials recovered from end-of-life batteries for recycling (i.e., to new batteries)
-
 EQ_RECYCLED_MAT(optyear,mat_cats)..                   RECYCLED_MAT(optyear, mat_cats) =e= sum((prodyear,age), sum((fleetreg), RECYCLED_BATT(optyear, fleetreg, age))*VEH_PAY(prodyear, age, optyear)* MAT_CONTENT(optyear, mat_cats))/1000*RECOVERY_PCT(optyear, mat_cats);
 * Calculate total amount of materials available (virgin and recycled)
 *eq_tot_mats(mat_cats,year)..          sum(mat_prod$mat(mat_cats,mat_prod), mat_mix(year,mat_prod)) =e= battery(mat_cats,year);
@@ -854,15 +714,10 @@ FILT_STCK(tec,seg,fleetreg,'2020',age) = VEH_STCK.l(tec,seg,fleetreg,'2020',age)
 FILT_REM(tec,seg,fleetreg,'2020',age) = VEH_STCK_REM.l(tec,seg,fleetreg,'2020',age);
 FILT_ADD(tec,seg,fleetreg,'2021',age) = VEH_STCK_ADD.l(tec,seg,fleetreg,'2021',age);
 FILT_STCK(tec,seg,fleetreg,'2021',age) = VEH_STCK.l(tec,seg,fleetreg,'2021',age); 
-FILT_REM(tec,seg,fleetreg,'2021',age) = VEH_STCK_REM.l(tec,seg,fleetreg,'2021',age);        
+FILT_REM(tec,seg,fleetreg,'2021',age) = VEH_STCK_REM.l(tec,seg,fleetreg,'2021',age);
+
 *test(mat_cats, modelyear) =  sum((prodyear,age), sum((fleetreg), RECYCLED_BATT.l(modelyear, fleetreg, age))*VEH_PAY(prodyear, age, modelyear)*MAT_CONTENT(prodyear, mat_cats));
 *test2(age, prodyear, modelyear) =  sum((fleetreg), RECYCLED_BATT.l(modelyear, fleetreg, age))*VEH_PAY(prodyear, age, modelyear);
 
-* average lifecycle emissions by cohort; doesn't work, perform in Python
-*POS_STOCK(tec,seg,reg,modelyear,agej) = VEH_STCK.l(tec,seg,reg,modelyear,agej)$(VEH_STCK.l(tec,seg,reg,modelyear,agej)>10);
-*VEH_LC_EMISS(tec,seg,reg,prodyear) = VEH_PROD_CINT(tec,seg,prodyear) +
-*sum((modelyear,agej), VEH_OPER_COHORT(tec,seg,reg,prodyear,modelyear,agej)/POS_STOCK(tec,seg,reg,modelyear,agej)) + sum((modelyear,agej), VEH_EOLT_COHORT(tec,seg,reg,prodyear,modelyear,agej)/POS_STOCK(tec,seg,reg,modelyear,agej))
-*VEH_LC_EMISS(tec,seg,reg,prodyear) = VEH_PROD_CINT(tec,seg,prodyear) + sum((modelyear,agej), VEH_OPER_COHORT(tec,seg,reg,prodyear,modelyear,agej)/VEH_STCK.l(tec,seg,reg,modelyear,agej)$(VEH_STCK.l(tec,seg,reg,modelyear,agej)<>0)) + sum((modelyear,agej), VEH_EOLT_COHORT(tec,seg,reg,prodyear,modelyear,agej)/VEH_STCK.l(tec,seg,reg,modelyear,agej)$(VEH_STCK.l(tec,seg,reg,modelyear,agej)<>0))
-*(VEH_STCK.l(tec,seg,reg,modelyear,agej)>0);
 
 execute_unload 'EVD4EUR_addset.gdx'
