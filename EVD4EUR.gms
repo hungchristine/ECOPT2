@@ -25,6 +25,7 @@ optyear(year)   years for optimization (2020-2050)
 inityear(year)  years for initialization (2000-2020)
 age             age of vehicle
 tec             technology
+newtecs(tec)     new technologies to replace incumbent
 enr             energy carrier
 reg             region or country group
 fleetreg(reg)     model regions of BEV operation
@@ -92,6 +93,7 @@ $LOAD inityear
 $LOAD age
 $LOAD new
 $LOAD tec
+$LOAD newtecs
 $LOAD enr
 $LOAD reg
 $LOAD fleetreg
@@ -190,7 +192,7 @@ VEH_STCK_INT(tec,seg,reg,age)    Initial size of stock of vehicles by age cohort
 *VEH_STCK_DELTA(year,reg)
 
 ** CONSTRAINTS -------
-VEH_ADD_GRD(grdeq,tec)           Parameter for gradient of change constraint (fleet additions) - individual (IND) for each tech or related to all tech (ALL)
+VEH_ADD_GRD(grdeq,newtecs)           Parameter for gradient of change constraint (fleet additions) - individual (IND) for each tech or related to all tech (ALL)
 MANUF_CNSTRNT(year)              Annual manufacturing capacity (for batteries destined for Europe) [GWh]
 MAT_CONTENT(year,mat_cats)       Critical material content per kWh by production year
 RECOVERY_PCT(year,mat_cats)      Recovery of critical materials from battery recycling processes in wt%
@@ -392,7 +394,7 @@ VEH_STCK_DELTA(year,fleetreg)               Net change in stock from one year to
 TOT_PRIMARY_MAT(year, mat_cats) Total primary resources required by year [kg]
 
 SLACK_ADD(tec,seg,fleetreg,year,age)        Slack variable for additions to stock
-SLACK_TEC_ADD(tec,seg,fleetreg,year,age)
+SLACK_TEC_ADD(newtecs, seg,fleetreg,year,age)
 SLACK_SEG_ADD(seg,fleetreg,year)
 SLACK_RECYCLED_BATT(year, fleetreg, age)
 SLACK_VIRG_MAT(year, mat_prod)
@@ -527,9 +529,10 @@ EQ_STCK_BAL(tec,seg,fleetreg,modelyear,age)$(ord(modelyear) > card(inityear)).. 
 
 *** Constraints -----------------------------------------------------------------------
 *------ New technology addition constraint ("Willingness to adopt")
-EQ_STCK_GRD(tec,seg,fleetreg,modelyear)$(ord(modelyear)>card(inityear))..     VEH_STCK_ADD(tec,seg,fleetreg,modelyear,new)
-    =l= ((1 + VEH_ADD_GRD('IND',tec)) * VEH_STCK_ADD(tec,seg,fleetreg,modelyear-1,new)) + 5000
-%SLACK_ADD% + SLACK_TEC_ADD(tec,seg,fleetreg,modelyear,new)
+* incumbent technology excluded
+EQ_STCK_GRD(newtecs,seg,fleetreg,modelyear)$(ord(modelyear)>card(inityear))..     VEH_STCK_ADD(newtecs,seg,fleetreg,modelyear,new)
+    =l= ((1 + VEH_ADD_GRD('IND', newtecs)) * VEH_STCK_ADD(newtecs,seg,fleetreg,modelyear-1,new)) + 5000
+%SLACK_ADD% + SLACK_TEC_ADD(newtecs,seg,fleetreg,modelyear,new)
 ;
 
 * Segment share constraint (segments kept constant)
@@ -599,7 +602,7 @@ EQ_VEH_OPER_TOTC(tec,seg,fleetreg,modelyear)..             VEH_OPER_TOTC(tec,seg
 EQ_VEH_EOLT_TOTC(tec,seg,fleetreg,modelyear)..             VEH_EOLT_TOTC(tec,seg,fleetreg,modelyear) =e= sum( (agej), VEH_STCK_REM(tec,seg,fleetreg,modelyear,agej))*VEH_EOLT_CINT(tec,seg,modelyear)
 ;
 
-chck.fx(tec,seg, fleetreg, modelyear) = ((1 + VEH_ADD_GRD('IND',tec)) * VEH_STCK_ADD.l(tec,seg,fleetreg,modelyear-1,new));
+chck.fx(newtecs,seg, fleetreg, modelyear) = ((1 + VEH_ADD_GRD('IND',newtecs)) * VEH_STCK_ADD.l(newtecs,seg,fleetreg,modelyear-1,new));
 
 execute_loadpoint 'EVD4EUR_Basic_p.gdx';
 
@@ -700,7 +703,7 @@ MAT_REQ_TOT(modelyear, mat_cats) = sum((seg, fleetreg), VEH_STCK_ADD.l('BEV',seg
 *shares(inityear, fleetreg, tec,seg,age) = VEH_STCK_TOT(inityear,fleetreg) * (VEH_STCK_INT_TEC(tec) * VEH_LIFT_PDF(age)* VEH_STCK_INT_SEG(seg));
 *(((VEH_STCK_TOT(inityear,fleetreg) * VEH_STCK_INT_TEC(tec) / tec.len) * VEH_LIFT_PDF(age)/age.len) * VEH_STCK_INT_SEG(seg)/seg.len);
 
-VEH_STCK_GRD(tec,seg,fleetreg,optyear) = ((1 + VEH_ADD_GRD('IND',tec)) * VEH_STCK_ADD.l(tec,seg,fleetreg,optyear-1,new));
+VEH_STCK_GRD(newtecs,seg,fleetreg,optyear) = ((1 + VEH_ADD_GRD('IND',newtecs)) * VEH_STCK_ADD.l(newtecs,seg,fleetreg,optyear-1,new));
 VEH_TOT_ADD(fleetreg,modelyear) = sum((tec,seg), VEH_STCK_ADD.l(tec, seg, fleetreg, modelyear, new));
 VEH_TOT_REM(fleetreg, modelyear) = sum((tec,seg,age), VEH_STCK_REM.l(tec, seg, fleetreg, modelyear, age));
 VEH_STCK_CHK(fleetreg, modelyear) = sum((tec,seg,age), VEH_STCK.l(tec,seg,fleetreg, modelyear, age));

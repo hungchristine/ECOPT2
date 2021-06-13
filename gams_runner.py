@@ -105,6 +105,7 @@ class GAMSRunner:
         optyear = gmspy.list2set(self.db, fleet.sets.optyear, 'optyear')
         inityear = gmspy.list2set(self.db, fleet.sets.inityear, 'inityear')
         tecs = gmspy.list2set(self.db, fleet.sets.tecs, 'tec')
+        newtecs = gmspy.list2set(self.db, fleet.sets.newtecs, 'newtecs')
         age = gmspy.list2set(self.db, fleet.sets.age, 'age')
         new = gmspy.list2set(self.db, fleet.sets.new, 'new')
         enr = gmspy.list2set(self.db, fleet.sets.enr, 'enr')
@@ -150,15 +151,15 @@ class GAMSRunner:
         try:
             veh_add_grd = self.db.get_parameter('VEH_ADD_GRD')
         except:
-            veh_add_grd = self.db.add_parameter_dc('VEH_ADD_GRD', ['grdeq', 'tec'])
+            veh_add_grd = self.db.add_parameter_dc('VEH_ADD_GRD', ['grdeq', 'newtecs'])
 
         # Prep work making add gradient df from given rate constraint
         # TODO: this is redundant with update_fleet??
-        # adding growth constraint for each tec
+        # adding growth constraint for each (new/emerging) tec
         for keys, value in iter(fleet.parameters.veh_add_grd.items()):
             veh_add_grd.add_record(keys).value = value
 
-        gro_cnstrnt = gmspy.df2param(self.db, fleet.gro_cnstrnt, ['year'], 'GRO_CNSTRNT')
+        # gro_cnstrnt = gmspy.df2param(self.db, fleet.gro_cnstrnt, ['year'], 'GRO_CNSTRNT')
 
         manuf_cnstrnt = gmspy.df2param(self.db, fleet.parameters.manuf_cnstrnt, ['year'], 'MANUF_CNSTRNT')
 
