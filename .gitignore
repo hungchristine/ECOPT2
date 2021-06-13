@@ -36,3 +36,9 @@ _gams_py_*
 *.pdf
 *.xls*
 *.zip
+
+*.pf
+*.jpg
+*.json
+*.png
+*.docx
