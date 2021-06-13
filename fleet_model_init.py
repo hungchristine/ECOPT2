@@ -37,6 +37,7 @@ class SetsClass:
     age_int: list = field(default_factory=lambda: [i for i in range(29)])
 
     new: list = field(default_factory=lambda: ['0'])  # static set for new vehicles
+    newtecs: list = field(default_factory=lambda:['BEV'])
     demeq: list = field(default_factory=lambda: ['STCK_TOT', 'OPER_DIST', 'OCUP'])
     grdeq: list = field(default_factory=lambda: ['IND', 'ALL'])
     veheq: list = field(default_factory=lambda: ['PROD_EINT', 'PROD_CINT_CSNT', 'OPER_EINT', 'EOLT_CINT'])
@@ -97,7 +98,8 @@ class SetsClass:
         SetsClass
             Initialized SetsClass from Excel file.
         """
-        set_list = ['tecs', 'enr', 'seg', 'mat_cats', 'reg', 'fleetreg',
+        set_list = ['tecs', 'newtecs', 'enr', 'seg', 'mat_cats',
+                    'reg', 'fleetreg',
                     'year', 'modelyear', 'inityear',
                     'cohort', 'optyear', 'age']
 
