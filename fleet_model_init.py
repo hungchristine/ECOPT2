@@ -13,18 +13,18 @@ from itertools import product
 import warnings
 import pandas as pd
 import numpy as np
-from scipy.stats import norm
+from scipy.stats import norm, weibull_min
 import yaml
 
 @dataclass
 class SetsClass:
-    """Default values initialize with a two-region system with three size segments."""
+    """Default values initialize with a two-region system with three size segments
+    and two critical material classes each with two producers."""
 
     tecs: list = field(default_factory=lambda:['BEV', 'ICEV'])
     enr: list = field(default_factory=lambda: ['FOS', 'ELC'])
     seg: list = field(default_factory=lambda: ['A', 'C', 'F'])
     mat_cats: list = field(default_factory=lambda: ['Li', 'Co'])
-    # default 2 suppliers per material category
     mat_prod: dict = field(default_factory=lambda: {mat: [mat+str(i) for i in range(1,3)] for mat in ['Li', 'Co']})
     reg: list = field(default_factory=lambda: ['LOW', 'HIGH', 'PROD'])
     fleetreg: list = field(default_factory=lambda: ['LOW', 'HIGH'])
@@ -98,6 +98,8 @@ class SetsClass:
         SetsClass
             Initialized SetsClass from Excel file.
         """
+
+        # list of sets required in Excel file for initialization
         set_list = ['tecs', 'newtecs', 'enr', 'seg', 'mat_cats',
                     'reg', 'fleetreg',
                     'year', 'modelyear', 'inityear',
@@ -113,8 +115,8 @@ class SetsClass:
             if s not in all_sets.columns:
                 err.append(s)
         if len(err):
-            #TODO: below raises this error: TypeError: exceptions must derive from BaseException
-            raise(f'Set(s) {err} not found in Excel file')
+            print('\n *****************************************')
+            print(f'\n Set(s) {err} not found in Excel file')
 
         # generate dict of sets (remove nan from dataframe due to differing set lengths)
         mat_dict = {}
@@ -135,7 +137,9 @@ class SetsClass:
             warnings.warn(f'Critical materials {mat_checklist} do not have primary producers defined')
         sets_dict['mat_prod'] = mat_dict
 
-        # TODO: validation method: e.g., check overlap between inityear and modelyear
+        # validate initialization period and optimization period
+        if len(set(sets_dict['inityear']).intersection(set(sets_dict['optyear']))):
+            warnings.warn('Overlap in inityear and optyear members. May result in infeasibility.')
 
         return cls(**sets_dict)
 
@@ -162,7 +166,7 @@ class RawDataClass:
     recycle_rate: float = 0.75
     # other parameters
     occupancy_rate: float = 2
-    eur_batt_share: float = None
+    eur_batt_share: float = 1  # default assumes primary material supply given is for entire region
     tec_add_gradient: float = 0.2
 
     # enr_cint_src: str = os.path.join('Data','load_data','el_footprints_pathways.csv')
@@ -171,23 +175,23 @@ class RawDataClass:
     def from_dict(cls, src_dict:dict):
         return cls(**src_dict)
 
-    # move the operations from fleet_model here; calculation of veh_partab, glf terms, etc etc
+    #TODO: move the operations from fleet_model here; calculation of veh_partab, glf terms, etc etc
 
 
 @dataclass
 class ParametersClass:
     """Contains all parameter values for GAMS model (in ready-to-insert form)."""
 
-    veh_stck_tot: pd.DataFrame
-    enr_veh: pd.DataFrame
-    veh_pay: pd.DataFrame
+    veh_stck_tot: pd.DataFrame = None
+    enr_veh: pd.DataFrame = None
+    veh_pay: pd.DataFrame = None
 
     # constraints
-    manuf_cnstrnt: pd.DataFrame
+    manuf_cnstrnt: pd.DataFrame = None
 
-    mat_content: Union[list, pd.DataFrame]
-    virg_mat_supply: pd.DataFrame
-    mat_cint: Union[list, pd.DataFrame]
+    mat_content: Union[list, pd.DataFrame] = None
+    virg_mat_supply: pd.DataFrame = None
+    mat_cint: Union[list, pd.DataFrame] = None
     veh_add_grd: Union[float, pd.DataFrame] = None
 
     enr_cint: pd.DataFrame = None
@@ -258,6 +262,7 @@ class ParametersClass:
         elif filepath.endswith('yml') or filepath.endswith('.yaml'):
             return cls.from_yaml(filepath, experiment)
         else:
+            print('\n *****************************************')
             raise ValueError("Invalid filetype for ParametersClass. Only Excel or yaml accepted.")
 
     @classmethod
@@ -346,7 +351,7 @@ class ParametersClass:
                     value = value.astype({cat: str for cat in mi_dict[param.lower()]})
                     value.set_index(mi_dict[param.lower()], inplace=True, drop=True)
                 elif value.shape[0] == 0:
-                    print(f"Empty values for {param} in Excel file.")
+                    print(f"\n INFO: Empty values for {param} in Excel file.")
                 elif value.shape == (1,2):
                     value = value.iloc[0,1]
                 else:
@@ -357,7 +362,6 @@ class ParametersClass:
                     params_dict[param.lower()] = value
                 else:
                     raw_data_dict[param.lower()] = value
-
         # add user-specified values in experiment dict to params_dict and raw_data_dict
         for exp_param, value in experiment.items():
             # separate ready-to-go parameters from intermediate data
@@ -458,17 +462,21 @@ class ParametersClass:
         if isinstance(self.raw_data.tec_add_gradient, float) and (self.veh_add_grd is None):
             self.veh_add_grd = {}
             for element in product(*[sets.grdeq, sets.tecs]):
-                self.veh_add_grd[element] = self.raw_data.tec_add_gradient
+                if element[1] in sets.newtecs:
+                    self.veh_add_grd[element] = self.raw_data.tec_add_gradient
 
         self.virg_mat_supply = self.virg_mat_supply.T
         self.veh_stck_int_tec = pd.Series([1-self.raw_data.bev_int_shr, self.raw_data.bev_int_shr], index=['ICE', 'BEV'])  # TODO: generalize
         self.year_par = pd.Series([float(i) for i in sets.year], index=sets.year)
         self.calc_veh_lifetime(sets)
 
+        if self.veh_pay is None:
+            self.veh_pay = self.build_veh_pay(sets)
 
-    def build_veh_pay(self):
+
+    def build_veh_pay(self, sets):
         """
-
+        Build production year-cohort concordance matrix for use in GAMS (as parameter).
 
         Returns
         -------
@@ -477,7 +485,24 @@ class ParametersClass:
         """
         # get this from parameters.py
         # self.veh_pay = stuff
-        pass
+
+        top_year = int(sets.optyear[-1])
+        start_year = int(sets.inityear[0])
+        prod_year = start_year - int(sets.age[-1])
+        ind = []
+        for year in range(start_year, top_year + 1):
+            for a in sets.age_int:
+                prod_year = year - a - 1
+                ind.append([prod_year, a, year, 1])
+
+        index = pd.DataFrame(ind)
+        #index = index[index[0]<=2050]
+        index = index[index[2] <= (top_year + 1)]
+        for ind, col in index.iloc[:,:-1].iteritems():
+            index.loc(axis=1)[ind] = index.loc(axis=1)[ind].astype(str)
+        index.columns = ['prodyear', 'age', 'year', 'level']
+
+        return index
 
 
     def build_BEV(self):
@@ -610,19 +635,22 @@ class ParametersClass:
         None.
 
         """
+        # Placeholder for Weibull calculations
         # Weibull: alpha = scale, beta = shape
+        # self.veh_lift_cdf = pd.Series(weibull_min.cdf(x, c, loc=0, scale=1), index=sets.age)
+        # self.veh_lift_age = pd.Series()
         # self.raw_data.veh_avg_age = alpha * gamma(1+beta^-1)
         # self.raw_data.veh_age_stdev^2 = alpha^2 * (gamma(1+2*beta^-1) - gamma(1+beta^-1)^2)
-        # TODO: introduce Weibull survival curve estimation?
         self.veh_lift_cdf = pd.Series(norm.cdf(sets.age_int, self.raw_data.veh_avg_age, self.raw_data.veh_age_stdev), index=sets.age)
         self.veh_lift_cdf.index = self.veh_lift_cdf.index.astype('str')
 
         # self.veh_lift_age = pd.Series(1 - self.veh_lift_cdf)
+        # Calculate normalized survival function
         self.veh_lift_age = pd.Series(self.calc_steadystate_vehicle_age_distributions(sets.age_int, self.raw_data.veh_avg_age, self.raw_data.veh_age_stdev), index=sets.age)
         # self.veh_lift_pdf = pd.Series(self.calc_steadystate_vehicle_age_distributions(sets.age_int, self.raw_data.veh_avg_age, self.raw_data.veh_age_stdev), index=sets.age)
         self.veh_lift_sc = pd.Series(norm.sf(sets.age_int, self.raw_data.veh_avg_age, self.raw_data.veh_age_stdev), index=sets.age)
         self.veh_lift_pdf = pd.Series(norm.pdf(sets.age_int, self.raw_data.veh_avg_age, self.raw_data.veh_age_stdev), index=sets.age)
-        #
+
         self.veh_lift_pdf.index = self.veh_lift_pdf.index.astype('str')
 
         self.veh_lift_mor = pd.Series(self.calc_probability_of_vehicle_retirement(sets.age_int, self.veh_lift_age), index=sets.age)
@@ -689,7 +717,7 @@ class ParametersClass:
 
         # The total (100%) minus the cumulation of all the cars retired by the time they reach a certain age
         h = 1 - norm.cdf(ages, loc=average_expectancy, scale=standard_dev)
-
+        # h = 1 - veh_lift_cdf()
         # Normalize to represent a _fraction_ of the total fleet
         q = h / h.sum()
         return q
@@ -764,7 +792,6 @@ class ParametersClass:
         # Initialize
         g = np.zeros_like(age_distribution)
 
-
         for a in ages[:-1]:
             if age_distribution[a] > 0:
                 # Probability of dying is 1 minus the factions of cars that make it to the next year
@@ -808,6 +835,7 @@ class ParametersClass:
 
         self.enr_cint = self.enr_cint.stack()  # reg, enr, year
 
+
     def validate_data(self, sets):
         """
         Perform simple checks to validate input data.
@@ -827,20 +855,23 @@ class ParametersClass:
             # convert to dict with explicit connection to segments
             self.veh_stck_int_seg = {seg: share for seg, share in zip(sets.seg, self.veh_stck_int_seg)}
         if isinstance(self.veh_stck_int_seg, dict):
-            if sum(self.veh_stck_int_seg.values()) != 1:\
+            if sum(self.veh_stck_int_seg.values()) != 1:
+                print('\n *****************************************')
                 warnings.warn('Vehicle segment shares (VEH_STCK_INT_SEG) do not sum to 1!')
         if (isinstance(self.veh_stck_int_tec, list) or isinstance(self.veh_stck_int_tec, pd.Series)):
             tec_sum = sum(self.veh_stck_int_tec)
         elif (isinstance(self.veh_stck_int_tec, dict)):
             tec_sum = sum(self.veh_stck_int_tec.values())
         else:
+            print('\n *****************************************')
             warnings.warn(f'veh_stck_int_tec is an invalid format. It is {type(self.veh_stck_int_tec)}; only dict or list allowed')
             tec_sum = np.nan
         if tec_sum != 1:
+            print('\n *****************************************')
             warnings.warn('Vehicle powertrain technology shares (VEH_STCK_INT_TEC) do not sum to 1!')
             print(self.veh_stck_int_tec)
         if (self.veh_oper_dist is not None) and (self.raw_data.pkm_scenario is not None):
-            warnings.warn('Vehicle operating distance over specified. Both an annual vehicle mileage and an IAM scenario are specified.')
+            warnings.warn('Info: Vehicle operating distance over specified. Both an annual vehicle mileage and an IAM scenario are specified.')
 
 
     # @staticmethod

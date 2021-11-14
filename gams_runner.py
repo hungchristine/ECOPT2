@@ -53,27 +53,28 @@ class GAMSRunner:
         Load input and run  experiment in GAMS
     """
 
-    def __init__(self):
-        """ Initialize GAMS workspace for set of experiments """
+    def __init__(self, fp):
+        """Initialize GAMS workspace for set of experiments."""
         self.current_path = os.path.dirname(os.path.realpath(__file__))
-        self.export_fp = os.path.join(self.current_path, 'Model run data')
+        self.export_fp = fp #os.path.join(self.current_path, 'Model run data')
         self.ws = gams.GamsWorkspace(working_directory=self.current_path, debug=2)
 #        self.db = self.ws.add_database()#database_name='pyGAMSdb')
         self.opt = self.ws.add_options()
         self.opt.Keep = 0  # Controls keeping or deletion of process directory and scratch files.
-        self.opt.LogLine = 2  # Amount of line tracing to the log file
-        self.opt.TraceOpt = 3  # Trace file format option
-#        self.opt.DumpParms = 2
-        self.opt.ForceWork = 1  # Force GAMS to process a save file created with a newer GAMS version or with execution errors.
-        self.opt.trace = os.path.join(os.path.curdir, 'trace.txt')
+        self.opt.LogLine = 0  # Amount of line tracing to the log file
+        self.opt.trace = fp + 'trace'
+        self.opt.TraceOpt = 0  # Trace file format option; 3: Solver trace only in format used for GAMS performance world.
+        self.opt.DumpParms = 0 # GAMS parameter logging; 1: accepted parameters/sets, 2; log of file operations + accepted sets/parameters
+        self.opt.ForceWork = 0  # Force GAMS to process a save file created with a newer GAMS version or with execution errors.
         # gams.execution.SymbolUpdateType = 1  # if record does not exist, use values from instantiation
 
-    def _load_input_to_gams(self, fleet, filename, timestamp): # will become unnecessary as we start calculating/defining sets and/or parameters within the class
+    def _load_input_to_gams(self, fleet, filename, timestamp):
+        # will become unnecessary as we start calculating/defining sets and/or parameters within the class
         """
-        Create input gdx file for GAMS experiment
+        Create input gdx file for GAMS experiment.
 
         Add database to workspace, update FleetModel, then load database with
-        experiment parameters
+        experiment parameters.
 
         Parameters
         ----------
@@ -87,17 +88,16 @@ class GAMSRunner:
          Returns
         -------
         None.
-        """
 
-        # TODO: add functionality to gmspy --> check if Symbol exists in database, write over
-        # TODO: related: refactor to just use gams.execution.GamsModifier and/or GamsModelInstance (see documentation)
+        """
 
         try:
             if hasattr(self.db, 'name'):
-                print('Database exists, clearing values from previous run')
+                print('\n Database exists, clearing values from previous run')
                 self.db.clear()  # remove entry values from database for subsequent runs
         except AttributeError:
             # for first run, add database to GAMS workspace
+            print('\n Creating new GAMS database')
             self.db = self.ws.add_database(database_name='pyGAMS_input')
 
         years = gmspy.list2set(self.db, fleet.sets.year,'year')
@@ -118,7 +118,9 @@ class GAMSRunner:
         veheq = gmspy.list2set(self.db, fleet.sets.veheq, 'veheq')
 
         mat_cats = gmspy.list2set(self.db, fleet.sets.mat_cats, 'mat_cats')
-        mat_prods = gmspy.list2set(self.db, sum(fleet.sets.mat_prod.values(), []), 'mat_prod')  # concatenate all material producers
+        mat_prods = gmspy.list2set(self.db, sum(fleet.sets.mat_prod.values(), []), 'mat_prod')  # concatenate all material producers from all material categories
+
+        # create "mat" multidimensional superset
         try:
             mat = self.db.get_set('mat')
         except:
@@ -154,7 +156,6 @@ class GAMSRunner:
             veh_add_grd = self.db.add_parameter_dc('VEH_ADD_GRD', ['grdeq', 'newtecs'])
 
         # Prep work making add gradient df from given rate constraint
-        # TODO: this is redundant with update_fleet??
         # adding growth constraint for each (new/emerging) tec
         for keys, value in iter(fleet.parameters.veh_add_grd.items()):
             veh_add_grd.add_record(keys).value = value
@@ -168,10 +169,10 @@ class GAMSRunner:
         virg_mat = gmspy.df2param(self.db, fleet.parameters.virg_mat_supply, ['year','mat_prod'], 'VIRG_MAT_SUPPLY')
         recovery_pct = gmspy.df2param(self.db, fleet.parameters.recovery_pct, ['year','mat_cats'], 'RECOVERY_PCT')
 
-        print('\n exporting database...' + filename + '_input')
         #TODO: remove export, redundant with first line of this method??
         try:
             self.db.export(os.path.join(self.current_path, filename + '_'+timestamp))
+            print('\n exported database...' + filename + '_input')
         except Exception as e:
             print('\n *****************************************')
             print('Error in exporting input database')
@@ -238,18 +239,18 @@ class GAMSRunner:
 
         """
         # Pass to GAMS all necessary sets and parameters
-        print('Loading GAMS data to database')
+        print('\n Loading data to GAMS database')
         self._load_input_to_gams(fleet, filename, timestamp)
 
         # Run GAMS Optimization
         try:
-            # TODO: refactor to
             model_run = self.ws.add_job_from_file(fleet.gms_file, job_name='EVD4EUR_'+run_tag) # model_run is type GamsJob
             opt = self.ws.add_options()
             opt.defines["gdxincname"] = self.db.name  # for auto-loading of database in GAMS model
             print('\n' + f'Using input gdx file: {self.db.name}')
             print('Running GAMS model, please wait...')
-            model_run.run(gams_options=opt, output=sys.stdout, databases=self.db)  # ,create_out_db = True)
+            print('\n')
+            model_run.run(gams_options=opt, databases=self.db)  # output=sys.stdout, ,create_out_db = True)
             self.ms = model_run.out_db['ms'].find_record().value
             self.ss = model_run.out_db['ss'].find_record().value
 
@@ -288,41 +289,17 @@ class GAMSRunner:
                                13 : 'System Failure'
                                }
             print('\n \n \n Ran GAMS model: ' + fleet.gms_file)
-            print(f'Model status: {self.ms}, {model_stat_dict[self.ms]}'+ '\n')
-            print(f'Solve status: {self.ss}, {solve_stat_dict[self.ss]}' + '\n \n \n')
+            if self.ms in model_stat_dict.keys():
+                print(f'Model status: {self.ms}, {model_stat_dict[self.ms]}'+ '\n')
+                print(f'Solve status: {self.ss}, {solve_stat_dict[self.ss]}' + '\n \n \n')
             gams_db = model_run.out_db
             self.export_model = os.path.join(self.export_fp, run_tag + '_solution.gdx')
             gams_db.export(self.export_model)
             print('\n' + f'Completed export of solution database to {self.export_model}')
-
-            fleet.read_gams_db(gams_db)  # retrieve results from GAMS run (.gdx file)
-            fleet.import_model_results()  # load key results as FleetModel attributes
-
-            # Fetch model outputs
-            fleet.LC_emissions_avg = [self.quality_check(fleet, i) for i in range(0, 28)]
-
-            add_gpby = fleet.stock_add.sum(axis=1).unstack('seg').unstack('tec')
-            fleet.add_share = add_gpby.div(add_gpby.sum(axis=1), axis=0)
-            fleet.add_share.dropna(how='all', axis=0, inplace=True) # drop production country (no fleet)
-
-            """ Export technology shares in 2030 to evaluate speed of uptake"""
-            fleet.shares_2030 = fleet.add_share.loc(axis=0)[:,'2030']
-            fleet.shares_2050 = fleet.add_share.loc(axis=0)[:,'2050']
-
-            try:
-                fleet.eq = fleet._e_dict['EQ_STCK_GRD']
-            except:
-                print('\n ******************************')
-                print('No equation EQ_STCK_GRD')
-
-            """ Export first year of 100% BEV market share """
-            tec_shares = fleet.add_share.stack().stack().sum(level=['prodyear', 'tec','fleetreg'])
-            temp_full_year = ((tec_shares.unstack('fleetreg').loc(axis=0)[:, 'BEV']==1).idxmax()).tolist()
-            fleet.full_BEV_year = [int(i[0]) if int(i[0])>1999 else np.nan for i in temp_full_year]
-
         except Exception as e:
             print('\n *****************************************')
             print('\n' + f'ERROR in running model {fleet.gms_file}')
+            print(e)
             try:
                 exceptions = self.db.get_database_dvs()
                 if len(exceptions) > 0:
@@ -334,6 +311,48 @@ class GAMSRunner:
             except:
                 print('Error running GAMS model, no database')
                 print(e)
+
+        # Fetch model outputs and retrieve key values for scenario comparisons
+        try:
+            fleet.read_gams_db(gams_db)  # retrieve results from GAMS run (.gdx file)
+        except Exception as e:
+            print('\n ******************************')
+            print('Error in reading GAMS database')
+            print(e)
+
+        try:
+            fleet.import_model_results()  # load key results as FleetModel attributes
+            print('\n Model results loaded to FleetModel object')
+        except Exception as e:
+            print('\n ******************************')
+            print('Error in loading results from GAMS database to FleetModel object')
+            print(e)
+
+        try:
+            fleet.LC_emissions_avg = [self.quality_check(fleet, i) for i in range(0, 28)]
+
+            add_gpby = fleet.stock_add.sum(axis=1).unstack('seg').unstack('tec')
+            fleet.add_share = add_gpby.div(add_gpby.sum(axis=1), axis=0)
+            fleet.add_share.dropna(how='all', axis=0, inplace=True) # drop production country (no fleet)
+
+            """ Export technology shares in 2030 to evaluate speed of uptake"""
+            fleet.shares_2030 = fleet.add_share.loc(axis=0)[:,'2030']
+            fleet.shares_2050 = fleet.add_share.loc(axis=0)[:,'2050']
+
+            """ Export first year of 100% BEV market share """
+            tec_shares = fleet.add_share.stack().stack().sum(level=['prodyear', 'tec','fleetreg'])
+            temp_full_year = ((tec_shares.unstack('fleetreg').loc(axis=0)[:, 'BEV']==1).idxmax()).tolist()
+            fleet.full_BEV_year = [int(i[0]) if int(i[0])>1999 else np.nan for i in temp_full_year]
+
+        except Exception as e:
+            print('\n ******************************')
+            print('Error in calculting scenario results')
+            print(e)
+            try:
+                fleet.eq = fleet._e_dict['EQ_STCK_GRD']
+            except:
+                print('\n ******************************')
+                print('No equation EQ_STCK_GRD')
 
 
     def quality_check(self, fleet, age=12):

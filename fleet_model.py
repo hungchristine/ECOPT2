@@ -97,7 +97,9 @@ class FleetModel:
         Parameters
         ----------
         sets: SetsClass
+            Contains all sets and indices for GAMS model.
         parameters: ParametersClass
+            Contains all parameter values for CMAS model.
         pkm_scenario : str, optional
             Name of scenario for total p-km travelled. The default is 'iTEM2-Base'.
         data_from_message : Pandas DataFrame, optional
@@ -235,9 +237,13 @@ class FleetModel:
         # Build fleet object from gdx file (contains model inputs and outputs)
         # For visualization
 
-        self.sets = gmspy.ls(gdx_filepath=gdx_file, entity='Set')
+        self.sets = gmspy.ls(gdx_filepath=gdx_file, entity='Set')  # list of set names
         ws = gams.GamsWorkspace()
         db = ws.add_database_from_gdx(gdx_file)
+
+        # attempt to generalize set intro
+        # for i, name in enumerate(self.sets):
+        #     set_dict = {name: gmspy.set2list(self.sets[i], db=db, ws=ws)}
 
         self.year = gmspy.set2list(self.sets[0], db=db, ws=ws)
         self.age = gmspy.set2list(self.sets[4], db=db, ws=ws)
@@ -329,8 +335,10 @@ class FleetModel:
                     print(f'p_dict ValueError in {p}')
                 except AttributeError:
                     print('\n *****************************************')
-                    print(f'Warning!: p_dict AttributeError in {p}! Probably no records for this parameter.')
+                    print(f'-----Warning!: p_dict AttributeError in {p}! Probably no records for this parameter.')
                     pass
+                except Exception as E:
+                    print(E)
 
         # Export variables
         self._v_dict = {}
@@ -345,8 +353,11 @@ class FleetModel:
                 pass
             except TypeError: # This error is specifically for seg_add
                 print('\n *****************************************')
-                print(f'Warning! v-dict TypeError in {v}! Probably no records for this variable.')
+                print(f'-----Warning! v-dict TypeError in {v}! Probably no records for this variable.')
+                print('\n')
                 pass
+            except Exception as E:
+                print(E)
 
         self._e_dict = {}
         for e in equations:
@@ -356,12 +367,15 @@ class FleetModel:
                 if len(gams_db[e]) == 1: # special case for totc
                     self._e_dict[e] = gams_db[e].first_record().level
                 else:
-                    print(f'Warning!: e_dict ValueError in {e}!')
+                    print(f'-----Warning: e_dict ValueError in {e}!')
+                    print('\n')
             except:
                 print('\n *****************************************')
-                print(f'Warning!: Error in {e}')
+                print(f'-----Warning: Error in {e}')
                 print(sys.exc_info()[0])
+                print('\n')
                 pass
+
 
     def import_model_results(self):
         """
@@ -386,7 +400,6 @@ class FleetModel:
             temp : Pandas DataFrame
                 DataFrame with age index sorted in ascending order.
             """
-            # TODO: move out of class
             temp = df_unordered
             temp.columns = temp.columns.astype(int)
             temp.sort_index(inplace=True, axis=1)
@@ -540,6 +553,7 @@ class FleetModel:
             self.op_intensity = op / init_stock
             self.op_intensity.sort_index(inplace=True)
         except Exception as e:
+            print('\n *****************************************')
             print('Error in calculating operating emissions by cohort. Perhaps post-processing parameters not loaded?')
             print(e)
 

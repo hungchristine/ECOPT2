@@ -47,30 +47,6 @@ def list2set(db, var, name, comment='', verbose=True):
                 warnings.warn('Set added just fine, but with its elements converted to strings.')
     return a_set
 
-def df2set(db, var, name, comment=''):
-    """
-    Insert GAMS multidimensional set based on DataFrame.
-
-    Parameters
-    ----------
-    db : Gams Database
-        Where the parameter will live
-    var : TYPE
-        DESCRIPTION.
-    name: str
-        Name of the parameter in GAMS
-    comment : str
-        Optional, comment
-
-    Returns
-    -------
-    a_set : GamsSet instance
-
-    """
-    #TODO: implement multidimensional sets
-    a_set = None
-    return a_set
-
 def df2param(db, df, domains, name, comment=''):
     """
     Insert pandas dataframe as Parameter in a GAMS database. Revision: also accepts dictionaries.

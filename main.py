@@ -53,7 +53,10 @@ import traceback
 ##fleet.run_GAMS('run_x')
 ##fleet.vis_GAMS('run_x')
 
+# Housekeeping: set up experiment options
 demo = True
+export = False
+
 # unit test consists of static LCA factors
 # (straight line in lieu of logistic function)
 if demo:
@@ -73,7 +76,6 @@ yaml.SafeDumper.ignore_aliases = lambda *args: True
 # Make timestamp and directory for scenario run results for output files
 now = datetime.now().isoformat(timespec='minutes').replace(':','_')
 
-
 if 'unit_test' in yaml_name:
     fp = r'C:\Users\chrishun\Box Sync\YSSP_temp\visualization output\unit_test_' + now
     input_file = os.path.join(os.path.curdir, yaml_name + '.yml') #r'C:\Users\chrishun\Box Sync\YSSP_temp\unit_test.yaml'
@@ -90,18 +92,19 @@ except:
 
 
 def run_experiment():
-    """ Parse all experiment parameters and run model.
+    """
+    Parse all experiment parameters and run model.
 
     Read YAML for key parameter values, create a GAMSRunner object,
     loop through each experiment (Cartesian product of all
     parameter combinations)
 
-    ---"""
+    """
     # Load parameter values for each experiment from YAML
     # r'C:\Users\chrishun\Box Sync\YSSP_temp\temp_input.yaml'
     # r'C:\Users\chrishun\Box Sync\YSSP_temp\temp_input_presubmission.yaml'
 #    with open(r'C:\Users\chrishun\Box Sync\YSSP_temp\GAMS_input.yaml', 'r') as stream:
-    print(os.path.abspath(os.path.curdir))
+
     with open(input_file, 'r') as stream:
         try:
             params = yaml.safe_load(stream)
@@ -121,7 +124,6 @@ def run_experiment():
     count = 1
     for x in params:
         temp = len(params[x])
-        #temp += len(id_and_value[x])
         count = temp * count
 
     # Create data structures for comparing results from multiple runs
@@ -135,7 +137,7 @@ def run_experiment():
     full_BEV_yr_df = pd.DataFrame()
 
     # Create a GAMSRunner object to run the experiments
-    gams_run = gams_runner.GAMSRunner()
+    gams_run = gams_runner.GAMSRunner(fp)
 
     all_exp_list = []  # list of all exp_dicts
     exp_dict = {}  # dict containing current experiment parameters
@@ -194,15 +196,9 @@ def run_experiment():
         exceptions = gams_run.db.get_database_dvs()
         if len(exceptions) > 1:
             print(exceptions[0].symbol.name)
-            # dunno = exceptions[0].symbol_dvs
-
-            # dunno2 = exceptions[0].symbol
             print(fm.db.number_symbols)
 
         # Pickle the scenario fleet object
-#        os.chdir(fp)
-
-        # with open('run_' + run_tag + '.pkl', 'wb') as f:
         pickle_fp = os.path.join(fp, run_tag + '.pkl')
         with gzip.GzipFile(pickle_fp, 'wb') as f:
             pickle.dump(fm, f)
@@ -210,18 +206,7 @@ def run_experiment():
         # Save log info
         info[run_tag] = {
             'params': experiment,
-            #     'veh_stck_int_seg ': veh_stck_int_seg,
-            #     'tec_add_gradient ': tec_add_gradient,
-            #     'seg_batt_caps ': seg_batt_caps,
-            #     'B_term_prod ': B_term_prod,
-            #     'B_term_oper_EOL ': B_term_oper_EOL,
-            #     'r_term_factors ': r_term_factors,
-            #     'u_term_factors ': u_term_factors,
-            #     'pkm_scenario': pkm_scenario,
-            #     'European share of global batter manuf. capacity': eur_batt_share
-            # },
             'output': {
-#                'totc': 42,   # life, the universe, and everything…
 #                 'first year of 100% BEV market share': fm.full_BEV_year
                  'totc_opt': fm.totc_opt,
                  'solver status': gams_run.ss,
@@ -243,9 +228,11 @@ def run_experiment():
             else:
                 exp_params[key] = value
 
+        # Run visualization
         try:
             fm.figure_calculations()  # run extra calculations for cross-experiment figures
-            vis.vis_GAMS(fm, fp, run_id, experiment, export_png=False)
+            vis.vis_GAMS(fm, fp, run_id, experiment, export_png=False, export_pdf=False)
+            # vis.vis_input(fm, fp, run_id, experiment, export_png=False, export_pdf=False, max_year=50, cropx=True, suppress_vis=False)
         except Exception:
             print('\n *****************************************')
             log.warning("Failed visualization, deleting folder")
@@ -287,7 +274,6 @@ def run_experiment():
         log.info(repr(info[run_tag]))
         print('\n\n\n ********** End of run ' + str(i+1) + ' ************** \n\n\n')
 
-
     # Write log to file
     output_fp = os.path.join(fp, f'output_{now}.yaml')
     with open(output_fp, 'w') as f:
@@ -304,6 +290,7 @@ fm, run_id_list, shares_2030, shares_2050, add_share, stock_comp, full_BEV_yr_df
 #    f.write('Successfully completed all runs!')
 
 """ Perform calculations across the experiments"""
+print('\n ********** Performing cross-experiment calculations ************** \n')
 full_BEV_yr = pd.DataFrame(full_BEV_yr_df, index=run_id_list)
 
 scenario_totcs = pd.DataFrame(totc_list, index=run_id_list)
@@ -337,42 +324,48 @@ except:
     print("No comparison to default performed")
 
 # Export potentially helpful output for analyzing across scenarios
-with open('overview_run_' + now + '.pkl', 'wb') as f:
-    pickle.dump([shares_2030, shares_2050, add_share, stock_comp, full_BEV_yr_df, scenario_totcs], f)
+if export:
+    print('\n ********** Exporting cross-experiment results to pickle and Excel ************** \n')
+    with open('overview_run_' + now + '.pkl', 'wb') as f:
+        pickle.dump([shares_2030, shares_2050, add_share, stock_comp, full_BEV_yr_df, scenario_totcs], f)
 
-"""with open('run_2019-09-22T14_50.pkl','rb') as f:
-    d=pickle.load(f)
-d[0][run_id_list[0]].add_share"""
-"""
-"with open(os.path.join(os.path.curdir, 'Run_2020-09-02T22_57', 'run_run_def_baseline_def_def_def_def_def_iTEM2-Base2020-09-02T22_57.pkl','rb') as f:
-    fm=pickle.load(f)
-"""
-
-with pd.ExcelWriter('cumulative_scenario_output'+now+'.xlsx') as writer:
-    shares_2030.to_excel(writer,sheet_name='tec_shares_in_2030')
-    shares_2050.to_excel(writer,sheet_name='tec_shares_in_2050')
-    add_share.to_excel(writer,sheet_name='add_shares')
-    stock_comp.to_excel(writer,sheet_name='total_stock')
-    full_BEV_yr.to_excel(writer,sheet_name='1st_year_full_BEV')
-    scenario_totcs.to_excel(writer,sheet_name='totc')
+    """with open('run_2019-09-22T14_50.pkl','rb') as f:
+        d=pickle.load(f)
+    d[0][run_id_list[0]].add_share"""
+    """
+    "with open(os.path.join(os.path.curdir, 'Run_2020-09-02T22_57', 'run_run_def_baseline_def_def_def_def_def_iTEM2-Base2020-09-02T22_57.pkl','rb') as f:
+        fm=pickle.load(f)
+    """
+    print('Exporting to Excel')
+    with pd.ExcelWriter('cumulative_scenario_output'+now+'.xlsx') as writer:
+        shares_2030.to_excel(writer,sheet_name='tec_shares_in_2030')
+        shares_2050.to_excel(writer,sheet_name='tec_shares_in_2050')
+        add_share.to_excel(writer,sheet_name='add_shares')
+        stock_comp.to_excel(writer,sheet_name='total_stock')
+        full_BEV_yr.to_excel(writer,sheet_name='1st_year_full_BEV')
+        scenario_totcs.to_excel(writer,sheet_name='totc')
 
 # plotting
-rename = {baseline_file.split('.pkl')[0]: 'baseline'}
-shares_2030.rename(columns=rename, inplace=True)
-shares_2050.rename(columns=rename, inplace=True)
-add_share.rename(columns=rename, inplace=True)
-stock_comp.rename(columns=rename, inplace=True)
-full_BEV_yr.rename(index=rename, inplace=True)
-scenario_totcs.rename(index=rename, inplace=True)
+# rename = {baseline_file.split('.pkl')[0]: 'baseline'}
+# shares_2030.rename(columns=rename, inplace=True)
+# shares_2050.rename(columns=rename, inplace=True)
+# add_share.rename(columns=rename, inplace=True)
+# stock_comp.rename(columns=rename, inplace=True)
+# full_BEV_yr.rename(index=rename, inplace=True)
+# scenario_totcs.rename(index=rename, inplace=True)
 
 try:
     full_BEV_yr.plot()
-except TypeError:
-    print('Regions do not reach 100% market share during model period')
+except Exception as e:
+    print(f'Error plotting figure: {e}')
+# except TypeError:
+#     print('Regions do not reach 100% market share during model period')
 
-(scenario_totcs['%_change_in_totc_opt']*100).plot(kind='bar')
-import numpy as np
-(shares_2030.replace(0, np.nan).dropna(how='all', axis=0)).unstack(['reg', 'tec']).T.plot(kind='bar', stacked=True)
+# (scenario_totcs['%_change_in_totc_opt']*100).plot(kind='bar')
+# import numpy as np
+# (shares_2030.replace(0, np.nan).dropna(how='all', axis=0)).unstack(['reg', 'tec']).T.plot(kind='bar', stacked=True)
+
+
 #os.remove(fp+'\failed.txt')
 
 
