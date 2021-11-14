@@ -299,9 +299,20 @@ def vis_GAMS(fleet, fp, filename, param_values, export_png, export_pdf=True, max
     try:
         fig, axes = plt.subplots(plt_array[0], plt_array[1], sharex=True, sharey='row')
 
-        tmp = fleet.stock_add.sum(axis=1).unstack('seg').unstack('tec').loc['2020':] / 1e6
-        tmp.index = sort_ind(tmp.index)
-        tmp = tmp.groupby('reg', sort=False)
+        tmp = fleet.stock_add.sum(axis=1).unstack('seg').unstack('tec').loc['2020':]
+
+        # Check if scaling of stock additions required
+        level_2050 = tmp.groupby(['fleetreg', 'prodyear']).sum().sum(axis=1).unstack('prodyear')['2050'].mean()
+        if level_2050 > 1e6:
+            tmp /= 1e6
+            units = 'millions'
+        elif level_2050 > 15e3:
+            tmp /= 1e3
+            units = 'thousands'
+        else:
+            units = ''
+        tmp.index = sort_ind(tmp.index, cat_type, fleet)
+        tmp = tmp.groupby('fleetreg', sort=False)
 
         for (key, ax) in zip(tmp.groups.keys(), axes.flatten()):
             tmp.get_group(key).plot(ax=ax, kind='area', cmap=paired, lw=0, legend=False, title=f'{key}')
@@ -326,8 +337,8 @@ def vis_GAMS(fleet, fp, filename, param_values, export_png, export_pdf=True, max
         """--- Plot stock addition shares by segment and technology ---"""
         fig, axes = plt.subplots(plt_array[0], plt_array[1], sharex=True, sharey=True)
         tmp = fleet.add_share
-        tmp.index = sort_ind(tmp.index)
-        tmp = tmp.groupby(['reg'], sort=False)
+        tmp.index = sort_ind(tmp.index, cat_type, fleet)
+        tmp = tmp.groupby(['fleetreg'], sort=False)
 
         for (key, ax) in zip(tmp.groups.keys(), axes.flatten()):
             tmp.get_group(key).plot(ax=ax, kind='area', cmap=paired, lw=0, legend=False, title=f'{key}')
@@ -347,8 +358,8 @@ def vis_GAMS(fleet, fp, filename, param_values, export_png, export_pdf=True, max
         """--- Plot tech split of stock additions by segment ---"""
         fig, axes = plt.subplots(plt_array[0], plt_array[1], sharex=True, sharey=True)
         tmp = fleet.add_share.div(fleet.add_share.sum(axis=1, level='seg'), axis=1, level='seg')
-        tmp.index = sort_ind(tmp.index)
-        tmp = tmp.groupby(['reg'], sort=False)
+        tmp.index = sort_ind(tmp.index, cat_type, fleet)
+        tmp = tmp.groupby(['fleetreg'], sort=False)
 
         for (key, ax) in zip(tmp.groups.keys(), axes.flatten()):
             tmp.get_group(key).plot(ax=ax, kind='area', cmap=paired, lw=0, legend=False, title=f'{key}')

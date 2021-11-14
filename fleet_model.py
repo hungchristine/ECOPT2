@@ -403,7 +403,7 @@ class FleetModel:
 
         self.veh_oper_cint = self._p_dict['VEH_OPER_CINT']
         self.veh_oper_cint = self.veh_oper_cint.stack().to_frame()
-        self.veh_oper_cint.index.names = ['tec', 'enr', 'seg', 'reg', 'age', 'modelyear', 'prodyear']
+        self.veh_oper_cint.index.names = ['tec', 'enr', 'seg', 'fleetreg', 'age', 'modelyear', 'prodyear']
 
 
         # Import model results
@@ -425,19 +425,15 @@ class FleetModel:
         self.emissions.columns = ['Production', 'Operation', 'End-of-life']
         self.emissions = self.emissions.unstack(['tec', 'year']).sum().unstack([None, 'tec'])
 
-        self.recycled_batt = self._v_dict['RECYCLED_BATT']
-        self.mat_req_virg = self._p_dict['MAT_REQ_VIRG']
-        self.mat_req_virg = pd.concat([self.mat_req_virg], axis=1, keys=['primary'])
-        self.mat_req_virg.where(cond=self.mat_req_virg>=0, other=np.nan, inplace=True)  # replace negative values with np.nan
-        if self.mat_req_virg.isnull().sum().sum() > 0:
-            print('Warning: supply of secondary materials greater than demand of materials')
-        self.mat_recycled = self._p_dict['MAT_RECYCLED']
-        self.mat_recycled = pd.concat([self.mat_recycled], axis=1, keys=['recycled'])
-        self.mat_demand = self._p_dict['MAT_REQ_TOT']
-        self.mat_demand = pd.concat([self.mat_demand], axis=1, keys=['total'])
-        self.resources = pd.concat([self.mat_demand, self.mat_req_virg, self.mat_recycled], axis=1)
-        self.mat_mix = self._v_dict['MAT_MIX']
-        self.mat_co2 = self._v_dict['MAT_CO2']
+        try:
+            self.recycled_batt = self._v_dict['RECYCLED_BATT']
+            self.recycled_mat = self._v_dict['RECYCLED_MAT']
+            self.primary_mat = self._v_dict['TOT_PRIMARY_MAT']
+            self.resources = pd.concat([self.primary_mat, self.recycled_mat], axis=1, keys=['primary', 'recycled'])
+            self.mat_mix = self._v_dict['MAT_MIX']
+            self.mat_co2 = self._v_dict['MAT_CO2']
+        except Exception as e:
+            print('INFO: could not load material related variables. Check model.')
 
         # Prepare model output dataframes for visualization
         self.stock_df = self._v_dict['VEH_STCK']
@@ -445,16 +441,28 @@ class FleetModel:
         self.stock_add = self._v_dict['VEH_STCK_ADD']
         self.stock_add = reorder_age_headers(self.stock_add)
         self.stock_add = self.stock_add.dropna(axis=1, how='any')
-        self.stock_add.index.rename(['tec', 'seg', 'reg', 'prodyear'], inplace=True)
+        self.stock_add.index.rename(['tec', 'seg', 'fleetreg', 'prodyear'], inplace=True)
+        self.stock_rem = self._v_dict['VEH_STCK_REM']
+        self.stock_rem = reorder_age_headers(self.stock_rem)
         self.stock_df_plot = self.stock_df.stack().unstack('age')
         self.stock_df_plot = reorder_age_headers(self.stock_df_plot)
+        if (self.stock_df_plot.values < 0).any():
+            # check for negative values in VEH_STCK; throw a warning for large values.
+            if self.stock_df_plot.where((self.stock_df_plot < 0) & (np.abs(self.stock_df_plot) > 1e-1)).sum().sum() < 0:
+                print('-----Warning: Large negative values in VEH_STCK found')
+                print('\n')
+            else:
+                # for smaller values, set 0 and print warning
+                print('-----Warning: Small negative values in VEH_STCK found. Setting to 0')
+                self.stock_df_plot.where(~(self.stock_df_plot < 0) & ~(np.abs(self.stock_df_plot) <= 1e-1), other=0, inplace=True)
+                print('\n')
 
         self.stock_df_plot_grouped = self.stock_df_plot.groupby(['tec', 'seg'])
 
         # Import post-processing parameters
         try:
             self.veh_oper_cohort = self._p_dict['VEH_OPER_COHORT']
-            self.veh_oper_cohort.index.rename(['tec', 'seg', 'reg', 'prodyear', 'modelyear' 'age'], inplace=True)
+            self.veh_oper_cohort.index.rename(['tec', 'seg', 'fleetreg', 'prodyear', 'modelyear' 'age'], inplace=True)
             self.stock_cohort = self._p_dict['VEH_STCK_COHORT']
             self.stock_cohort.index.rename(['tec', 'seg', 'fleetreg', 'prodyear', 'age'], inplace=True)
             self.stock_cohort.columns.rename('modelyear', inplace=True)
@@ -462,8 +470,20 @@ class FleetModel:
             self.stock_cohort = self.stock_cohort.stack().unstack('prodyear').sum(axis=0, level=['tec', 'fleetreg', 'modelyear'])
             self.bau_emissions = self._p_dict['BAU_EMISSIONS']
             self.bau_emissions.index.rename(['modelyear'], inplace=True)
+
+            # self.mat_req_virg = self._p_dict['MAT_REQ_VIRG']
+            # self.mat_req_virg = pd.concat([self.mat_req_virg], axis=1, keys=['primary'])
+            # self.mat_req_virg.where(cond=self.mat_req_virg>=0, other=np.nan, inplace=True)  # replace negative values with np.nan
+            # if self.mat_req_virg.isnull().sum().sum() > 0:
+            #     print('-----INFO: supply of secondary materials greater than demand of materials')
+            #     print('\n')
+            # self.mat_recycled = self._p_dict['MAT_RECYCLED']
+            # self.mat_recycled = pd.concat([self.mat_recycled], axis=1, keys=['recycled'])
+            self.mat_demand = self._p_dict['MAT_REQ_TOT']
+            self.mat_demand = pd.concat([self.mat_demand], axis=1, keys=['total'])
+            # self.resources_pp = pd.concat([self.mat_demand, self.mat_req_virg, self.mat_recycled], axis=1)
         except TypeError:
-            print("Could not find post-processing parameter(s)")
+            print("-----Warning: Could not find post-processing parameter(s)")
 
 
         self.veh_oper_dist = self._p_dict['VEH_OPER_DIST']
@@ -472,8 +492,8 @@ class FleetModel:
         self.full_oper_dist = self.veh_oper_dist.reindex(self.veh_oper_cint.index, level='modelyear')
         self.op_emissions = self.veh_oper_cint.multiply(self.full_oper_dist)
         self.op_emissions.index = self.op_emissions.index.droplevel(level=['enr', 'age']) # these columns are unncessary/redundant
-        self.op_emissions = self.op_emissions.sum(level=['tec', 'seg', 'reg', 'prodyear']) # sum the operating emissions over all model years for each cohort
-        self.op_emissions = self.op_emissions.reorder_levels(order=['tec', 'seg', 'reg', 'prodyear']) # reorder MultiIndex to add production emissions
+        self.op_emissions = self.op_emissions.sum(level=['tec', 'seg', 'fleetreg', 'prodyear']) # sum the operating emissions over all model years for each cohort
+        self.op_emissions = self.op_emissions.reorder_levels(order=['tec', 'seg', 'fleetreg', 'prodyear']) # reorder MultiIndex to add production emissions
 
         self.LC_emissions = self.op_emissions.add(self.veh_prod_cint)
 
@@ -506,7 +526,7 @@ class FleetModel:
 
         # Calculate operating emissions by cohort (i.e., prodyear)
         try:
-            operation_em = self.veh_oper_cohort.sum(level=['prodyear', 'reg', 'tec', 'seg']).sum(axis=1)
+            operation_em = self.veh_oper_cohort.sum(level=['prodyear', 'fleetreg', 'tec', 'seg']).sum(axis=1)
             operation_em.sort_index(axis=0, level=0, inplace=True)
             op = operation_em.loc['2000':'2050']
 

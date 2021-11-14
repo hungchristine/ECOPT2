@@ -316,8 +316,8 @@ class GAMSRunner:
                 print('No equation EQ_STCK_GRD')
 
             """ Export first year of 100% BEV market share """
-            tec_shares = fleet.add_share.stack().stack().sum(level=['prodyear', 'tec','reg'])
-            temp_full_year = ((tec_shares.unstack('reg').loc(axis=0)[:, 'BEV']==1).idxmax()).tolist()
+            tec_shares = fleet.add_share.stack().stack().sum(level=['prodyear', 'tec','fleetreg'])
+            temp_full_year = ((tec_shares.unstack('fleetreg').loc(axis=0)[:, 'BEV']==1).idxmax()).tolist()
             fleet.full_BEV_year = [int(i[0]) if int(i[0])>1999 else np.nan for i in temp_full_year]
 
         except Exception as e:
@@ -347,23 +347,23 @@ class GAMSRunner:
         fleet.veh_oper_cint_avg = fleet.veh_oper_cint_avg[fleet.veh_oper_cint_avg.age<=age] # then, drop ages over lifetime
         fleet.veh_oper_cint_avg = fleet.veh_oper_cint_avg.set_index([fleet.veh_oper_cint_avg.index, fleet.veh_oper_cint_avg.age])
         fleet.veh_oper_cint_avg.drop(columns='age', inplace=True)
-        fleet.veh_oper_cint_avg = fleet.veh_oper_cint_avg.reorder_levels(['tec','enr','seg','reg','age','modelyear','prodyear'])
+        fleet.veh_oper_cint_avg = fleet.veh_oper_cint_avg.reorder_levels(['tec','enr','seg','fleetreg','age','modelyear','prodyear'])
 
         fleet.avg_oper_dist = fleet.full_oper_dist.reset_index(level='age')
         fleet.avg_oper_dist = fleet.avg_oper_dist.astype({'age': 'int32'})
         fleet.avg_oper_dist = fleet.avg_oper_dist[fleet.avg_oper_dist.age <= age]  # again, drop ages over lifetime
         fleet.avg_oper_dist = fleet.avg_oper_dist.set_index([fleet.avg_oper_dist.index, fleet.avg_oper_dist.age]) # make same index for joining with fleet.veh_oper_cint_avg
         fleet.avg_oper_dist.drop(columns='age', inplace=True)
-        fleet.avg_oper_dist = fleet.avg_oper_dist.reorder_levels(['tec','enr','seg','reg','age','modelyear','prodyear'])
+        fleet.avg_oper_dist = fleet.avg_oper_dist.reorder_levels(['tec','enr','seg','fleetreg','age','modelyear','prodyear'])
         fleet.d = fleet.avg_oper_dist.join(fleet.veh_oper_cint_avg, lsuffix='_dist')
         fleet.d.columns=['dist','intensity']
         fleet.op_emissions_avg = fleet.d.dist * fleet.d.intensity
         fleet.op_emissions_avg.index = fleet.op_emissions_avg.index.droplevel(level=['enr']) # these columns are unncessary/redundant
         fleet.op_emissions_avg.to_csv('op_emiss_avg_with_duplicates.csv')
-        fleet.op_emissions_avg = fleet.op_emissions_avg.reset_index().drop_duplicates().set_index(['tec','seg','reg','age','modelyear','prodyear'])
+        fleet.op_emissions_avg = fleet.op_emissions_avg.reset_index().drop_duplicates().set_index(['tec','seg','fleetreg','age','modelyear','prodyear'])
         fleet.op_emissions_avg.to_csv('op_emiss_avg_without_duplicates.csv')
-        fleet.op_emissions_avg = fleet.op_emissions_avg.sum(level=['tec','seg','reg','prodyear']) # sum the operating emissions over all model years
-        fleet.op_emissions_avg = fleet.op_emissions_avg.reorder_levels(order=['tec','seg','reg','prodyear']) # reorder MultiIndex to add production emissions
+        fleet.op_emissions_avg = fleet.op_emissions_avg.sum(level=['tec','seg','fleetreg','prodyear']) # sum the operating emissions over all model years
+        fleet.op_emissions_avg = fleet.op_emissions_avg.reorder_levels(order=['tec','seg','fleetreg','prodyear']) # reorder MultiIndex to add production emissions
         fleet.op_emissions_avg.columns = ['']
         return fleet.op_emissions_avg.add(fleet.veh_prod_cint, axis=0)
 
