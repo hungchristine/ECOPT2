@@ -364,6 +364,8 @@ class ParametersClass:
                     # single-level Index
                     value.set_index(value.iloc(axis=1)[0].name, inplace=True, drop=True)
                     value.index = value.index.astype(str)  # ensure all indices are strings (required to work for GAMS)
+                    value.columns = value.columns.astype(str)
+
                 if param.lower() in param_attrs:
                     params_dict[param.lower()] = value
                 else:
@@ -401,6 +403,8 @@ class ParametersClass:
         """
         attrs = dir(self.raw_data)
 
+        if (self.veh_oper_dist is not None) and (self.raw_data.pkm_scenario is not None):
+            warnings.warn('Info: Vehicle operating distance over specified. Both an annual vehicle mileage and an IAM scenario are specified.')
         # self.build_veh_pay()  # establish self.veh_pay
 
         if (self.raw_data.B_term_prod) and (self.raw_data.B_term_oper_EOL) and (self.raw_data.r_term_factors) and (self.raw_data.u_term_factors):
@@ -421,9 +425,17 @@ class ParametersClass:
 
         if isinstance(self.veh_oper_dist, float) or isinstance(self.veh_oper_dist, int):
             # calculate veh_oper_dist
-            # TODO: add check for veh_oper_dist OR and(pkm_scenario, all_scenarios)
+            # given a single value for veh_oper_dist, assumes that value applies for every region and year
             self.veh_oper_dist = pd.Series([self.veh_oper_dist for i in range(len(sets.modelyear))], index=sets.modelyear)
             self.veh_oper_dist.index.name = 'year'
+        elif isinstance(self.veh_oper_dist, list) or isinstance(self.veh_oper_dist, dict) or isinstance(self.veh_oper_dist, pd.DataFrame):
+            ## check if only years in case of dict or dataframe/series: if so, make for each region as well
+            if (yearsonly):
+                # duplicate series for each region
+                yearsonly
+            else:
+                #whatever
+                yearsonly
 
         if self.raw_data.pkm_scenario:
             # calculate veh oper dist
@@ -433,6 +445,11 @@ class ParametersClass:
             self.raw_data.passenger_demand.name = ''
 
             self.raw_data.fleet_vkm  = self.raw_data.passenger_demand / self.raw_data.occupancy_rate
+            self.raw_data.fleet_vkm.index = sets.modelyear
+            self.raw_data.fleet_vkm.index.name = 'year'
+            self.veh_oper_dist = self.raw_data.fleet_vkm / self.veh_stck_tot.T.sum()  # assume uniform distribution of annual distance travelled vs vehicle age and region
+            if self.veh_oper_dist.mean() > 25e3:
+                warnings.warn('Warning, calculated annual vehicle mileage is above 25000 km, check fleet_km and veh_stck_tot')
 
         if self.raw_data.recycle_rate is not None:
             self.recovery_pct = [[self.raw_data.recycle_rate]*len(sets.mat_cats) for year in range(len(sets.modelyear))]
@@ -465,7 +482,8 @@ class ParametersClass:
             self.enr_cint = self.enr_cint.to_frame()
             self.enr_cint.dropna(how='all', axis=0, inplace=True)
 
-        if isinstance(self.raw_data.tec_add_gradient, float) and (self.veh_add_grd is None):
+        # if (isinstance(self.raw_data.tec_add_gradient, float) or isinstance(self.raw_data.tec_add_gradient, int)) and (self.veh_add_grd is None):
+        if (isinstance(self.raw_data.tec_add_gradient, float)) and (self.veh_add_grd is None):
             self.veh_add_grd = {}
             for element in product(*[sets.grdeq, sets.tecs]):
                 if element[1] in sets.newtecs:
