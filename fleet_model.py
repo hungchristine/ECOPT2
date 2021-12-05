@@ -162,8 +162,8 @@ class FleetModel:
             self.trsp_dem = data_from_message # EUR transport demand as time series from MESSAGE
 
         self.parameters.calculate_from_raw_data(self.sets)  # calculate parameters from intermediate/raw data
-        self.parameters.validate_data(self.sets)
         """ boundary conditions for constraints, e.g., electricity market supply constraints, crit. material reserves? could possibly belong in experiment specifications as well..."""
+        self.parameters.validate_data(self.sets)
 
         #### filters and parameter aliases ####
         self.parameters.enr_veh = self._process_df_to_series(self.parameters.enr_veh)

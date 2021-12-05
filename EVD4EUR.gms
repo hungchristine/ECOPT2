@@ -469,7 +469,7 @@ EQ_MAT_TOT_PRIMARY(mat_cats, optyear)..               TOT_PRIMARY_MAT(optyear, m
 * D - Critical material primary supply constraint
 * demand of virgin resources from each source must be less than or equal to available supply
 EQ_VIRG_MAT_SUPPLY(optyear,mat_prod)..                MAT_MIX(optyear, mat_prod)
-                                                        =l= VIRG_MAT_SUPPLY(optyear,mat_prod)*1000
+                                                        =l= VIRG_MAT_SUPPLY(optyear, mat_prod)*1000
 %SLACK_VIRG_MAT% + SLACK_VIRG_MAT(optyear, mat_prod)
 ;
 

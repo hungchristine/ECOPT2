@@ -146,28 +146,34 @@ class SetsClass:
 
 @dataclass
 class RawDataClass:
-    """Contains any raw data used to further calculate or construct parameters."""
+    """ Contains any raw data used to further calculate or construct parameters.
 
+    Converts e.g., dicts and floats to timeseries in pd.Series format
+    """
+
+    pkm_scenario: str = None
     all_pkm_scen: pd.DataFrame = None
+    fleet_vkm: pd.DataFrame = None
     batt_portfolio: pd.DataFrame = None
     veh_factors: pd.DataFrame = None
-    B_term_prod: Any = None
-    B_term_oper_EOL: Any = None
-    r_term_factors: Any = None
-    u_term_factors: Any = None
-    enr_glf_terms: Any = None
+    B_term_prod: Union[dict, float] = None
+    B_term_oper_EOL: Union[dict, float] = None
+    r_term_factors: Union[dict, pd.Series] = None  # {str: float}
+    u_term_factors: Union[dict, pd.Series] = None  # {str: float}
+    prod_df: pd.DataFrame = None
 
     veh_avg_age: Union[float, dict] = 11.1 # From ACEA 2019-2020 report
     veh_age_stdev: Union[float, dict] = 2.21
 
     bev_int_shr: float = 0.0018  # from Eurostat; assume remaining is ICE
-    pkm_scenario: str = None
 
     recycle_rate: float = 0.75
     # other parameters
-    occupancy_rate: float = 2
-    eur_batt_share: float = 1  # default assumes primary material supply given is for entire region
+    occupancy_rate: float = 2.
+    eur_batt_share: float = 1.  # default assumes primary material supply given is for entire region
     tec_add_gradient: float = 0.2
+
+    enr_glf_terms: pd.Series= None
 
     # enr_cint_src: str = os.path.join('Data','load_data','el_footprints_pathways.csv')
 
@@ -198,7 +204,7 @@ class ParametersClass:
 
     raw_data: RawDataClass = None
 
-    veh_oper_dist: Union[float, list, dict, pd.DataFrame] = 10000
+    veh_oper_dist: Union[float, int, list, dict, pd.DataFrame] = None
     veh_stck_int_seg: Union[dict, list] = field(default_factory=lambda:[0.08, 0.21, 0.27, 0.08, 0.03, 0.34])  # Shares from 2017, ICCT report
 
     bev_capac: Union[dict, list] = field(default_factory=lambda:{'A': 26.6, 'B': 42.2, 'C': 59.9, 'D': 75., 'E':95., 'F':100.})
@@ -562,7 +568,8 @@ class ParametersClass:
         None.
 
         """
-        # TO DO: separate A-terms for battery and rest-of-vehicle and apply different b-factors
+        # TODO: separate A-terms for battery and rest-of-vehicle and apply different b-factors
+        #  TODO: allow for series of B-term values
 
         # Fetch sigmoid A terms from RawDataClass
         self.raw_data.veh_factors.columns.names = ['comp']
@@ -864,14 +871,20 @@ class ParametersClass:
             tec_sum = sum(self.veh_stck_int_tec.values())
         else:
             print('\n *****************************************')
-            warnings.warn(f'veh_stck_int_tec is an invalid format. It is {type(self.veh_stck_int_tec)}; only dict or list allowed')
+            w = warnings.warn(f'veh_stck_int_tec is an invalid format. It is {type(self.veh_stck_int_tec)}; only dict or list allowed')
+            print(w)
             tec_sum = np.nan
         if tec_sum != 1:
             print('\n *****************************************')
-            warnings.warn('Vehicle powertrain technology shares (VEH_STCK_INT_TEC) do not sum to 1!')
+            w = warnings.warn('Vehicle powertrain technology shares (VEH_STCK_INT_TEC) do not sum to 1!')
+            print(w)
             print(self.veh_stck_int_tec)
-        if (self.veh_oper_dist is not None) and (self.raw_data.pkm_scenario is not None):
-            warnings.warn('Info: Vehicle operating distance over specified. Both an annual vehicle mileage and an IAM scenario are specified.')
+        if any(v is None for k, v in self.__dict__.items()):
+            missing = [k for k, v in self.__dict__.items() if v is None]
+            print('\n *****************************************')
+            w = warnings.warn(f'The following parameters are missing values: {missing}')
+            print(w)
+
 
 
     # @staticmethod
