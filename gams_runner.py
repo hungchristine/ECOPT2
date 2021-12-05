@@ -9,6 +9,8 @@ the fleet model object.
 """
 
 import os
+import shutil
+from pathlib import Path
 import sys
 import pandas as pd
 import numpy as np
@@ -293,9 +295,17 @@ class GAMSRunner:
                 print(f'Model status: {self.ms}, {model_stat_dict[self.ms]}'+ '\n')
                 print(f'Solve status: {self.ss}, {solve_stat_dict[self.ss]}' + '\n \n \n')
             gams_db = model_run.out_db
-            self.export_model = os.path.join(self.export_fp, run_tag + '_solution.gdx')
-            gams_db.export(self.export_model)
-            print('\n' + f'Completed export of solution database to {self.export_model}')
+            export_model = os.path.join(self.export_fp, run_tag + '_solution.gdx')
+            gams_db.export(export_model)
+            print('\n' + f'Completed export of solution database to {export_model}')
+
+            # manually move .lst and .pf files to run output folder
+            file_ext = ['.lst', '.pf']
+            path = Path(os.path.abspath(os.path.curdir)).parents[1]
+            for file in file_ext:
+                shutil.move(os.path.join(path, 'EVD4EUR_'+ run_tag+file),
+                            self.export_fp)
+
         except Exception as e:
             print('\n *****************************************')
             print('\n' + f'ERROR in running model {fleet.gms_file}')
