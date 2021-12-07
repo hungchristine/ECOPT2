@@ -7,7 +7,7 @@ intermediate data used to calculate parameters.
 """
 
 from dataclasses import dataclass, field, fields
-from typing import List, Dict, Any, Union
+from typing import List, Dict, Union
 from itertools import product
 
 import warnings
@@ -18,30 +18,33 @@ import yaml
 
 @dataclass
 class SetsClass:
-    """Default values initialize with a two-region system with three size segments
-    and two critical material classes each with two producers."""
+    """Contains values for all GAMS sets."""
 
-    tecs: list = field(default_factory=lambda:['BEV', 'ICEV'])
-    enr: list = field(default_factory=lambda: ['FOS', 'ELC'])
-    seg: list = field(default_factory=lambda: ['A', 'C', 'F'])
-    mat_cats: list = field(default_factory=lambda: ['Li', 'Co'])
-    mat_prod: dict = field(default_factory=lambda: {mat: [mat+str(i) for i in range(1,3)] for mat in ['Li', 'Co']})
-    reg: list = field(default_factory=lambda: ['LOW', 'HIGH', 'PROD'])
-    fleetreg: list = field(default_factory=lambda: ['LOW', 'HIGH'])
-    year: list = field(default_factory=lambda: [str(i) for i in range(2000-28, 2081)])
-    cohort: list = field(default_factory=lambda: [str(i) for i in range(2000-28, 2081)])
-    inityear: list = field(default_factory=lambda: [str(i) for i in range(2000, 2021)])
-    optyear: list = field(default_factory=lambda: [str(i) for i in range(2020, 2081)])
-    modelyear: list = field(default_factory=lambda: [str(i) for i in range(2000, 2081)])
-    age: list = field(default_factory=lambda: [str(i) for i in range(29)])
-    age_int: list = field(default_factory=lambda: [i for i in range(29)])
+    """ Default values initialize with a two-region system with three
+    size segments and two critical material classes each with two producers."""
 
-    new: list = field(default_factory=lambda: ['0'])  # static set for new vehicles
-    newtecs: list = field(default_factory=lambda:['BEV'])
-    demeq: list = field(default_factory=lambda: ['STCK_TOT', 'OPER_DIST', 'OCUP'])
-    grdeq: list = field(default_factory=lambda: ['IND', 'ALL'])
-    veheq: list = field(default_factory=lambda: ['PROD_EINT', 'PROD_CINT_CSNT', 'OPER_EINT', 'EOLT_CINT'])
-    sigvar: list = field(default_factory=lambda: ['A', 'B', 'r', 'u'])
+    tecs: List = field(default_factory=lambda:['BEV', 'ICEV'])
+    enr: List = field(default_factory=lambda: ['FOS', 'ELC'])
+    seg: List = field(default_factory=lambda: ['A', 'C', 'F'])
+    mat_cats: List = field(default_factory=lambda: ['Li', 'Co'])
+    mat_prod: Dict = field(default_factory=lambda: {mat: [mat+str(i) for i in range(1,3)] for mat in ['Li', 'Co']})
+    reg: List = field(default_factory=lambda: ['LOW', 'HIGH', 'PROD'])
+    fleetreg: List = field(default_factory=lambda: ['LOW', 'HIGH'])
+    year: List = field(default_factory=lambda: [str(i) for i in range(2000-28, 2081)])
+    cohort: List = field(default_factory=lambda: [str(i) for i in range(2000-28, 2081)])
+    inityear: List = field(default_factory=lambda: [str(i) for i in range(2000, 2021)])
+    optyear: List = field(default_factory=lambda: [str(i) for i in range(2020, 2081)])
+    modelyear: List = field(default_factory=lambda: [str(i) for i in range(2000, 2081)])
+    age: List = field(default_factory=lambda: [str(i) for i in range(29)])
+    age_int: List = field(default_factory=lambda: [i for i in range(29)])
+
+    new: List = field(default_factory=lambda: ['0'])  # static set for new vehicles
+    newtecs: List = field(default_factory=lambda:['BEV'])
+    demeq: List = field(default_factory=lambda: ['STCK_TOT', 'OPER_DIST', 'OCUP'])
+    grdeq: List = field(default_factory=lambda: ['IND', 'ALL'])
+    veheq: List = field(default_factory=lambda: ['PROD_EINT', 'PROD_CINT_CSNT', 'OPER_EINT', 'EOLT_CINT'])
+    sigvar: List = field(default_factory=lambda: ['A', 'B', 'r', 'u'])
+
 
     @classmethod
     def from_file(cls, filepath):
@@ -178,7 +181,7 @@ class RawDataClass:
     # enr_cint_src: str = os.path.join('Data','load_data','el_footprints_pathways.csv')
 
     @classmethod
-    def from_dict(cls, src_dict:dict):
+    def from_dict(cls, src_dict:Dict):
         return cls(**src_dict)
 
     #TODO: move the operations from fleet_model here; calculation of veh_partab, glf terms, etc etc
@@ -195,19 +198,19 @@ class ParametersClass:
     # constraints
     manuf_cnstrnt: pd.DataFrame = None
 
-    mat_content: Union[list, pd.DataFrame] = None
+    mat_content: Union[List, pd.DataFrame] = None
     virg_mat_supply: pd.DataFrame = None
-    mat_cint: Union[list, pd.DataFrame] = None
+    mat_cint: Union[List, pd.DataFrame] = None
     veh_add_grd: Union[float, pd.DataFrame] = None
 
     enr_cint: pd.DataFrame = None
 
     raw_data: RawDataClass = None
 
-    veh_oper_dist: Union[float, int, list, dict, pd.DataFrame] = None
-    veh_stck_int_seg: Union[dict, list] = field(default_factory=lambda:[0.08, 0.21, 0.27, 0.08, 0.03, 0.34])  # Shares from 2017, ICCT report
+    veh_oper_dist: Union[float, int, List, Dict, pd.DataFrame] = None
+    veh_stck_int_seg: Union[Dict, List] = field(default_factory=lambda:[0.08, 0.21, 0.27, 0.08, 0.03, 0.34])  # Shares from 2017, ICCT report
 
-    bev_capac: Union[dict, list] = field(default_factory=lambda:{'A': 26.6, 'B': 42.2, 'C': 59.9, 'D': 75., 'E':95., 'F':100.})
+    bev_capac: Union[Dict, List] = field(default_factory=lambda:{'A': 26.6, 'B': 42.2, 'C': 59.9, 'D': 75., 'E':95., 'F':100.})
 
     def __post_init__(self):
         """
