@@ -77,19 +77,19 @@ yaml.SafeDumper.ignore_aliases = lambda *args: True
 now = datetime.now().isoformat(timespec='minutes').replace(':','_')
 
 if 'unit_test' in yaml_name:
-    fp = r'C:\Users\chrishun\Box Sync\YSSP_temp\visualization output\unit_test_' + now
-    input_file = os.path.join(os.path.curdir, yaml_name + '.yml') #r'C:\Users\chrishun\Box Sync\YSSP_temp\unit_test.yaml'
+    fp = os.path.join(os.path.curdir, 'output', 'unit_test_' + now)
 else:
-    fp = r'C:\Users\chrishun\Box Sync\YSSP_temp\visualization output\Run_' + now
-    input_file = os.path.join(os.path.abspath(os.path.curdir), yaml_name + '.yaml') #'r'C:\Users\chrishun\Box Sync\YSSP_temp\ +yaml_name+'.yaml'
+    fp = os.path.join(os.path.curdir, 'output','Run_'+now)
+
+input_file = os.path.join(os.path.curdir, yaml_name + '.yaml')
+
 
 try:
     os.mkdir(fp)
-    os.chdir(fp)
+    # os.chdir(fp)
 except:
     print('\n *****************************************')
     print("cannot make folder!")
-
 
 def run_experiment():
     """
@@ -165,11 +165,11 @@ def run_experiment():
         run_id_list.append(run_id)
 
         if demo:
-            sets = SetsClass.from_file(r'C:\Users\chrishun\Box Sync\YSSP_temp\Data\load_data\sets_demo.xlsx')
-            params = ParametersClass.from_file(r'C:\Users\chrishun\Box Sync\YSSP_temp\Data\load_data\GAMS_input_demo.xlsx', experiment=experiment)
+            sets = SetsClass.from_file(os.path.join(os.path.curdir, 'data', 'sets_demo.xlsx'))
+            params = ParametersClass.from_file(os.path.join(os.path.curdir, 'data', 'GAMS_input_demo.xlsx'), experiment=experiment)
         else:
-            sets = SetsClass.from_file(r'C:\Users\chrishun\Box Sync\YSSP_temp\Data\load_data\sets.xlsx')
-            params = ParametersClass.from_file(r'C:\Users\chrishun\Box Sync\YSSP_temp\Data\load_data\GAMS_input_demo_test.xlsx', experiment=experiment)
+            sets = SetsClass.from_file(os.path.join(os.path.curdir, 'data', 'sets.xlsx'))
+            params = ParametersClass.from_file(os.path.join(os.path.curdir, 'data', 'GAMS_input_demo_test.xlsx'), experiment=experiment)
 
         fm = fleet_model.FleetModel(sets, params)
 
@@ -185,7 +185,7 @@ def run_experiment():
             print('\n *****************************************')
             log.warning("Failed run")
             traceback.print_exc()
-            os.chdir('..')
+            # os.chdir('..')
             if not os.listdir(fp):  # check folder is empty before deleting
                 log.warning(f'Deleting folder {fp}')
                 os.rmdir(fp)
@@ -237,7 +237,7 @@ def run_experiment():
             print('\n *****************************************')
             log.warning("Failed visualization, deleting folder")
             traceback.print_exc()
-            os.chdir('..')
+            # os.chdir('..')
             if (os.path.exists(fp)) and (not os.listdir(fp)):
                 os.rmdir(fp)
 

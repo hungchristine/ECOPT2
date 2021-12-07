@@ -23,7 +23,7 @@ import re
 import os
 import openpyxl
 
-data_fp = os.path.join(os.path.curdir, 'Data', 'load_data')
+data_fp = os.path.join(os.path.curdir, 'data')
 
 #%% Load electricity footprints from regionalized footprints paper - these are used to determine clustering
 

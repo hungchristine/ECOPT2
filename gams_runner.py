@@ -173,14 +173,14 @@ class GAMSRunner:
 
         #TODO: remove export, redundant with first line of this method??
         try:
-            self.db.export(os.path.join(self.current_path, filename + '_'+timestamp))
+            self.db.export(os.path.join(self.export_fp, filename + '_'+timestamp))
             print('\n exported database...' + filename + '_input')
         except Exception as e:
             print('\n *****************************************')
             print('Error in exporting input database')
             print(e)
             self.db.suppress_auto_domain_checking = 1
-            self.db.export(os.path.join(self.current_path, filename + '_FAILED_'+timestamp))
+            self.db.export(os.path.join(self.export_fp, filename + '_FAILED_'+timestamp))
 
 
     def get_output_from_GAMS(self, gams_db, output_var):
