@@ -59,6 +59,7 @@ import visualization as vis
 # Housekeeping: set up experiment options
 demo = True
 export = False
+visualize_input = False # visualize input factors for debugging
 
 # unit test consists of static LCA factors
 # (straight line in lieu of logistic function)
@@ -68,6 +69,10 @@ else:
     #yaml_name = 'unit_test'#.yaml'
     yaml_name = 'GAMS_input'#.yaml'
     # yaml_name = 'GAMS_input_demo'
+
+# Make timestamp and directory for scenario run results for output files
+now = datetime.now().isoformat(timespec='minutes').replace(':', '_')  # timestamp for run IDs
+
 # Set up logging
 log_fp = os.path.join(os.path.curdir, 'output', now+'_log.log')
 formatter = logging.Formatter('%(levelname)s [%(name)s] - %(message)s')
@@ -85,9 +90,6 @@ log.addHandler(stream_log)
 
 # Make output YAML less ugly, see https://stackoverflow.com/a/30682604
 yaml.SafeDumper.ignore_aliases = lambda *args: True
-
-# Make timestamp and directory for scenario run results for output files
-now = datetime.now().isoformat(timespec='minutes').replace(':','_')
 
 if 'unit_test' in yaml_name:
     fp = os.path.join(os.path.curdir, 'output', 'unit_test_' + now)
@@ -151,14 +153,12 @@ def run_experiment():
 
     # Create a GAMSRunner object to run the experiments
     gams_run = gams_runner.GAMSRunner(fp)
-
     all_exp_list = []  # list of all exp_dicts
     exp_dict = {}  # dict containing current experiment parameters
     param_vals = [params_dict[p].items() for p in params_dict.keys()]  # list containing all parameter experiment values (for Cartesian product)
     exp_id_list = []  # list of experiment IDs
 
     # unpack/create all experiments as Cartesian product of all parameter options
-    now = datetime.now().isoformat(timespec='minutes').replace(':', '_')  # timestamp for run ID
     for i, experiment in enumerate(product(*param_vals)):
         id_string = "run"
 
@@ -246,6 +246,8 @@ def run_experiment():
             fm.figure_calculations()  # run extra calculations for cross-experiment figures
             vis.vis_GAMS(fm, fp, run_id, experiment, export_png=False, export_pdf=False)
             # vis.vis_input(fm, fp, run_id, experiment, export_png=False, export_pdf=False, max_year=50, cropx=True, suppress_vis=False)
+            if visualize_input:
+                vis.vis_input(fm, fp, run_id, experiment, export_png=False, export_pdf=False, max_year=50, cropx=True, suppress_vis=False)
         except Exception:
             print('\n *****************************************')
             log.warning("Failed visualization, deleting folder")
@@ -253,6 +255,7 @@ def run_experiment():
             # os.chdir('..')
             if (os.path.exists(fp)) and (not os.listdir(fp)):
                 os.rmdir(fp)
+
 
         # Save pertinent info to compare across scenarios in dataframe
         fm.shares_2030.name = run_id
@@ -303,38 +306,58 @@ fm, run_id_list, shares_2030, shares_2050, add_share, stock_comp, full_BEV_yr_df
 #    f.write('Successfully completed all runs!')
 
 """ Perform calculations across the experiments"""
-print('\n ********** Performing cross-experiment calculations ************** \n')
-full_BEV_yr = pd.DataFrame(full_BEV_yr_df, index=run_id_list)
+if len(run_id_list) > 1:
+    print('\n ********** Performing cross-experiment calculations ************** \n')
+    full_BEV_yr = pd.DataFrame(full_BEV_yr_df, index=run_id_list)
 
-scenario_totcs = pd.DataFrame(totc_list, index=run_id_list)
-scenario_totcs = pd.DataFrame(totc_list, index=run_id_list, columns=['totc_opt'])
+    scenario_totcs = pd.DataFrame(totc_list, index=run_id_list)
+    scenario_totcs = pd.DataFrame(totc_list, index=run_id_list, columns=['totc_opt'])
 
-# Load a "baseline" fleet and extract parameters for comparison
-baseline_file = None
-for i, exp in enumerate(run_id_list):
-    new_list = [j for j in exp.split('_')]
-    if len(set(new_list))==1:
-        new_list[0] =='def'
-        print(exp)
-        print(os.path.abspath(os.path.curdir))
-        baseline_file = 'run_' + run_id_list[i] + '.pkl'
+    # Load a "baseline" fleet and extract parameters for comparison
+    baseline_file = None
+    for i, exp in enumerate(run_id_list):
+        new_list = [j for j in exp.split('_')]
+        if len(set(new_list))==1:
+            new_list[0] =='def'
+            print(exp)
+            print(os.path.abspath(os.path.curdir))
+            baseline_file = os.path.join(fp, 'run_' + run_id_list[i] + '.pkl')
 
-if baseline_file is None:
-    baseline_file = run_id_list[0] + '.pkl' # use first experiment performed as baseline experiment
+    if baseline_file is None:
+        baseline_file = os.path.join(fp, run_id_list[0] + '.pkl') # use first experiment performed as baseline experiment
 
-with gzip.open(baseline_file, 'rb') as f:
-    d = pickle.load(f)
-    default_totc_opt = d.totc_opt
-#with open('run_2019-09-22T14_50.pkl','rb') as f:
-#    d=pickle.load(f)
-#    default_totc_opt = d[0][run_id_list[0]].totc_opt
+    with gzip.open(baseline_file, 'rb') as f:
+        d = pickle.load(f)
+        default_totc_opt = d.totc_opt
+    #with open('run_2019-09-22T14_50.pkl','rb') as f:
+    #    d=pickle.load(f)
+    #    default_totc_opt = d[0][run_id_list[0]].totc_opt
 
-try:
-    scenario_totcs['Abs. difference from totc_opt'] = default_totc_opt - scenario_totcs['totc_opt']
-    scenario_totcs['%_change_in_totc_opt'] = (default_totc_opt - scenario_totcs['totc_opt'])/default_totc_opt
-except:
-    print('\n *****************************************')
-    print("No comparison to default performed")
+    try:
+        scenario_totcs['Abs. difference from totc_opt'] = default_totc_opt - scenario_totcs['totc_opt']
+        scenario_totcs['%_change_in_totc_opt'] = (default_totc_opt - scenario_totcs['totc_opt'])/default_totc_opt
+    except:
+        print('\n *****************************************')
+        print("No comparison to default performed")
+
+    # plotting
+    # rename = {baseline_file.split('.pkl')[0]: 'baseline'}
+    # shares_2030.rename(columns=rename, inplace=True)
+    # shares_2050.rename(columns=rename, inplace=True)
+    # add_share.rename(columns=rename, inplace=True)
+    # stock_comp.rename(columns=rename, inplace=True)
+    # full_BEV_yr.rename(index=rename, inplace=True)
+    # scenario_totcs.rename(index=rename, inplace=True)
+
+    if not full_BEV_yr.empty:
+        full_BEV_yr.plot()
+    else:
+        print('100% market share of BEVs is not achieved in any scenario')
+
+    # (scenario_totcs['%_change_in_totc_opt']*100).plot(kind='bar')
+    # import numpy as np
+    # (shares_2030.replace(0, np.nan).dropna(how='all', axis=0)).unstack(['reg', 'tec']).T.plot(kind='bar', stacked=True)
+
 
 # Export potentially helpful output for analyzing across scenarios
 if export:
@@ -357,26 +380,6 @@ if export:
         stock_comp.to_excel(writer,sheet_name='total_stock')
         full_BEV_yr.to_excel(writer,sheet_name='1st_year_full_BEV')
         scenario_totcs.to_excel(writer,sheet_name='totc')
-
-# plotting
-# rename = {baseline_file.split('.pkl')[0]: 'baseline'}
-# shares_2030.rename(columns=rename, inplace=True)
-# shares_2050.rename(columns=rename, inplace=True)
-# add_share.rename(columns=rename, inplace=True)
-# stock_comp.rename(columns=rename, inplace=True)
-# full_BEV_yr.rename(index=rename, inplace=True)
-# scenario_totcs.rename(index=rename, inplace=True)
-
-try:
-    full_BEV_yr.plot()
-except Exception as e:
-    print(f'Error plotting figure: {e}')
-# except TypeError:
-#     print('Regions do not reach 100% market share during model period')
-
-# (scenario_totcs['%_change_in_totc_opt']*100).plot(kind='bar')
-# import numpy as np
-# (shares_2030.replace(0, np.nan).dropna(how='all', axis=0)).unstack(['reg', 'tec']).T.plot(kind='bar', stacked=True)
 
 
 # Close logging handlers
