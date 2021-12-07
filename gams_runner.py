@@ -12,6 +12,7 @@ import os
 import shutil
 from pathlib import Path
 import sys
+import glob
 import pandas as pd
 import numpy as np
 from scipy.stats import norm
@@ -302,12 +303,21 @@ class GAMSRunner:
             gams_db.export(export_model)
             print('\n' + f'Completed export of solution database to {export_model}')
 
-            # manually move .lst and .pf files to run output folder
+            # Workaround to manually move .lst and .pf files to run output folder
+            # The entire filepath for these filepath can be (are) defined
+            # in self.opt above, but the API has hardcoded these filenames to match
+            # the job name and working directory of the workspace and therefore
+            # ignores any changes made to these options. (See execution.py lines ~847)
             file_ext = ['.lst', '.pf']
-            path = Path(os.path.abspath(os.path.curdir)).parents[1]
+
             for file in file_ext:
-                shutil.move(os.path.join(path, 'EVD4EUR_'+ run_tag+file),
+                shutil.move(os.path.join(os.path.curdir, 'EVD4EUR_'+ run_tag+file),
                             self.export_fp)
+
+            # remove the temp opt files the GAMS API creates (without file extension)
+            for file in glob.glob('_gams_py_'+('[0-9a-z_]'*8)):
+                log.info(f'Removing temp opt file {file}')
+                os.remove(file)
 
         except Exception as e:
             print('\n *****************************************')
