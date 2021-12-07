@@ -60,14 +60,6 @@ class GAMSRunner:
         self.current_path = os.path.dirname(os.path.realpath(__file__))
         self.export_fp = fp #os.path.join(self.current_path, 'Model run data')
         self.ws = gams.GamsWorkspace(working_directory=self.current_path, debug=2)
-#        self.db = self.ws.add_database()#database_name='pyGAMSdb')
-        self.opt = self.ws.add_options()
-        self.opt.Keep = 0  # Controls keeping or deletion of process directory and scratch files.
-        self.opt.LogLine = 0  # Amount of line tracing to the log file
-        self.opt.trace = fp + 'trace'
-        self.opt.TraceOpt = 0  # Trace file format option; 3: Solver trace only in format used for GAMS performance world.
-        self.opt.DumpParms = 0 # GAMS parameter logging; 1: accepted parameters/sets, 2; log of file operations + accepted sets/parameters
-        self.opt.ForceWork = 0  # Force GAMS to process a save file created with a newer GAMS version or with execution errors.
         # gams.execution.SymbolUpdateType = 1  # if record does not exist, use values from instantiation
 
     def _load_input_to_gams(self, fleet, filename, timestamp):
@@ -247,12 +239,23 @@ class GAMSRunner:
         # Run GAMS Optimization
         try:
             model_run = self.ws.add_job_from_file(fleet.gms_file, job_name='EVD4EUR_'+run_tag) # model_run is type GamsJob
-            opt = self.ws.add_options()
-            opt.defines["gdxincname"] = self.db.name  # for auto-loading of database in GAMS model
+            self.opt = self.ws.add_options() # opt is of type gams.options.GamsOptions
+            self.opt.keep = 0  # Controls keeping or deletion of process directory and scratch files.
+            self.opt.logline = 0  # Amount of line tracing to the log file; values of 0-2
+            self.opt.trace = os.path.join(self.export_fp, 'trace.trc')
+            self.opt.traceopt = 2  # Trace file format option; 1-3: Solver trace only in format used for GAMS performance world.
+            self.opt.dumpparms = 0 # GAMS parameter logging; 1: accepted parameters/sets, 2; log of file operations + accepted sets/parameters
+            self.opt.forcework = 0  # Force GAMS to process a save file created with a newer GAMS version or with execution errors.
+
+            lst_fp = os.path.abspath(os.path.join(self.export_fp, 'EVD4EUR_A_' + run_tag + '.lst'))
+            self.opt.set_output(lst_fp)
+            self.opt.putdir = self.export_fp
+            # self.opt.defines["gdxincname"] = self.db.name  # for auto-loading of database in GAMS model
             print('\n' + f'Using input gdx file: {self.db.name}')
             print('Running GAMS model, please wait...')
             print('\n')
-            model_run.run(gams_options=opt, databases=self.db)  # output=sys.stdout, ,create_out_db = True)
+            model_run.run(gams_options=self.opt, databases=self.db)
+
             self.ms = model_run.out_db['ms'].find_record().value
             self.ss = model_run.out_db['ss'].find_record().value
 
