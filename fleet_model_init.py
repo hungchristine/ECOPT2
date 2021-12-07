@@ -558,7 +558,8 @@ class ParametersClass:
         self.raw_data.prod_df = self.raw_data.prod_df.stack()
         self.raw_data.prod_df.index.names = ['veheq', 'tec', 'comp', 'seg']
         self.raw_data.prod_df.index = self.raw_data.prod_df.index.swaplevel(i=-2, j=-1)
-        self.raw_data.prod_df.drop('battery weight', axis=0, inplace=True)  # remove (currently)
+        self.raw_data.prod_df.sort_index(inplace=True)
+        self.raw_data.prod_df.drop('battery weight', axis=0, inplace=True)  # remove (currently not implemented)
 
 
     def build_veh_partab(self):
@@ -598,6 +599,7 @@ class ParametersClass:
 
         # Retrieve production emission factors for chosen battery capacities and place in raw A factors (with component resolution)
         self.build_BEV()  # update self.prod_df with selected battery capacities
+        self.raw_data.veh_factors.sort_index(inplace=True)
         for index, value in self.raw_data.prod_df.iteritems():
             self.raw_data.veh_factors.loc[index, 'a'] = value
 
