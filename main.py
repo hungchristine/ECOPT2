@@ -6,11 +6,9 @@ Created on Thu Apr 25 17:26:23 2019
   """
 import logging
 import sys
+from importlib import reload
+reload(logging)  # override built-in logging config
 
-import fleet_model
-import gams_runner
-from fleet_model_init import SetsClass, ParametersClass
-import visualization as vis
 
 #import sigmoid
 #import test_gams
@@ -28,6 +26,11 @@ import pickle
 import gzip
 import os
 import traceback
+
+import fleet_model
+import gams_runner
+from fleet_model_init import SetsClass, ParametersClass
+import visualization as vis
 
 """
 #fleet.read_all_sets("C:\\Users\\chrishun\\Box Sync5\\YSSP_temp\\EVD4EUR_input.gdx")
@@ -65,10 +68,20 @@ else:
     #yaml_name = 'unit_test'#.yaml'
     yaml_name = 'GAMS_input'#.yaml'
     # yaml_name = 'GAMS_input_demo'
+# Set up logging
+log_fp = os.path.join(os.path.curdir, 'output', now+'_log.log')
+formatter = logging.Formatter('%(levelname)s [%(name)s] - %(message)s')
+log = logging.getLogger()
+log.setLevel(logging.INFO)
+file_log = logging.FileHandler(log_fp)
+file_log.setLevel(logging.INFO)
+file_log.setFormatter(formatter)
+stream_log = logging.StreamHandler(sys.stdout)
+stream_log.setLevel(logging.INFO)
+stream_log.setFormatter(formatter)
+log.addHandler(file_log)
+log.addHandler(stream_log)
 
-# Log to screen
-logging.basicConfig(stream=sys.stdout, level=logging.INFO)
-log = logging.getLogger(__name__)
 
 # Make output YAML less ugly, see https://stackoverflow.com/a/30682604
 yaml.SafeDumper.ignore_aliases = lambda *args: True
@@ -366,6 +379,9 @@ except Exception as e:
 # (shares_2030.replace(0, np.nan).dropna(how='all', axis=0)).unstack(['reg', 'tec']).T.plot(kind='bar', stacked=True)
 
 
+# Close logging handlers
+for handler in log.handlers:
+    handler.close()
 #os.remove(fp+'\failed.txt')
 
 

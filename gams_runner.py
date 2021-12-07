@@ -9,7 +9,9 @@ the fleet model object.
 """
 
 import os
+import logging
 import shutil
+import traceback
 from pathlib import Path
 import sys
 import glob
@@ -26,6 +28,7 @@ import gams
 import gmspy
 
 import fleet_model
+log = logging.getLogger(__name__)
 
 class GAMSRunner:
     """
@@ -322,18 +325,18 @@ class GAMSRunner:
         except Exception as e:
             print('\n *****************************************')
             print('\n' + f'ERROR in running model {fleet.gms_file}')
-            print(e)
             try:
                 exceptions = self.db.get_database_dvs()
                 if len(exceptions) > 0:
                     print('GAMS database exceptions:')
                     print(exceptions.symbol.name)
                 else:
-                    print('Error running GAMS model')
-                print(e)
-            except:
+                    print(e)
+                    print(traceback.format_exc())
+
+            except Exception as ee:
                 print('Error running GAMS model, no database')
-                print(e)
+                print(ee)
 
         # Fetch model outputs and retrieve key values for scenario comparisons
         try:

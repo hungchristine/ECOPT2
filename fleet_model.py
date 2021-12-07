@@ -6,6 +6,7 @@ Created on Sun Apr 21 13:27:57 2019
 """
 
 import os
+import logging
 import sys
 import traceback
 import pandas as pd
@@ -27,6 +28,7 @@ import gams
 import gmspy
 from fleet_model_init import SetsClass, ParametersClass
 
+log = logging.getLogger(__name__)
 class FleetModel:
     """
     Instance of a fleet model experiment.
@@ -207,6 +209,7 @@ class FleetModel:
         self.BEV_ADD_blaaaah = pd.DataFrame()
         self.VEH_STCK = pd.DataFrame()
 
+        log.info('Imported parameters')
         """ experiment specifications """
         self.recycling_losses = pd.DataFrame() # vector of material-specific recycling loss factors
         self.fossil_scenario = pd.DataFrame() # adoption of unconventional sources for fossil fuel chain
@@ -259,6 +262,8 @@ class FleetModel:
 
         # Retrieve GAMS-calculated parameters and variables
         self.import_model_results()
+
+        log.info('Imported parameters')
 
 
     @staticmethod
@@ -342,6 +347,7 @@ class FleetModel:
 
         # Export variables
         self._v_dict = {}
+        print('\n')
         for v in variables:
             try:
                 self._v_dict[v] = gmspy.var2df(v, db=gams_db)
@@ -354,11 +360,10 @@ class FleetModel:
             except TypeError: # This error is specifically for seg_add
                 print('\n *****************************************')
                 print(f'-----Warning! v-dict TypeError in {v}! Probably no records for this variable.')
-                print('\n')
                 pass
             except Exception as E:
                 print(E)
-
+        print('\n')
         self._e_dict = {}
         for e in equations:
             try:
@@ -447,6 +452,7 @@ class FleetModel:
             self.mat_co2 = self._v_dict['MAT_CO2']
         except Exception as e:
             print('INFO: could not load material related variables. Check model.')
+            print(e)
 
         # Prepare model output dataframes for visualization
         self.stock_df = self._v_dict['VEH_STCK']

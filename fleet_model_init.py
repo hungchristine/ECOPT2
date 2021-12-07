@@ -10,11 +10,14 @@ from dataclasses import dataclass, field, fields
 from typing import List, Dict, Union
 from itertools import product
 
-import warnings
+import logging
 import pandas as pd
 import numpy as np
 from scipy.stats import norm, weibull_min
 import yaml
+
+
+log = logging.getLogger(__name__)
 
 @dataclass
 class SetsClass:
@@ -75,6 +78,7 @@ class SetsClass:
             return cls.from_yaml(filepath)
         else:
             raise ValueError("invalid filetype. only excel or yaml accepted. you suck")
+        log.info('Finished initializing sets')
 
     @classmethod
     def from_yaml(cls, filepath):
@@ -133,16 +137,16 @@ class SetsClass:
                 if key in mat_checklist:
                     mat_checklist = mat_checklist[mat_checklist != key]  # remove material from checklist
                 else:
-                    warnings.warn(f'Critical material {key} not in mat_cats, but has primary producers')
+                    log.warning(f'Critical material {key} not in mat_cats, but has primary producers')
             else:
                 sets_dict[ind] = all_sets[ind].dropna().to_list()
         if len(mat_checklist) > 0:
-            warnings.warn(f'Critical materials {mat_checklist} do not have primary producers defined')
+            log.warning(f'Critical materials {mat_checklist} do not have primary producers defined')
         sets_dict['mat_prod'] = mat_dict
 
         # validate initialization period and optimization period
         if len(set(sets_dict['inityear']).intersection(set(sets_dict['optyear']))):
-            warnings.warn('Overlap in inityear and optyear members. May result in infeasibility.')
+            log.warning('Overlap in inityear and optyear members. May result in infeasibility.')
 
         return cls(**sets_dict)
 
@@ -360,7 +364,7 @@ class ParametersClass:
                     value = value.astype({cat: str for cat in mi_dict[param.lower()]})
                     value.set_index(mi_dict[param.lower()], inplace=True, drop=True)
                 elif value.shape[0] == 0:
-                    print(f"\n INFO: Empty values for {param} in Excel file.")
+                    log.info(f"Empty values for {param} in Excel file.")
                 elif value.shape == (1,2):
                     value = value.iloc[0,1]
                 else:
@@ -407,7 +411,7 @@ class ParametersClass:
         attrs = dir(self.raw_data)
 
         if (self.veh_oper_dist is not None) and (self.raw_data.pkm_scenario is not None):
-            warnings.warn('Info: Vehicle operating distance over specified. Both an annual vehicle mileage and an IAM scenario are specified.')
+            log.warning('Info: Vehicle operating distance over specified. Both an annual vehicle mileage and an IAM scenario are specified.')
         # self.build_veh_pay()  # establish self.veh_pay
 
         if (self.raw_data.B_term_prod) and (self.raw_data.B_term_oper_EOL) and (self.raw_data.r_term_factors) and (self.raw_data.u_term_factors):
@@ -452,7 +456,7 @@ class ParametersClass:
             self.raw_data.fleet_vkm.index.name = 'year'
             self.veh_oper_dist = self.raw_data.fleet_vkm / self.veh_stck_tot.T.sum()  # assume uniform distribution of annual distance travelled vs vehicle age and region
             if self.veh_oper_dist.mean() > 25e3:
-                warnings.warn('Warning, calculated annual vehicle mileage is above 25000 km, check fleet_km and veh_stck_tot')
+                log.warning('Warning, calculated annual vehicle mileage is above 25000 km, check fleet_km and veh_stck_tot')
 
         if self.raw_data.recycle_rate is not None:
             self.recovery_pct = [[self.raw_data.recycle_rate]*len(sets.mat_cats) for year in range(len(sets.modelyear))]
@@ -887,26 +891,25 @@ class ParametersClass:
         if isinstance(self.veh_stck_int_seg, dict):
             if sum(self.veh_stck_int_seg.values()) != 1:
                 print('\n *****************************************')
-                warnings.warn('Vehicle segment shares (VEH_STCK_INT_SEG) do not sum to 1!')
+                log.warning('Vehicle segment shares (VEH_STCK_INT_SEG) do not sum to 1!')
         if (isinstance(self.veh_stck_int_tec, list) or isinstance(self.veh_stck_int_tec, pd.Series)):
             tec_sum = sum(self.veh_stck_int_tec)
         elif (isinstance(self.veh_stck_int_tec, dict)):
             tec_sum = sum(self.veh_stck_int_tec.values())
         else:
             print('\n *****************************************')
-            w = warnings.warn(f'veh_stck_int_tec is an invalid format. It is {type(self.veh_stck_int_tec)}; only dict or list allowed')
-            print(w)
+            log.warning(f'veh_stck_int_tec is an invalid format. It is {type(self.veh_stck_int_tec)}; only dict or list allowed')
+            # print(w)
             tec_sum = np.nan
         if tec_sum != 1:
             print('\n *****************************************')
-            w = warnings.warn('Vehicle powertrain technology shares (VEH_STCK_INT_TEC) do not sum to 1!')
-            print(w)
+            log.warning('Vehicle powertrain technology shares (VEH_STCK_INT_TEC) do not sum to 1!')
+
             print(self.veh_stck_int_tec)
         if any(v is None for k, v in self.__dict__.items()):
             missing = [k for k, v in self.__dict__.items() if v is None]
             print('\n *****************************************')
-            w = warnings.warn(f'The following parameters are missing values: {missing}')
-            print(w)
+            log.warning(f'The following parameters are missing values: {missing}')
 
 
 
