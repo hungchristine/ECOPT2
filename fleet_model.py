@@ -134,9 +134,9 @@ class FleetModel:
                 self._from_python(data_from_message)
             except AttributeError as err:
                 print('\n *****************************************')
-                print(f"Exception: {err}")
-                print(traceback.format_exc())
-                print("Generating empty fleet object")
+                log.error(f"Exception: {err}. {traceback.format_exc()}")
+                log.warning('----- Generating empty fleet object')
+                # print("Generating empty fleet object")
 
     def _from_python(self, data_from_message):
         """
@@ -263,7 +263,7 @@ class FleetModel:
         # Retrieve GAMS-calculated parameters and variables
         self.import_model_results()
 
-        log.info('Imported parameters')
+        log.info('Loaded FleetModel object from {gdx_file}')
 
 
     @staticmethod
@@ -330,24 +330,27 @@ class FleetModel:
 
         # Export parameters
         self._p_dict = {}
+        log.info('Loading parameters...')
         for p in parameters:
             # Skip model status and solver status scalar parameters
             if (p != 'ms') and (p != 'ss'):
                 try:
                     self._p_dict[p] = gmspy.param2df(p, db=gams_db)
                 except ValueError as e:
-                    print('\n *****************************************')
-                    print(f'p_dict ValueError in {p}')
+                    # print('\n *****************************************')
+                    log.error(f'p_dict ValueError in {p}. {e}')
                 except AttributeError:
-                    print('\n *****************************************')
-                    print(f'-----Warning!: p_dict AttributeError in {p}! Probably no records for this parameter.')
+                    # print('\n *****************************************')
+                    log.warning(f'p_dict AttributeError in {p}! Probably no records for this parameter.')
                     pass
                 except Exception as E:
-                    print(E)
+                    log.error(f'Error in loading parameters. {E}')
+                    # print(E)
 
         # Export variables
         self._v_dict = {}
         print('\n')
+        log.info('Loading variables...')
         for v in variables:
             try:
                 self._v_dict[v] = gmspy.var2df(v, db=gams_db)
@@ -355,15 +358,18 @@ class FleetModel:
                 if len(gams_db[v]) == 1: # special case for totc
                     self._v_dict[v] = gams_db[v].first_record().level
                 else:
-                    print(f'Warning!: v_dict ValueError in {v}!')
+                    log.error('-----  v_dict ValueError in {v}!')
+                    # print(f'Warning!: v_dict ValueError in {v}!')
                 pass
             except TypeError: # This error is specifically for seg_add
-                print('\n *****************************************')
-                print(f'-----Warning! v-dict TypeError in {v}! Probably no records for this variable.')
+                log.warning(f'----- v-dict TypeError in {v}! Probably no records for this variable.')
+                # print(f'-----Warning! v-dict TypeError in {v}! Probably no records for this variable.')
                 pass
             except Exception as E:
                 print(E)
+
         print('\n')
+        log.info('Loading equations...')
         self._e_dict = {}
         for e in equations:
             try:
@@ -372,15 +378,17 @@ class FleetModel:
                 if len(gams_db[e]) == 1: # special case for totc
                     self._e_dict[e] = gams_db[e].first_record().level
                 else:
-                    print(f'-----Warning: e_dict ValueError in {e}!')
-                    print('\n')
+                    log.warning(f'-----  e_dict ValueError in {e}!')
             except:
-                print('\n *****************************************')
-                print(f'-----Warning: Error in {e}')
-                print(sys.exc_info()[0])
-                print('\n')
+                print('*****************************************')
+                log.error(f'----- Error in {e}. {sys.exc_info()[0]}')
+
+                # print(f'-----Warning: Error in {e}')
+                # print(sys.exc_info()[0])
+                # print('\n')
                 pass
 
+        log.info('Finished loading')
 
     def import_model_results(self):
         """
@@ -501,8 +509,8 @@ class FleetModel:
             self.mat_demand = self._p_dict['MAT_REQ_TOT']
             self.mat_demand = pd.concat([self.mat_demand], axis=1, keys=['total'])
             # self.resources_pp = pd.concat([self.mat_demand, self.mat_req_virg, self.mat_recycled], axis=1)
-        except TypeError:
-            print("-----Warning: Could not find post-processing parameter(s)")
+        except TypeError as e:
+            log.warning(f"Could not find post-processing parameter(s). {e}")
 
 
         self.veh_oper_dist = self._p_dict['VEH_OPER_DIST']
@@ -527,7 +535,7 @@ class FleetModel:
         self.enr_cint = self.enr_cint.stack()
         self.enr_cint.index.rename(['enr', 'reg', 'year'], inplace=True)
 
-        print('\n Finished importing results from GAMS run')
+        log.info('Finished importing results from GAMS run')
 
     def figure_calculations(self):
         """
@@ -560,5 +568,4 @@ class FleetModel:
             self.op_intensity.sort_index(inplace=True)
         except Exception as e:
             print('\n *****************************************')
-            print('Error in calculating operating emissions by cohort. Perhaps post-processing parameters not loaded?')
-            print(e)
+            log.error(f'Error in calculating operating emissions by cohort. Perhaps post-processing parameters not loaded? {e}')

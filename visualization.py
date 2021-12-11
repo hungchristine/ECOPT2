@@ -20,6 +20,9 @@ from cycler import cycler
 from matplotlib.backends.backend_pdf import PdfPages
 import os
 import itertools
+import logging
+
+log = logging.getLogger(__name__)
 
 #### Define custom colormaps
 # Paired colormap for comparing tecs

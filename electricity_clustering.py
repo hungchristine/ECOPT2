@@ -22,8 +22,11 @@ import country_converter as coco
 import re
 import os
 import openpyxl
+import logging
 
 data_fp = os.path.join(os.path.curdir, 'data')
+
+log = logging.getLogger(__name__)
 
 #%% Load electricity footprints from regionalized footprints paper - these are used to determine clustering
 

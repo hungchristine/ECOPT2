@@ -126,7 +126,8 @@ def run_experiment():
             print('finished reading parameter values')
         except yaml.YAMLError as exc:
             print('\n *****************************************')
-            print(exc)
+            log.error(f'Could not read parameter values from YAML file. {exc}')
+
 
     params_dict = {}  # dict with parameter names key values, and dict of experiments as values
     for key, item in params.items():
@@ -171,8 +172,7 @@ def run_experiment():
 
     # start iterating and running experiments
     for i, experiment in enumerate(all_exp_list):
-        print('Starting run ' + str(i+1) + ' of ' + str(count) + '\n\n')
-        log.info(f'Starting run {exp_id_list[i]}')
+        log.info(f'Starting run {exp_id_list[i]}, {i+1} of {count}')
         run_tag = exp_id_list[i]
         run_id = f'{exp_id_list[i]}'
         run_id_list.append(run_id)
@@ -250,7 +250,7 @@ def run_experiment():
                 vis.vis_input(fm, fp, run_id, experiment, export_png=False, export_pdf=False, max_year=50, cropx=True, suppress_vis=False)
         except Exception:
             print('\n *****************************************')
-            log.warning("Failed visualization, deleting folder")
+            log.error("Failed visualization, deleting folder")
             traceback.print_exc()
             # os.chdir('..')
             if (os.path.exists(fp)) and (not os.listdir(fp)):
@@ -288,6 +288,7 @@ def run_experiment():
 
         # Display the info for this run
         log.info(repr(info[run_tag]))
+        log.info(f'End of run {str(i+1)}')
         print('\n\n\n ********** End of run ' + str(i+1) + ' ************** \n\n\n')
 
     # Write log to file
@@ -338,7 +339,7 @@ if len(run_id_list) > 1:
         scenario_totcs['%_change_in_totc_opt'] = (default_totc_opt - scenario_totcs['totc_opt'])/default_totc_opt
     except:
         print('\n *****************************************')
-        print("No comparison to default performed")
+        log.info("No comparison to default performed")
 
     # plotting
     # rename = {baseline_file.split('.pkl')[0]: 'baseline'}

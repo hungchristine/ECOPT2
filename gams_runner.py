@@ -167,14 +167,12 @@ class GAMSRunner:
         virg_mat = gmspy.df2param(self.db, fleet.parameters.virg_mat_supply, ['year','mat_prod'], 'VIRG_MAT_SUPPLY')
         recovery_pct = gmspy.df2param(self.db, fleet.parameters.recovery_pct, ['year','mat_cat'], 'RECOVERY_PCT')
 
-        #TODO: remove export, redundant with first line of this method??
         try:
             self.db.export(os.path.join(self.export_fp, filename + '_'+timestamp))
-            print('\n exported database...' + filename + '_input')
+            log.info('Exported input database...' + filename + '_'+timestamp)
         except Exception as e:
             print('\n *****************************************')
-            print('Error in exporting input database')
-            print(e)
+            log.error(f'Error in exporting input database. {e}')
             self.db.suppress_auto_domain_checking = 1
             self.db.export(os.path.join(self.export_fp, filename + '_FAILED_'+timestamp))
 
@@ -297,14 +295,18 @@ class GAMSRunner:
                                12 : 'Solve Processing Skipped',
                                13 : 'System Failure'
                                }
-            print('\n \n \n Ran GAMS model: ' + fleet.gms_file)
+            print('\n \n \n')
+            log.info('Ran GAMS model: ' + fleet.gms_file)
+
             if self.ms in model_stat_dict.keys():
-                print(f'Model status: {self.ms}, {model_stat_dict[self.ms]}'+ '\n')
-                print(f'Solve status: {self.ss}, {solve_stat_dict[self.ss]}' + '\n \n \n')
+                print(f'Model status: {self.ms}, {model_stat_dict[self.ms]}')
+                print(f'Solve status: {self.ss}, {solve_stat_dict[self.ss]}' + '\n')
             gams_db = model_run.out_db
             export_model = os.path.join(self.export_fp, run_tag + '_solution.gdx')
             gams_db.export(export_model)
-            print('\n' + f'Completed export of solution database to {export_model}')
+            print('\n')
+            log.info(f'Completed export of solution database to {export_model}')
+
 
             # Workaround to manually move .lst and .pf files to run output folder
             # The entire filepath for these filepath can be (are) defined
@@ -324,7 +326,7 @@ class GAMSRunner:
 
         except Exception as e:
             print('\n *****************************************')
-            print('\n' + f'ERROR in running model {fleet.gms_file}')
+            log.error(f'ERROR in running model {fleet.gms_file}')
             try:
                 exceptions = self.db.get_database_dvs()
                 if len(exceptions) > 0:
@@ -343,16 +345,14 @@ class GAMSRunner:
             fleet.read_gams_db(gams_db)  # retrieve results from GAMS run (.gdx file)
         except Exception as e:
             print('\n ******************************')
-            print('Error in reading GAMS database')
-            print(e)
+            log.error(f'Error in reading GAMS database. {e}')
 
         try:
             fleet.import_model_results()  # load key results as FleetModel attributes
-            print('\n Model results loaded to FleetModel object')
+            log.info('Model results loaded to FleetModel object')
         except Exception as e:
             print('\n ******************************')
-            print('Error in loading results from GAMS database to FleetModel object')
-            print(e)
+            log.error(f'Error in loading results from GAMS database to FleetModel object. {e}')
 
         try:
             fleet.LC_emissions_avg = [self.quality_check(fleet, i) for i in range(0, 28)]
@@ -372,13 +372,12 @@ class GAMSRunner:
 
         except Exception as e:
             print('\n ******************************')
-            print('Error in calculting scenario results')
-            print(e)
+            log.error(f'Error in calculting scenario results. {e}')
             try:
                 fleet.eq = fleet._e_dict['EQ_STCK_GRD']
             except:
                 print('\n ******************************')
-                print('No equation EQ_STCK_GRD')
+                log.info('No equation EQ_STCK_GRD')
 
 
     def quality_check(self, fleet, age=12):

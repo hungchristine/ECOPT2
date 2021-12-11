@@ -77,7 +77,9 @@ class SetsClass:
         elif filepath.endswith('yml') or filepath.endswith('.yaml'):
             return cls.from_yaml(filepath)
         else:
-            raise ValueError("invalid filetype. only excel or yaml accepted. you suck")
+            log.error('Could not load set values. Invalid filetype. Only Excel or YAML formats accepted.')
+            raise ValueError("Invalid filetype. Only Excel or YAML formats accepted.")
+
         log.info('Finished initializing sets')
 
     @classmethod
@@ -122,7 +124,7 @@ class SetsClass:
                 err.append(s)
         if len(err):
             print('\n *****************************************')
-            print(f'\n Set(s) {err} not found in Excel file')
+            log.warning(f'Set(s) {err} not found in Excel file')
 
         # generate dict of sets (remove nan from dataframe due to differing set lengths)
         mat_dict = {}
@@ -136,7 +138,7 @@ class SetsClass:
                 if key in mat_checklist:
                     mat_checklist = mat_checklist[mat_checklist != key]  # remove material from checklist
                 else:
-                    log.warning(f'Critical material {key} not in mat_cats, but has primary producers')
+                    log.warning(f'Critical material {key} not in mat_cat, but has primary producers')
             else:
                 sets_dict[ind] = all_sets[ind].dropna().to_list()
         if len(mat_checklist) > 0:
@@ -275,6 +277,7 @@ class ParametersClass:
             return cls.from_yaml(filepath, experiment)
         else:
             print('\n *****************************************')
+            log.error('Invalid filetype for ParametersClass. Only Excel (.xls or .xlsx) or YAML accepted.')
             raise ValueError("Invalid filetype for ParametersClass. Only Excel or yaml accepted.")
 
     @classmethod
@@ -302,7 +305,7 @@ class ParametersClass:
                 params = yaml.safe_load(stream)
                 print('Finished reading parameter values from yaml')
             except yaml.YAMLError as exc:
-                print(exc)
+                log.error(f'Error reading in parameters from {filepath}. {exc}')
 
         params_dict = {}  # dict with parameter names key values, and dict of experiments as values
         for key, item in params.items():
@@ -410,7 +413,7 @@ class ParametersClass:
         attrs = dir(self.raw_data)
 
         if (self.veh_oper_dist is not None) and (self.raw_data.pkm_scenario is not None):
-            log.warning('Info: Vehicle operating distance over specified. Both an annual vehicle mileage and an IAM scenario are specified.')
+            log.warning('Vehicle operating distance over specified. Both an annual vehicle mileage and an IAM scenario are specified.')
         # self.build_veh_pay()  # establish self.veh_pay
 
         if (self.raw_data.B_term_prod) and (self.raw_data.B_term_oper_EOL) and (self.raw_data.r_term_factors) and (self.raw_data.u_term_factors):
