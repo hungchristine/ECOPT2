@@ -6,6 +6,7 @@
 *.lxi
 *.opt
 *.~gm
+*.inc
 
 # Output YAML files
 testing_*.yaml
@@ -13,11 +14,10 @@ testing_*.yaml
 # Compilation stuff
 
 __pycache__/
-
+/.ipynb_checkpoints/
 
 # Compiled python modules.
 *.pyc
-
 
 # Setuptools distribution folder.
 /dist/
@@ -29,6 +29,33 @@ __pycache__/
 
 # Output pickles
 *.pkl
+
+# Unrelated folders
+/visualization output/
+/225a/
+/.spyproject/
+/.pylint.d/
+/Analysis and troubleshooting/
+/archive/
+/build/
+/calculation output/
+/check_files/
+/Cleanup April 2020/
+/demo/
+/Flowcharts/
+/Model run data/
+/Manuscript/
+/MESSAGE/
+/reflection/
+/temp_code/
+/temp_code_feb4/
+/Test results/
+/
+/Data_old/*
+/output/
+
+# Keep load_data
+!/data/
 
 # Python-generated GAMS temp files
 _gams_py_*
