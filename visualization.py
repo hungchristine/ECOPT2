@@ -948,7 +948,7 @@ def vis_GAMS(fleet, fp, filename, param_values, export_png, export_pdf=True, max
     #%% Total resource use
     """--- Plot total resource use ---"""
     try:
-        fig, axes = plt.subplots(len(fleet.sets.mat_cats), 1, sharex=True, dpi=300)
+        fig, axes = plt.subplots(len(fleet.sets.mat_cat), 1, sharex=True, dpi=300)
         plt.subplots_adjust(top=0.85, hspace=0.4)
 
         gpby_class = {supp: mat for mat, li in fleet.sets.mat_prod.items() for supp in li}
@@ -1022,7 +1022,7 @@ def vis_GAMS(fleet, fp, filename, param_values, export_png, export_pdf=True, max
     #%% Production mixes for primary critical materials
     """--- Plot production mixes for primary critical materials ---"""
     try:
-        fig, axes = plt.subplots(len(fleet.sets.mat_cats), 1, sharex=True, dpi=300)#, figsize=(8,8))
+        fig, axes = plt.subplots(len(fleet.sets.mat_cat), 1, sharex=True, dpi=300)#, figsize=(8,8))
         plt.subplots_adjust(top=0.85, hspace=0.4)
         plot_data = fleet.mat_mix.copy()
         level_2020 = plot_data.loc['2020'].mean() # use as baseline value to scale y-axis
@@ -1086,7 +1086,7 @@ def vis_GAMS(fleet, fp, filename, param_values, export_png, export_pdf=True, max
             lines.extend(axLine)
             labels.extend(axLabel)
 
-        w = .42 * len(fleet.sets.mat_cats)
+        w = .42 * len(fleet.sets.mat_cat)
         h = .15 * len(labels)
         leg = axes[-1].legend(lines, labels, loc=9, bbox_to_anchor=((1-w)/2, -0.4-h, w, h),
                               mode='expand', ncol=len(axes), borderaxespad=0, handlelength=3)

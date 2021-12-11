@@ -26,10 +26,10 @@ class SetsClass:
     """ Default values initialize with a two-region system with three
     size segments and two critical material classes each with two producers."""
 
-    tecs: List = field(default_factory=lambda:['BEV', 'ICEV'])
+    tec: List = field(default_factory=lambda:['BEV', 'ICEV'])
     enr: List = field(default_factory=lambda: ['FOS', 'ELC'])
     seg: List = field(default_factory=lambda: ['A', 'C', 'F'])
-    mat_cats: List = field(default_factory=lambda: ['Li', 'Co'])
+    mat_cat: List = field(default_factory=lambda: ['Li', 'Co'])
     mat_prod: Dict = field(default_factory=lambda: {mat: [mat+str(i) for i in range(1,3)] for mat in ['Li', 'Co']})
     reg: List = field(default_factory=lambda: ['LOW', 'HIGH', 'PROD'])
     fleetreg: List = field(default_factory=lambda: ['LOW', 'HIGH'])
@@ -42,7 +42,7 @@ class SetsClass:
     age_int: List = field(default_factory=lambda: [i for i in range(29)])
 
     new: List = field(default_factory=lambda: ['0'])  # static set for new vehicles
-    newtecs: List = field(default_factory=lambda:['BEV'])
+    newtec: List = field(default_factory=lambda:['BEV'])
     demeq: List = field(default_factory=lambda: ['STCK_TOT', 'OPER_DIST', 'OCUP'])
     grdeq: List = field(default_factory=lambda: ['IND', 'ALL'])
     veheq: List = field(default_factory=lambda: ['PROD_EINT', 'PROD_CINT_CSNT', 'OPER_EINT', 'EOLT_CINT'])
@@ -105,9 +105,8 @@ class SetsClass:
         SetsClass
             Initialized SetsClass from Excel file.
         """
-
         # list of sets required in Excel file for initialization
-        set_list = ['tecs', 'newtecs', 'enr', 'seg', 'mat_cats',
+        set_list = ['tec', 'newtec', 'enr', 'seg', 'mat_cat',
                     'reg', 'fleetreg',
                     'year', 'modelyear', 'inityear',
                     'cohort', 'optyear', 'age']
@@ -127,7 +126,7 @@ class SetsClass:
 
         # generate dict of sets (remove nan from dataframe due to differing set lengths)
         mat_dict = {}
-        mat_checklist = all_sets['mat_cats'].dropna(how='all', axis=0).values  # used to validate materials
+        mat_checklist = all_sets['mat_cat'].dropna(how='all', axis=0).values  # used to validate materials
         sets_dict = {}
         for ind in all_sets.columns:
             if '_prod' in ind:
@@ -459,10 +458,10 @@ class ParametersClass:
                 log.warning('Warning, calculated annual vehicle mileage is above 25000 km, check fleet_km and veh_stck_tot')
 
         if self.raw_data.recycle_rate is not None:
-            self.recovery_pct = [[self.raw_data.recycle_rate]*len(sets.mat_cats) for year in range(len(sets.modelyear))]
+            self.recovery_pct = [[self.raw_data.recycle_rate]*len(sets.mat_cat) for year in range(len(sets.modelyear))]
             self.recovery_pct = pd.DataFrame(self.recovery_pct,
                                              index=sets.modelyear,
-                                             columns=sets.mat_cats)
+                                             columns=sets.mat_cat)
         if self.raw_data.enr_glf_terms is not None:
             if self.enr_cint is not None:
                 # for building enr_cint from IAM pathways
@@ -492,8 +491,8 @@ class ParametersClass:
         # if (isinstance(self.raw_data.tec_add_gradient, float) or isinstance(self.raw_data.tec_add_gradient, int)) and (self.veh_add_grd is None):
         if (isinstance(self.raw_data.tec_add_gradient, float)) and (self.veh_add_grd is None):
             self.veh_add_grd = {}
-            for element in product(*[sets.grdeq, sets.tecs]):
-                if element[1] in sets.newtecs:
+            for element in product(*[sets.grdeq, sets.tec]):
+                if element[1] in sets.newtec:
                     self.veh_add_grd[element] = self.raw_data.tec_add_gradient
 
         self.virg_mat_supply = self.virg_mat_supply.T

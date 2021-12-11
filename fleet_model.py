@@ -189,7 +189,7 @@ class FleetModel:
 
         self.manuf_cnstrnt = self._process_df_to_series(self.parameters.manuf_cnstrnt)
         self.mat_content = [[0.11, 0.05] for year in range(len(self.sets.modelyear))]
-        self.mat_content = pd.DataFrame(self.parameters.mat_content, index=self.sets.modelyear, columns=self.sets.mat_cats)
+        self.mat_content = pd.DataFrame(self.parameters.mat_content, index=self.sets.modelyear, columns=self.sets.mat_cat)
         self.mat_content.index = self.mat_content.index.astype('str')
 
         self.parameters.mat_cint.columns = self.parameters.mat_cint.columns.astype(str)

@@ -102,8 +102,8 @@ class GAMSRunner:
         modelyear = gmspy.list2set(self.db, fleet.sets.modelyear,'modelyear')
         optyear = gmspy.list2set(self.db, fleet.sets.optyear, 'optyear')
         inityear = gmspy.list2set(self.db, fleet.sets.inityear, 'inityear')
-        tecs = gmspy.list2set(self.db, fleet.sets.tecs, 'tec')
-        newtecs = gmspy.list2set(self.db, fleet.sets.newtecs, 'newtecs')
+        tec = gmspy.list2set(self.db, fleet.sets.tec, 'tec')
+        newtec= gmspy.list2set(self.db, fleet.sets.newtec, 'newtec')
         age = gmspy.list2set(self.db, fleet.sets.age, 'age')
         new = gmspy.list2set(self.db, fleet.sets.new, 'new')
         enr = gmspy.list2set(self.db, fleet.sets.enr, 'enr')
@@ -115,8 +115,8 @@ class GAMSRunner:
         sigvar = gmspy.list2set(self.db, fleet.sets.sigvar, 'sigvar')
         veheq = gmspy.list2set(self.db, fleet.sets.veheq, 'veheq')
 
-        mat_cats = gmspy.list2set(self.db, fleet.sets.mat_cats, 'mat_cats')
-        mat_prods = gmspy.list2set(self.db, sum(fleet.sets.mat_prod.values(), []), 'mat_prod')  # concatenate all material producers from all material categories
+        mat_cat = gmspy.list2set(self.db, fleet.sets.mat_cat, 'mat_cat')
+        mat_prod = gmspy.list2set(self.db, sum(fleet.sets.mat_prod.values(), []), 'mat_prod')  # concatenate all material producers from all material categories
 
         # create "mat" multidimensional superset
         try:
@@ -151,7 +151,7 @@ class GAMSRunner:
         try:
             veh_add_grd = self.db.get_parameter('VEH_ADD_GRD')
         except:
-            veh_add_grd = self.db.add_parameter_dc('VEH_ADD_GRD', ['grdeq', 'newtecs'])
+            veh_add_grd = self.db.add_parameter_dc('VEH_ADD_GRD', ['grdeq', 'newtec'])
 
         # Prep work making add gradient df from given rate constraint
         # adding growth constraint for each (new/emerging) tec
@@ -162,10 +162,10 @@ class GAMSRunner:
 
         manuf_cnstrnt = gmspy.df2param(self.db, fleet.parameters.manuf_cnstrnt, ['year'], 'MANUF_CNSTRNT')
 
-        mat_content = gmspy.df2param(self.db, fleet.parameters.mat_content, ['year','mat_cats'], 'MAT_CONTENT')
-        mat_cint = gmspy.df2param(self.db, fleet.parameters.mat_cint, ['year', 'mat_prods'], 'MAT_CINT')
+        mat_content = gmspy.df2param(self.db, fleet.parameters.mat_content, ['year','mat_cat'], 'MAT_CONTENT')
+        mat_cint = gmspy.df2param(self.db, fleet.parameters.mat_cint, ['year', 'mat_prod'], 'MAT_CINT')
         virg_mat = gmspy.df2param(self.db, fleet.parameters.virg_mat_supply, ['year','mat_prod'], 'VIRG_MAT_SUPPLY')
-        recovery_pct = gmspy.df2param(self.db, fleet.parameters.recovery_pct, ['year','mat_cats'], 'RECOVERY_PCT')
+        recovery_pct = gmspy.df2param(self.db, fleet.parameters.recovery_pct, ['year','mat_cat'], 'RECOVERY_PCT')
 
         #TODO: remove export, redundant with first line of this method??
         try:
