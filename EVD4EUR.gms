@@ -52,13 +52,8 @@ new(age)
 ** Load sets defined in Python class
 * These lines must be uncommented if specific input .gdx is not specified, e.g., $gdxin <filepath>_input.gdx
 * By default uses pyGAMS_input.gdx if gdx filename not provided by Python
-* Comment out these two lines if running directly in GAMS:
 $if not set gdxincname $GDXIN C:\Users\chrishun\Box Sync\YSSP_temp\pyGAMS_input.gdx 
 $if set gdxincname $GDXIN %gdxincname%
-*$abort 'no include file name for data file provided'
-
-* This .gdx for running via Python-defined sets
-*$gdxin C:\Users\chrishun\Box Sync\YSSP_temp\pyGAMS_input.gdx
 
 * This .gdx is for troubleshooting
 *$GDXIN 'troubleshooting_params'
@@ -178,8 +173,6 @@ TOT_BEVS(year)                   Total number of BEVs in Europe
 TOT_BATT_MANUF(year)             Total battery capacity required by year [MWh]
 TOT_BATT_RECYCLED(year)          Total battery capacity retired each year [kWh]
 MAT_REQ_TOT(year, mat_cat)      Total resources required by year [kg]
-*MAT_RECYCLED(year, mat_cat)     Total critical materials recycled per year [kg]
-*MAT_REQ_VIRG(year, mat_cat)     Total critical material from primary resources required [kg]
 VEH_STCK_TOT_CHECK(modelyear)
 VEH_STCK_COHORT(tec,seg,fleetreg,prodyear,age,modelyear)       Total stock by technology segment region and cohort
 VEH_OPER_COHORT(tec,seg,fleetreg,prodyear,modelyear,age)       Total fleet operating emissions by technology segment region and cohort
@@ -204,15 +197,8 @@ FILT_REM(tec,seg,fleetreg,year,age)
 
 * Load in parameter values from .gdx file [dummy data]
 
-* Default input .gdx built in Python
-*$gdxin C:\Users\chrishun\Box Sync\YSSP_temp\pyGAMS_input.gdx 
-
 * Sample input GDX as trial for introducing the region set
-*$gdxin C:\Users\chrishun\Box Sync\YSSP_temp\Cleanup April 2020\run_def_baseline_def_def_def_def_aggr_iTEM2-Base2019-10-23T07_40_input.gdx
-
-* Comment out these lines if running directly in GAMS
-
-$if not set gdxincname $GDXIN C:\Users\chrishun\Box Sync\YSSP_temp\pyGAMS_input.gdx
+$if not set gdxincname $GDXIN pyGAMS_input.gdx
 $if set gdxincname $GDXIN %gdxincname%
 
 $LOAD YEAR_PAR
@@ -245,10 +231,6 @@ $LOAD VIRG_MAT_SUPPLY
 $OFFMULTI
 $GDXIN
 ;
-
-
-** try removing this??
-*ENR_CINT('ELC', reg, inityear) = ENR_CINT('ELC', reg, '2019');
 
 *----- Production-related emissions
 * Assume constant for all regions for now
@@ -430,7 +412,7 @@ EQ_NEW_BATT_CAP(optyear)..                            MANUF_CNSTRNT(optyear)*1e6
 * E - Technology uptake constraint
 * incumbent technology excluded
 EQ_STCK_GRD(newtec,seg,fleetreg,modelyear)$(ord(modelyear)>card(inityear))..     VEH_STCK_ADD(newtec,seg,fleetreg,modelyear,new)
-    =l= ((1 + VEH_ADD_GRD('IND', newtec)) * VEH_STCK_ADD(newtec,seg,fleetreg,modelyear-1,new)) + 5000
+    =l= ((1 + VEH_ADD_GRD('IND', newtec)) * VEH_STCK_ADD(newtec,seg,fleetreg,modelyear-1,new)) + 100
 %SLACK_ADD% + SLACK_TEC_ADD(newtec,seg,fleetreg,modelyear,new)
 ;
 
@@ -458,7 +440,7 @@ EQ_RECYCLED_MAT(optyear,mat_cat)..                   RECYCLED_MAT(optyear, mat_c
 * Total amount of material required calculated from new vehicles entering the market, in kg
 EQ_MAT_REQ(optyear, mat_cat)..                       MAT_REQ(optyear, mat_cat) =e= sum((seg, fleetreg), VEH_STCK_ADD('BEV',seg,fleetreg,optyear,new)*BEV_CAPAC(seg)) * MAT_CONTENT(optyear, mat_cat)
 */1000
-%SLACK_NEW_BATT_CAP% + SLACK_NEW_BATT_CAP(optyear) * MAT_CONTENT(optyear, mat_cat)/1000
+%SLACK_NEW_BATT_CAP% + SLACK_NEW_BATT_CAP(optyear) * MAT_CONTENT(optyear, mat_cat)
 ;
 
 * Amount of virgin + recycled material to produce new batteries
@@ -503,8 +485,6 @@ EQ_VEH_EOLT_TOTC(tec,seg,fleetreg,modelyear)..             VEH_EOLT_TOTC(tec,seg
 
 chck.fx(newtec,seg, fleetreg, modelyear) = ((1 + VEH_ADD_GRD('IND',newtec)) * VEH_STCK_ADD.l(newtec,seg,fleetreg,modelyear-1,new));
 
-execute_loadpoint 'EVD4EUR_Basic_p.gdx';
-
 *-----------------------------------------------------------------------------------
 *
 * Model Execution  p.t 1 : Model Definition and Options
@@ -528,8 +508,7 @@ MODEL EVD4EUR_Basic "default model run in normal mode" /ALL/
       no_constraints "model without constraints" /no_mat - EQ_SEG_GRD - EQ_STCK_GRD - EQ_NEW_BATT_CAP/
       
 ;
-*      no_contr "model no constraints at all" /unit_test2 - EQ_STCK_ADD0 - EQ_STCK_GRD0/
-*;
+
 
 * Defining model run options and solver
 
@@ -537,14 +516,12 @@ MODEL EVD4EUR_Basic "default model run in normal mode" /ALL/
 *OPTION THREADS = 40;
 
 *OPTION sysout = off;
-OPTION limrow = 0;
-OPTION limcol = 0;
-OPTION PROFILE = 0;
+*OPTION limrow = 0;
+*OPTION limcol = 0;
+*OPTION PROFILE = 0;
 * set to PROFILE = 2 for debugging speed
-OPTION Solprint = on;
-OPTION savepoint = 1;
-Option LP = CPLEX;
-EVD4EUR_Basic.optfile = 1;
+
+*EVD4EUR_Basic.optfile = 1;
 
 Scalar ms 'model status', ss 'solve status';
 
@@ -599,8 +576,6 @@ TOT_BEVS(modelyear) = sum((seg, fleetreg, age), VEH_STCK.l('BEV', seg, fleetreg,
 TOT_BATT_MANUF(modelyear) = sum((seg, fleetreg)$VEH_STCK_ADD.l('BEV', seg, fleetreg, modelyear, new), VEH_STCK_ADD.l('BEV',seg,fleetreg,modelyear,new)*BEV_CAPAC(seg))/1e6;
 TOT_BATT_RECYCLED(modelyear) = sum((seg), sum((fleetreg, age), VEH_STCK_REM.l('BEV',seg,fleetreg,modelyear, age))* BEV_CAPAC(seg));
 MAT_REQ_TOT(modelyear, mat_cat) = sum((seg, fleetreg), VEH_STCK_ADD.l('BEV',seg,fleetreg,modelyear,new)*BEV_CAPAC(seg)*MAT_CONTENT(modelyear,mat_cat));
-*shares(inityear, fleetreg, tec,seg,age) = VEH_STCK_TOT(inityear,fleetreg) * (VEH_STCK_INT_TEC(tec) * VEH_LIFT_PDF(age)* VEH_STCK_INT_SEG(seg));
-*(((VEH_STCK_TOT(inityear,fleetreg) * VEH_STCK_INT_TEC(tec) / tec.len) * VEH_LIFT_PDF(age)/age.len) * VEH_STCK_INT_SEG(seg)/seg.len);
 
 VEH_STCK_GRD(newtec,seg,fleetreg,optyear) = ((1 + VEH_ADD_GRD('IND',newtec)) * VEH_STCK_ADD.l(newtec,seg,fleetreg,optyear-1,new));
 VEH_TOT_ADD(fleetreg,modelyear) = sum((tec,seg), VEH_STCK_ADD.l(tec, seg, fleetreg, modelyear, new));
@@ -622,8 +597,6 @@ BAU_OPER(modelyear) = sum((fleetreg,age,prodyear,seg), sum((tec), VEH_STCK.l(tec
 BAU_EOL(modelyear)  = sum(seg, sum((tec, fleetreg,age), VEH_STCK_REM.l(tec,seg,fleetreg,modelyear,age))  * VEH_EOLT_CINT('ICE',seg,modelyear));
 BAU_EMISSIONS(modelyear) = BAU_PROD(modelyear) + BAU_OPER(modelyear) + BAU_EOL(modelyear);
 
-*test(mat_cat, modelyear) =  sum((prodyear,age), sum((fleetreg), RECYCLED_BATT.l(modelyear, fleetreg, age))*VEH_PAY(prodyear, age, modelyear)*MAT_CONTENT(prodyear, mat_cat));
-*test2(age, prodyear, modelyear) =  sum((fleetreg), RECYCLED_BATT.l(modelyear, fleetreg, age))*VEH_PAY(prodyear, age, modelyear);
 
 
 execute_unload 'EVD4EUR_addset.gdx'
