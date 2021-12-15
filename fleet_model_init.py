@@ -183,6 +183,8 @@ class RawDataClass:
     Converts e.g., dicts and floats to timeseries in pd.Series format
     """
 
+    #TODO: move the operations from fleet_model here; calculation of veh_partab, glf terms, etc etc
+
     pkm_scenario: str = None
     all_pkm_scen: pd.DataFrame = None
     fleet_vkm: pd.DataFrame = None
@@ -200,10 +202,11 @@ class RawDataClass:
     bev_int_shr: float = 0.0018  # from Eurostat; assume remaining is ICE
 
     recycle_rate: float = 0.75
+
     # other parameters
-    occupancy_rate: float = 2.
-    eur_batt_share: float = 1.  # default assumes primary material supply given is for entire region
-    tec_add_gradient: float = 0.2
+    occupancy_rate: Union[float, pd.Series] = 2.
+    eur_batt_share: Union[float, pd.Series] = 1.  # default assumes primary material supply given is for entire region
+    tec_add_gradient: Union[float, pd.Series] = 0.2
 
     enr_glf_terms: pd.Series= None
 
@@ -211,26 +214,35 @@ class RawDataClass:
 class ParametersClass:
     """Contains all parameter values for GAMS model (in ready-to-insert form)."""
 
-    veh_stck_tot: pd.DataFrame = None
-    enr_veh: pd.DataFrame = None
-    veh_pay: pd.DataFrame = None
+    veh_stck_tot: Union[pd.Series, pd.DataFrame] = None
+    enr_veh: Union[pd.Series, pd.DataFrame] = None
+    veh_pay: Union[pd.Series, pd.DataFrame] = None
+    year_par: Union[pd.Series, pd.DataFrame] = None
+    veh_partab: Union[pd.Series, pd.DataFrame] = None
 
     # constraints
-    manuf_cnstrnt: pd.DataFrame = None
+    manuf_cnstrnt: Union[pd.Series, pd.DataFrame] = None
 
-    mat_content: Union[List, pd.DataFrame] = None
-    virg_mat_supply: pd.DataFrame = None
-    mat_cint: Union[List, pd.DataFrame] = None
-    veh_add_grd: Union[float, pd.DataFrame] = None
+    mat_content: Union[List, pd.Series, pd.DataFrame] = None
+    virg_mat_supply: Union[pd.Series, pd.DataFrame] = None
+    mat_cint: Union[List, pd.Series, pd.DataFrame] = None
+    veh_add_grd: Union[float, pd.Series, pd.DataFrame] = None
 
-    enr_cint: pd.DataFrame = None
+    enr_cint: Union[pd.Series, pd.DataFrame] = None
 
     raw_data: RawDataClass = None
 
-    veh_oper_dist: Union[float, int, List, Dict, pd.DataFrame] = None
+    veh_oper_dist: Union[float, int, List, Dict, pd.Series, pd.DataFrame] = None
     veh_stck_int_seg: Union[Dict, List] = field(default_factory=lambda:[0.08, 0.21, 0.27, 0.08, 0.03, 0.34])  # Shares from 2017, ICCT report
+    veh_stck_int_tec: Union[Dict, pd.Series, pd.DataFrame] = None
 
     bev_capac: Union[Dict, List] = field(default_factory=lambda:{'A': 26.6, 'B': 42.2, 'C': 59.9, 'D': 75., 'E':95., 'F':100.})
+    veh_lift_cdf: Union[pd.Series, pd.DataFrame] = None
+    veh_lift_pdf: Union[pd.Series, pd.DataFrame] = None
+    veh_lift_mor: Union[pd.Series, pd.DataFrame] = None
+    veh_lift_age: Union[pd.Series, pd.DataFrame] = None
+
+    recovery_pct: Union[float, pd.Series, pd.DataFrame] = None
 
     def __post_init__(self):
         """
@@ -240,11 +252,17 @@ class ParametersClass:
         -------
         None.
         """
+
         # convert battery capacities to float
         if isinstance(self.bev_capac, dict):
             self.bev_capac = {key: float(value) for key, value in self.bev_capac.items()}
-        else:
+        elif not isinstance(self.bev_capac, pd.DataFrame):
             self.bev_capac = [float(value) for value in self.bev_capac]
+
+        # convert DataFrame to correct format (used in initializing FleetModel from .gdx file)
+        if isinstance(self.veh_add_grd, pd.DataFrame) and not isinstance(self.veh_add_grd.index, pd.MultiIndex):
+            tmp = self.veh_add_grd.stack()
+            self.veh_add_grd = tmp.to_dict()
 
     @classmethod
     def from_exp(cls, experiment:dict):
@@ -436,6 +454,17 @@ class ParametersClass:
         if (self.veh_oper_dist is not None) and (self.raw_data.pkm_scenario is not None):
             log.warning('----- Vehicle operating distance overspecified. Both an annual vehicle mileage and an IAM scenario are specified.')
 
+        if self.veh_pay is None:
+            self.veh_pay = self.build_veh_pay(sets)  # establish self.veh_pay
+
+        has_required_data = all(attr is not None for attr in (self.raw_data.B_term_prod,
+                                                              self.raw_data.B_term_oper_EOL,
+                                                              self.raw_data.r_term_factors,
+                                                              self.raw_data.u_term_factors
+                                                             ))
+        if self.veh_partab is not None and has_required_data:
+            log.warning('----- veh_partab is overdefined')
+        elif has_required_data:
             self.veh_partab = self.build_veh_partab()
 
         if self.raw_data.eur_batt_share:
@@ -449,15 +478,9 @@ class ParametersClass:
             # calculate veh_oper_dist
             # given a single value for veh_oper_dist, assumes that value applies for every region, year and technology
             self.veh_oper_dist = pd.Series([self.veh_oper_dist for i in range(len(sets.modelyear))], index=sets.modelyear)
-            self.veh_oper_dist.index.name = 'year'
-        elif isinstance(self.veh_oper_dist, list) or isinstance(self.veh_oper_dist, dict) or isinstance(self.veh_oper_dist, pd.DataFrame):
-            ## check if only years in case of dict or dataframe/series: if so, make for each region as well
-            if (yearsonly):
-                # duplicate series for each region
-                yearsonly
-            else:
-                #whatever
-                yearsonly
+        elif isinstance(self.veh_oper_dist, dict):
+            self.veh_oper_dist = pd.Series(self.veh_oper_dist)
+        self.veh_oper_dist.index.name = 'year'
 
         if self.raw_data.pkm_scenario:
             # calculate veh oper dist
@@ -469,6 +492,7 @@ class ParametersClass:
             self.raw_data.fleet_vkm  = self.raw_data.passenger_demand / self.raw_data.occupancy_rate
             self.raw_data.fleet_vkm.index = sets.modelyear
             self.raw_data.fleet_vkm.index.name = 'year'
+            self.veh_oper_dist = self.raw_data.fleet_vkm / self.veh_stck_tot.T.sum()  # assumes uniform distribution of annual distance travelled vs vehicle age and region
             if self.veh_oper_dist.mean() > 25e3:
                 log.warning('Warning, calculated annual vehicle mileage is above 25000 km, check fleet_km and veh_stck_tot')
 
@@ -477,15 +501,16 @@ class ParametersClass:
             self.recovery_pct = pd.DataFrame(self.recovery_pct,
                                              index=sets.modelyear,
                                              columns=sets.mat_cat)
-        if self.raw_data.enr_glf_terms is not None:
-            if self.enr_cint is not None:
-                # for building enr_cint from IAM pathways
-                self.build_enr_cint()
-            else:
-                mi = pd.MultiIndex.from_product([sets.reg, sets.enr, sets.modelyear], names=['reg', 'enr', 'modelyear'])
-                self.enr_cint = pd.Series(index=mi)
-            # NB: we only need enr_cint from electricity pathways, OR we can build enr_cint from enr_partab.
-            # TODO: run a check for which one to do in post_init
+
+        if (self.raw_data.enr_glf_terms is not None) and self.enr_cint is not None:
+            log.warning('----- Source for energy pathways may be overspecified; both enr_glf_terms and enr_cint are specified')
+        elif self.enr_cint is not None:
+            # for building enr_cint from IAM pathways (see electricity_clustering.py)
+            self.build_enr_cint()
+        elif self.raw_data.enr_glf_terms is not None:
+            # build enr_cint from generalized logistic function
+            mi = pd.MultiIndex.from_product([sets.reg, sets.enr, sets.modelyear], names=['reg', 'enr', 'modelyear'])
+            self.enr_cint = pd.Series(index=mi)
 
             # complete enr_cint parameter with fossil fuel chain and electricity in production regions
             # using terms for general logisitic function
@@ -509,13 +534,24 @@ class ParametersClass:
                 if element[1] in sets.newtec:
                     self.veh_add_grd[element] = self.raw_data.tec_add_gradient
 
-        self.virg_mat_supply = self.virg_mat_supply.T
-        self.veh_stck_int_tec = pd.Series([1-self.raw_data.bev_int_shr, self.raw_data.bev_int_shr], index=['ICE', 'BEV'])  # TODO: generalize
+        if len(self.virg_mat_supply.columns) in [len(sets.year), len(sets.optyear), len(sets.modelyear)]:
+            # if years are in columns, transpose for transferring to GAMS
+            self.virg_mat_supply = self.virg_mat_supply.T
+
+        oldtec = list(set(sets.tec) - set(sets.newtec))  # get name of incumbent technology; works for single tec
+        if len(sets.newtec) == 1:
+            self.veh_stck_int_tec = pd.Series([1-self.raw_data.bev_int_shr, self.raw_data.bev_int_shr], index=oldtec + sets.newtec)
+        else:
+            if isinstance(self.raw_data.bev_int_shr, dict):
+                all_new_tecs = sum(self.raw_data.bev_int_shr.values())
+                self.veh_stck_int_tec = pd.Series(self.raw_data.bev_int_shr)
+                self.veh_stck_int_tec.loc[oldtec] = 1- all_new_tecs
+            elif isinstance(self.raw_data.bev_int_shr, pd.DataFrame) or isinstance(self.raw_data.bev_int_shr, pd.Series):
+                self.veh_stck_int_tec.loc[oldtec] - 1 - self.veh_stck_int_tec.sum()
+
         self.year_par = pd.Series([float(i) for i in sets.year], index=sets.year)
         self.calc_veh_lifetime(sets)
 
-        if self.veh_pay is None:
-            self.veh_pay = self.build_veh_pay(sets)
 
 
     def build_veh_pay(self, sets):
@@ -575,8 +611,10 @@ class ParametersClass:
         self.raw_data.prod_df.index.names = ['veheq', 'tec', 'comp', 'seg']
         self.raw_data.prod_df.index = self.raw_data.prod_df.index.swaplevel(i=-2, j=-1)
         self.raw_data.prod_df.sort_index(inplace=True)
-        self.raw_data.prod_df.drop('battery weight', axis=0, inplace=True)  # remove (currently not implemented)
-
+        try:
+            self.raw_data.prod_df.drop('battery weight', axis=0, inplace=True)  # remove (currently not implemented)
+        except KeyError:
+            log.info('Could not drop battery weight')
 
     def build_veh_partab(self):
         """
@@ -902,9 +940,10 @@ class ParametersClass:
         if isinstance(self.veh_stck_int_seg, dict):
             if sum(self.veh_stck_int_seg.values()) != 1:
                 print('\n *****************************************')
-        if (isinstance(self.veh_stck_int_tec, list) or isinstance(self.veh_stck_int_tec, pd.Series)):
+                log.warning('----- Vehicle segment shares (VEH_STCK_INT_SEG) do not sum to 1!')
+        if isinstance(self.veh_stck_int_tec, (list, pd.Series)):
             tec_sum = sum(self.veh_stck_int_tec)
-        elif (isinstance(self.veh_stck_int_tec, dict)):
+        elif isinstance(self.veh_stck_int_tec, dict):
             tec_sum = sum(self.veh_stck_int_tec.values())
         else:
             print('\n *****************************************')
