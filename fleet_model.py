@@ -183,28 +183,18 @@ class FleetModel:
         # Build fleet object from gdx file (contains model inputs and outputs)
         # For visualization
 
-        self.sets = gmspy.ls(gdx_filepath=gdx_file, entity='Set')  # list of set names
         ws = gams.GamsWorkspace()
         db = ws.add_database_from_gdx(gdx_file)
 
-        # attempt to generalize set intro
-        # for i, name in enumerate(self.sets):
-        #     set_dict = {name: gmspy.set2list(self.sets[i], db=db, ws=ws)}
+        self.read_gams_db(db, sets=True) # generate s_dict, p_dict and v_dict
+        self.sets = SetsClass(**self._s_dict)
+        self._p_dict = {key.lower(): value for key, value in self._p_dict.items()}
+        self.parameters = ParametersClass(**self._p_dict)
 
-        self.year = gmspy.set2list(self.sets[0], db=db, ws=ws)
-        self.age = gmspy.set2list(self.sets[4], db=db, ws=ws)
-        self.tecs = gmspy.set2list(self.sets[5], db=db, ws=ws)
-        self.enr = gmspy.set2list(self.sets[6], db=db, ws=ws)
-        self.reg = gmspy.set2list(self.sets[7], db=db, ws=ws)
-        self.seg = gmspy.set2list(self.sets[8], db=db, ws=ws)
+        # Retrieve GAMS-calculated variables, if present in .gdx file
+        if self._v_dict:
+            self.import_model_results()
 
-        self.read_gams_db(db)  # generate p_dict and v_dict
-
-        # Retrieve parameters required for visualization and calculations
-        self.veh_oper_dist = self._p_dict['VEH_OPER_DIST']
-
-        # Retrieve GAMS-calculated parameters and variables
-        self.import_model_results()
         log.info(f'Loaded FleetModel object from {gdx_file}')
 
 
