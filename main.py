@@ -10,17 +10,10 @@ from importlib import reload
 reload(logging)  # override built-in logging config
 
 
-#import sigmoid
-#import test_gams
 from itertools import product
 from datetime import datetime
 import yaml
 import pandas as pd
-
-import matplotlib
-import matplotlib.pyplot as plt
-from matplotlib.ticker import (MultipleLocator, FormatStrFormatter, AutoMinorLocator)
-from matplotlib.backends.backend_pdf import PdfPages
 
 import pickle
 import gzip
@@ -32,33 +25,10 @@ import gams_runner
 from fleet_model_init import SetsClass, ParametersClass
 import visualization as vis
 
-"""
-#fleet.read_all_sets("C:\\Users\\chrishun\\Box Sync5\\YSSP_temp\\EVD4EUR_input.gdx")
-#fleet.add_to_GAMS()
-
-#fleet._read_all_final_parameters("C:\\Users\\chrishun\\Box Sync\\YSSP_temp\\EVD4EUR_input.gdx")
-"""
-#a=[1/6 for i in range(6)]
-#b=[1/6 for i in range(6)]
-#c=0.3
-#.
-#fleet = fleet_model.FleetModel(a,b,c)
-#sigm = sigmoid.Sigmoid
-#fun = getattr(sigmoid, f'make_{sigmoid_case}')
-#
-#values = fun()
-##values = sigmoid.make_values(**sigmoid_case[1])
-##values = sigmoid.make_values(A_batt_size=30, F_batt_size=100)
-#asdf = getattr(fleet,'veh_partab')
-#vals = asdf()
-##asdf = getattr(sigmoid,'genlogfnc')([2000, 2010, 2020, 2030])
-#print(asdf)
-##fleet.run_GAMS('run_x')
-##fleet.vis_GAMS('run_x')
 
 # Housekeeping: set up experiment options
 demo = True
-export = False
+export = False  # export cross-scenario results
 visualize_input = False # visualize input factors for debugging
 
 # unit test consists of static LCA factors
@@ -66,9 +36,8 @@ visualize_input = False # visualize input factors for debugging
 if demo:
     yaml_name = 'GAMS_input_demo'
 else:
-    #yaml_name = 'unit_test'#.yaml'
-    yaml_name = 'GAMS_input'#.yaml'
-    # yaml_name = 'GAMS_input_demo'
+    # yaml_name = 'unit_test'
+    yaml_name = 'GAMS_input'
 
 # Make timestamp and directory for scenario run results for output files
 now = datetime.now().isoformat(timespec='minutes').replace(':', '_')  # timestamp for run IDs
@@ -101,10 +70,9 @@ input_file = os.path.join(os.path.curdir, yaml_name + '.yaml')
 
 try:
     os.mkdir(fp)
-    # os.chdir(fp)
 except:
     print('\n *****************************************')
-    print("cannot make folder!")
+    log.error(f'Could not make output folder {fp}!')
 
 def run_experiment():
     """
@@ -123,10 +91,10 @@ def run_experiment():
     with open(input_file, 'r') as stream:
         try:
             params = yaml.safe_load(stream)
-            print('finished reading parameter values')
+            log.info(f'Successfully read experiment parameter values from {input_file}.yaml file')
         except yaml.YAMLError as exc:
             print('\n *****************************************')
-            log.error(f'Could not read parameter values from YAML file. {exc}')
+            log.error(f'----- Could not read parameter values from YAML file. {exc}')
 
 
     params_dict = {}  # dict with parameter names key values, and dict of experiments as values
@@ -147,10 +115,7 @@ def run_experiment():
     shares_2050 = None
     add_share = None
     stock_comp = None
-    fleet_dict = {}
     run_id_list = []
-    totc_list = []
-    full_BEV_yr_df = pd.DataFrame()
 
     # Create a GAMSRunner object to run the experiments
     gams_run = gams_runner.GAMSRunner(fp)
@@ -158,6 +123,14 @@ def run_experiment():
     exp_dict = {}  # dict containing current experiment parameters
     param_vals = [params_dict[p].items() for p in params_dict.keys()]  # list containing all parameter experiment values (for Cartesian product)
     exp_id_list = []  # list of experiment IDs
+
+    # DataFrames to store key cross-experiment results
+    shares_2030 = pd.DataFrame()
+    shares_2050 = pd.DataFrame()
+    add_share = pd.DataFrame()
+    stock_comp = pd.DataFrame()
+    full_BEV_yr_df = pd.DataFrame()
+    totc_df = pd.DataFrame()
 
     # unpack/create all experiments as Cartesian product of all parameter options
     for i, experiment in enumerate(product(*param_vals)):
@@ -186,19 +159,12 @@ def run_experiment():
 
         fm = fleet_model.FleetModel(sets, params)
 
-        """
-        # need to pass in run ID tag for saving gdx/csv
-        # instantiate FleetModel object
-        # NB here, use explicit names to avoid any confusion """
-        # sets = SetsClass.from_file(r'C:\Users\chrishun\Box Sync\YSSP_temp\Data\load_data\sets.xlsx')
-
         try:
             gams_run.run_GAMS(fm, run_tag, yaml_name, now)  # run the GAMS model
         except Exception:
             print('\n *****************************************')
             log.warning("Failed run")
             traceback.print_exc()
-            # os.chdir('..')
             if not os.listdir(fp):  # check folder is empty before deleting
                 log.warning(f'Deleting folder {fp}')
                 os.rmdir(fp)
@@ -216,22 +182,6 @@ def run_experiment():
         with gzip.GzipFile(pickle_fp, 'wb') as f:
             pickle.dump(fm, f)
 
-        # Save log info
-        info[run_tag] = {
-            'params': experiment,
-            'output': {
-#                 'first year of 100% BEV market share': fm.full_BEV_year
-                 'totc_opt': fm.totc_opt,
-                 'solver status': gams_run.ss,
-                 'model status': gams_run.ms
-#                 'BEV shares in 2030': fm.shares_2030.loc[:,'BEV'].to_string(),
-#                 'totc in optimization period':fm.totc_opt # collect these from all runs into a dataframe...ditto with shares of BEV/ICE
-            }
-        }
-
-#        with open(fp+'\failed.txt','a+') as f:
-#            f.write('Successful run. Next: visualization!')
-
         # convert dict values in experiment to list (drop keys)
         exp_params = {}
         for key, value in experiment.items():
@@ -244,18 +194,30 @@ def run_experiment():
         # Run visualization
         try:
             fm.figure_calculations()  # run extra calculations for cross-experiment figures
-            vis.vis_GAMS(fm, fp, run_id, experiment, export_png=False, export_pdf=False)
-            # vis.vis_input(fm, fp, run_id, experiment, export_png=False, export_pdf=False, max_year=50, cropx=True, suppress_vis=False)
+            fig_fp = os.path.join(fp, f'exp_{i}_figs')
+            os.mkdir(fig_fp)
+            vis.vis_GAMS(fm, fig_fp, run_id, experiment, export_png=True, export_pdf=True)
             if visualize_input:
                 vis.vis_input(fm, fp, run_id, experiment, export_png=False, export_pdf=False, max_year=50, cropx=True, suppress_vis=False)
         except Exception:
             print('\n *****************************************')
             log.error("Failed visualization, deleting folder")
             traceback.print_exc()
-            # os.chdir('..')
             if (os.path.exists(fp)) and (not os.listdir(fp)):
                 os.rmdir(fp)
 
+        # Save log info
+        info[run_tag] = {
+            'input_params': experiment,
+            'output': {
+                 'totc_opt': fm.totc_opt,
+                 'solver status': gams_run.ss,
+                 'model status': gams_run.ms,
+                 'first year of 100% BEV market share': fm.full_BEV_year.to_dict(),
+                  'BEV shares in 2030': fm.shares_2030.to_dict(),
+                 'totc in optimization period':fm.totc_opt # collect these from all runs into a dataframe...ditto with shares of BEV/ICE
+            }
+        }
 
         # Save pertinent info to compare across scenarios in dataframe
         fm.shares_2030.name = run_id
@@ -263,31 +225,15 @@ def run_experiment():
         fm.add_share.name = run_id
         fm.veh_stck.name = run_id
 
-        if shares_2030 is None:
-            shares_2030 = pd.DataFrame(fm.shares_2030.stack().stack(), columns=[run_id])
-        else:
-            shares_2030[run_id] = fm.shares_2030.stack().stack()
-
-        if shares_2050 is None:
-            shares_2050 = pd.DataFrame(fm.shares_2050.stack().stack(), columns=[run_id])
-        else:
-            shares_2050[run_id] = fm.shares_2050.stack().stack()
-
-        if add_share is None:
-            add_share = pd.DataFrame(fm.add_share.stack().stack(), columns=[run_id])
-        else:
-            add_share[run_id] = fm.add_share.stack().stack()
-
-        if stock_comp is None:
-            stock_comp = pd.DataFrame(fm.veh_stck.stack(), columns=[run_id])
-        else:
-            stock_comp[run_id] = fm.veh_stck.stack()
-
-        full_BEV_yr_df.append(fm.full_BEV_year, ignore_index=True)
-        totc_list.append(fm.totc_opt)
+        totc_df.loc['totc_opt', run_id] = fm.totc_opt
+        stock_comp[run_id] = fm.veh_stck.stack() # fleet stock composition
+        shares_2030[run_id] = fm.shares_2030.stack().stack() # market shares in 2030
+        shares_2050[run_id] = fm.shares_2050.stack().stack()  # market shares in 2050
+        add_share[run_id] = fm.add_share.stack().stack()  # market shares
+        full_BEV_yr_df[run_id] = fm.full_BEV_year  # first year of full newtec penetration
 
         # Display the info for this run
-        log.info(repr(info[run_tag]))
+        log.info('\n'+repr(info[run_tag])+'\n')
         log.info(f'End of run {str(i+1)}')
         print('\n\n\n ********** End of run ' + str(i+1) + ' ************** \n\n\n')
 
@@ -297,104 +243,68 @@ def run_experiment():
         yaml.safe_dump(info, f)
 
     # Return last fleet object for troubleshooting
-    return fm, run_id_list, shares_2030, shares_2050, add_share, stock_comp, full_BEV_yr_df, totc_list  #, fleet_dict
+    return fm, run_id_list, shares_2030, shares_2050, add_share, stock_comp, full_BEV_yr_df, totc_df
 
 
 """ Run the full experiment portfolio; also returns last instance of FleetModel object for troubleshooting"""
-fm, run_id_list, shares_2030, shares_2050, add_share, stock_comp, full_BEV_yr_df, totc_list = run_experiment()
+fm, run_id_list, shares_2030, shares_2050, add_share, stock_comp, full_BEV_yr_df, totc_df = run_experiment()
 
-#with open(fp+'\failed.txt','a+') as f:
-#    f.write('Successfully completed all runs!')
 
 """ Perform calculations across the experiments"""
 if len(run_id_list) > 1:
     print('\n ********** Performing cross-experiment calculations ************** \n')
-    full_BEV_yr = pd.DataFrame(full_BEV_yr_df, index=run_id_list)
-
-    scenario_totcs = pd.DataFrame(totc_list, index=run_id_list)
-    scenario_totcs = pd.DataFrame(totc_list, index=run_id_list, columns=['totc_opt'])
 
     # Load a "baseline" fleet and extract parameters for comparison
     baseline_file = None
     for i, exp in enumerate(run_id_list):
         new_list = [j for j in exp.split('_')]
+        new_list = new_list[1:-2]  # drop 'run' and timestamp from run tag
+        # find experiment of all "def"; by default, this run is the baseline
         if len(set(new_list))==1:
             new_list[0] =='def'
-            print(exp)
-            print(os.path.abspath(os.path.curdir))
-            baseline_file = os.path.join(fp, 'run_' + run_id_list[i] + '.pkl')
+            log.info(f'Using {exp} as baseline scenario in cross-experiment calculations')
+            baseline_file = os.path.join(fp, run_id_list[i] + '.pkl')
 
+    # if baseline file not found, use the first experiment as baseline instead
     if baseline_file is None:
         baseline_file = os.path.join(fp, run_id_list[0] + '.pkl') # use first experiment performed as baseline experiment
+        log.info(f'Could not find baseline scenario. Using {run_id_list[0]} as baseline scenario in cross-experiment calculations')
 
     with gzip.open(baseline_file, 'rb') as f:
-        d = pickle.load(f)
+        d = pickle.load(f)  # load FleetModel instance
         default_totc_opt = d.totc_opt
-    #with open('run_2019-09-22T14_50.pkl','rb') as f:
-    #    d=pickle.load(f)
-    #    default_totc_opt = d[0][run_id_list[0]].totc_opt
 
     try:
-        scenario_totcs['Abs. difference from totc_opt'] = default_totc_opt - scenario_totcs['totc_opt']
-        scenario_totcs['%_change_in_totc_opt'] = (default_totc_opt - scenario_totcs['totc_opt'])/default_totc_opt
+        totc_df.loc['Abs. difference from totc_opt'] = default_totc_opt - totc_df.loc['totc_opt']
+        totc_df.loc['%_change_in_totc_opt'] = (default_totc_opt - totc_df.loc['totc_opt'])/default_totc_opt
     except:
         print('\n *****************************************')
         log.info("No comparison to default performed")
 
-    # plotting
-    # rename = {baseline_file.split('.pkl')[0]: 'baseline'}
-    # shares_2030.rename(columns=rename, inplace=True)
-    # shares_2050.rename(columns=rename, inplace=True)
-    # add_share.rename(columns=rename, inplace=True)
-    # stock_comp.rename(columns=rename, inplace=True)
-    # full_BEV_yr.rename(index=rename, inplace=True)
-    # scenario_totcs.rename(index=rename, inplace=True)
-
-    if not full_BEV_yr.empty:
-        full_BEV_yr.plot()
+    # Plotting
+    if not full_BEV_yr_df.isnull().all().all():
+        full_BEV_yr_df.plot()
     else:
-        print('100% market share of BEVs is not achieved in any scenario')
-
-    # (scenario_totcs['%_change_in_totc_opt']*100).plot(kind='bar')
-    # import numpy as np
-    # (shares_2030.replace(0, np.nan).dropna(how='all', axis=0)).unstack(['reg', 'tec']).T.plot(kind='bar', stacked=True)
-
+        log.info('100% market share of BEVs is not achieved in any scenario')
 
 # Export potentially helpful output for analyzing across scenarios
 if export:
     print('\n ********** Exporting cross-experiment results to pickle and Excel ************** \n')
-    with open('overview_run_' + now + '.pkl', 'wb') as f:
-        pickle.dump([shares_2030, shares_2050, add_share, stock_comp, full_BEV_yr_df, scenario_totcs], f)
+    pickle_name = 'overview_run_' + now + '.pkl'
+    with open(pickle_name, 'wb') as f:
+        pickle.dump([shares_2030, shares_2050, add_share, stock_comp, full_BEV_yr_df, totc_df], f)
 
-    """with open('run_2019-09-22T14_50.pkl','rb') as f:
-        d=pickle.load(f)
-    d[0][run_id_list[0]].add_share"""
-    """
-    "with open(os.path.join(os.path.curdir, 'Run_2020-09-02T22_57', 'run_run_def_baseline_def_def_def_def_def_iTEM2-Base2020-09-02T22_57.pkl','rb') as f:
-        fm=pickle.load(f)
-    """
-    print('Exporting to Excel')
-    with pd.ExcelWriter('cumulative_scenario_output'+now+'.xlsx') as writer:
+    excel_name = 'cumulative_scenario_output'+now+'.xlsx'
+    with pd.ExcelWriter(excel_name) as writer:
         shares_2030.to_excel(writer,sheet_name='tec_shares_in_2030')
         shares_2050.to_excel(writer,sheet_name='tec_shares_in_2050')
         add_share.to_excel(writer,sheet_name='add_shares')
         stock_comp.to_excel(writer,sheet_name='total_stock')
-        full_BEV_yr.to_excel(writer,sheet_name='1st_year_full_BEV')
-        scenario_totcs.to_excel(writer,sheet_name='totc')
+        full_BEV_yr_df.to_excel(writer,sheet_name='1st_year_full_BEV')
+        totc_df.to_excel(writer,sheet_name='totc')
 
+    log.info(f'Exported cross-experiment results to {pickle_name} and {excel_name}')
 
 # Close logging handlers
 for handler in log.handlers:
     handler.close()
-#os.remove(fp+'\failed.txt')
-
-
-#        bounds = ['high','baseline','low']
-
-#    for element in itertools.product(experiment_list,bounds):
-#        fleet = fleet_model.FleetModel()
-
-#    for experiment in experiment_list:
-#        keeper
-#        for i, bound in enumerate(bounds):
-#            keeper[i] = + bound

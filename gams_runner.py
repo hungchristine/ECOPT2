@@ -12,22 +12,14 @@ import os
 import logging
 import shutil
 import traceback
-from pathlib import Path
-import sys
 import glob
 import pandas as pd
 import numpy as np
-from scipy.stats import norm
 
-import seaborn
-from datetime import datetime
-
-import itertools
 
 import gams
 import gmspy
 
-import fleet_model
 log = logging.getLogger(__name__)
 
 class GAMSRunner:
@@ -48,28 +40,30 @@ class GAMSRunner:
         Options for GAMS run
     db : gams.GamsDatabase
         Database containing all GAMS symbols for experiment
+    ms: int
+        model solve state from GAMS
+    ss: int
+        solution solve state from GAMS
 
     Methods
     -------
+    _load_input_to_GAMS
+        Utility method to load input to GAMS workspace and create .gdx file
     get_output_from_GAMS(gams_db, output_var)
         Load output from GAMS .gdx file
-    update_fleet(fleet)
-        Update FleetModel instantiation with results from GAMS run. Redundant with fleet.read_gams_db?
     run_GAMS(fleet, run_tag, filename)
-        Load input and run  experiment in GAMS
+        Run experiment in GAMS
     """
 
     def __init__(self, fp):
         """Initialize GAMS workspace for set of experiments."""
         self.current_path = os.path.dirname(os.path.realpath(__file__))
-        self.export_fp = fp #os.path.join(self.current_path, 'Model run data')
+        self.export_fp = fp
         self.ws = gams.GamsWorkspace(working_directory=self.current_path, debug=2)
         # gams.execution.SymbolUpdateType = 1  # if record does not exist, use values from instantiation
 
-    def _load_input_to_gams(self, fleet, filename, timestamp):
-        # will become unnecessary as we start calculating/defining sets and/or parameters within the class
-        """
-        Create input gdx file for GAMS experiment.
+    def _load_input_to_GAMS(self, fleet, filename, timestamp):
+        """Create input gdx file for GAMS experiment.
 
         Add database to workspace, update FleetModel, then load database with
         experiment parameters.
@@ -77,18 +71,16 @@ class GAMSRunner:
         Parameters
         ----------
         fleet : FleetModel object
-                FleetModel containing run input.
+            FleetModel containing run input.
         filename : str
             YAML filename with scenario definition.
         timestamp : str
             Runtime ID for filenames.
 
-         Returns
+        Returns
         -------
         None.
-
         """
-
         try:
             if hasattr(self.db, 'name'):
                 print('\n Database exists, clearing values from previous run')
@@ -235,8 +227,9 @@ class GAMSRunner:
 
         """
         # Pass to GAMS all necessary sets and parameters
-        print('\n Loading data to GAMS database')
-        self._load_input_to_gams(fleet, filename, timestamp)
+        print('\n')
+        print('Loading data to GAMS database')
+        self._load_input_to_GAMS(fleet, filename, timestamp)
 
         # Run GAMS Optimization
         try:
@@ -252,10 +245,12 @@ class GAMSRunner:
             lst_fp = os.path.abspath(os.path.join(self.export_fp, 'EVD4EUR_A_' + run_tag + '.lst'))
             self.opt.set_output(lst_fp)
             self.opt.putdir = self.export_fp
-            # self.opt.defines["gdxincname"] = self.db.name  # for auto-loading of database in GAMS model
+            self.opt.defines["gdxincname"] = self.db.name  # for auto-loading of database in GAMS model
+
             print('\n' + f'Using input gdx file: {self.db.name}')
             print('Running GAMS model, please wait...')
             print('\n')
+
             model_run.run(gams_options=self.opt, databases=self.db)
 
             self.ms = model_run.out_db['ms'].find_record().value
@@ -298,12 +293,14 @@ class GAMSRunner:
             print('\n \n \n')
             log.info('Ran GAMS model: ' + fleet.gms_file)
 
+            # provide model solve report
             if self.ms in model_stat_dict.keys():
                 print(f'Model status: {self.ms}, {model_stat_dict[self.ms]}')
                 print(f'Solve status: {self.ss}, {solve_stat_dict[self.ss]}' + '\n')
-            gams_db = model_run.out_db
+
+            gams_db = model_run.out_db  # get the solution .gdx database
             export_model = os.path.join(self.export_fp, run_tag + '_solution.gdx')
-            gams_db.export(export_model)
+            gams_db.export(export_model)  # export the solution .gdx database
             print('\n')
             log.info(f'Completed export of solution database to {export_model}')
 
@@ -326,88 +323,25 @@ class GAMSRunner:
 
         except Exception as e:
             print('\n *****************************************')
-            log.error(f'ERROR in running model {fleet.gms_file}')
+            log.error(f'----- Error in running model {fleet.gms_file}')
             try:
                 exceptions = self.db.get_database_dvs()
                 if len(exceptions) > 0:
-                    print('GAMS database exceptions:')
-                    print(exceptions.symbol.name)
+                    log.error(f'----- GAMS database exceptions: \n{exceptions.symbol.name}')
                 else:
-                    print(e)
-                    print(traceback.format_exc())
+                    log.error(f'{e} \n {traceback.format_exc()}')
 
             except Exception as ee:
-                print('Error running GAMS model, no database')
-                print(ee)
+                log.error(f'----- Error running GAMS model, no database. \n {ee}')
 
         # Fetch model outputs and retrieve key values for scenario comparisons
         try:
             fleet.read_gams_db(gams_db)  # retrieve results from GAMS run (.gdx file)
         except Exception as e:
-            print('\n ******************************')
-            log.error(f'Error in reading GAMS database. {e}')
+            log.error(f'----- Error in reading GAMS database. {e}')
 
         try:
             fleet.import_model_results()  # load key results as FleetModel attributes
             log.info('Model results loaded to FleetModel object')
         except Exception as e:
-            print('\n ******************************')
-            log.error(f'Error in loading results from GAMS database to FleetModel object. {e}')
-
-        try:
-            fleet.LC_emissions_avg = [self.quality_check(fleet, i) for i in range(0, 28)]
-
-            add_gpby = fleet.stock_add.sum(axis=1).unstack('seg').unstack('tec')
-            fleet.add_share = add_gpby.div(add_gpby.sum(axis=1), axis=0)
-            fleet.add_share.dropna(how='all', axis=0, inplace=True) # drop production country (no fleet)
-
-            """ Export technology shares in 2030 to evaluate speed of uptake"""
-            fleet.shares_2030 = fleet.add_share.loc(axis=0)[:,'2030']
-            fleet.shares_2050 = fleet.add_share.loc(axis=0)[:,'2050']
-
-            """ Export first year of 100% BEV market share """
-            tec_shares = fleet.add_share.stack().stack().sum(level=['prodyear', 'tec','fleetreg'])
-            temp_full_year = ((tec_shares.unstack('fleetreg').loc(axis=0)[:, 'BEV']==1).idxmax()).tolist()
-            fleet.full_BEV_year = [int(i[0]) if int(i[0])>1999 else np.nan for i in temp_full_year]
-
-        except Exception as e:
-            print('\n ******************************')
-            log.error(f'Error in calculting scenario results. {e}')
-            try:
-                fleet.eq = fleet._e_dict['EQ_STCK_GRD']
-            except:
-                print('\n ******************************')
-                log.info('No equation EQ_STCK_GRD')
-
-
-    def quality_check(self, fleet, age=12):
-        """Test calculation for average lifetime vehicle (~12 years)."""
-        fleet.veh_oper_cint_avg = fleet.veh_oper_cint.index.levels[4].astype(int)
-        ind = fleet.veh_oper_cint.index
-        fleet.veh_oper_cint.index = fleet.veh_oper_cint.index.set_levels(ind.levels[4].astype(int), level=4) #set ages as int
-        fleet.veh_oper_cint.sort_index(level='age', inplace=True)
-        fleet.veh_oper_cint.sort_index(level='age', inplace=True)
-        fleet.veh_oper_cint_avg = fleet.veh_oper_cint.reset_index(level='age')
-        fleet.veh_oper_cint_avg = fleet.veh_oper_cint_avg[fleet.veh_oper_cint_avg.age<=age] # then, drop ages over lifetime
-        fleet.veh_oper_cint_avg = fleet.veh_oper_cint_avg.set_index([fleet.veh_oper_cint_avg.index, fleet.veh_oper_cint_avg.age])
-        fleet.veh_oper_cint_avg.drop(columns='age', inplace=True)
-        fleet.veh_oper_cint_avg = fleet.veh_oper_cint_avg.reorder_levels(['tec','enr','seg','fleetreg','age','modelyear','prodyear'])
-
-        fleet.avg_oper_dist = fleet.full_oper_dist.reset_index(level='age')
-        fleet.avg_oper_dist = fleet.avg_oper_dist.astype({'age': 'int32'})
-        fleet.avg_oper_dist = fleet.avg_oper_dist[fleet.avg_oper_dist.age <= age]  # again, drop ages over lifetime
-        fleet.avg_oper_dist = fleet.avg_oper_dist.set_index([fleet.avg_oper_dist.index, fleet.avg_oper_dist.age]) # make same index for joining with fleet.veh_oper_cint_avg
-        fleet.avg_oper_dist.drop(columns='age', inplace=True)
-        fleet.avg_oper_dist = fleet.avg_oper_dist.reorder_levels(['tec','enr','seg','fleetreg','age','modelyear','prodyear'])
-        fleet.d = fleet.avg_oper_dist.join(fleet.veh_oper_cint_avg, lsuffix='_dist')
-        fleet.d.columns=['dist','intensity']
-        fleet.op_emissions_avg = fleet.d.dist * fleet.d.intensity
-        fleet.op_emissions_avg.index = fleet.op_emissions_avg.index.droplevel(level=['enr']) # these columns are unncessary/redundant
-        fleet.op_emissions_avg.to_csv('op_emiss_avg_with_duplicates.csv')
-        fleet.op_emissions_avg = fleet.op_emissions_avg.reset_index().drop_duplicates().set_index(['tec','seg','fleetreg','age','modelyear','prodyear'])
-        fleet.op_emissions_avg.to_csv('op_emiss_avg_without_duplicates.csv')
-        fleet.op_emissions_avg = fleet.op_emissions_avg.sum(level=['tec','seg','fleetreg','prodyear']) # sum the operating emissions over all model years
-        fleet.op_emissions_avg = fleet.op_emissions_avg.reorder_levels(order=['tec','seg','fleetreg','prodyear']) # reorder MultiIndex to add production emissions
-        fleet.op_emissions_avg.columns = ['']
-        return fleet.op_emissions_avg.add(fleet.veh_prod_cint, axis=0)
-
+            log.error(f'----- Error in loading results from GAMS database to FleetModel object. {e}')

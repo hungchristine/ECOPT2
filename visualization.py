@@ -12,11 +12,9 @@ from matplotlib import cm
 from matplotlib.colors import LinearSegmentedColormap, ListedColormap
 from matplotlib.ticker import (MultipleLocator, IndexLocator, IndexFormatter, PercentFormatter)
 from matplotlib.patches import Patch
-import matplotlib.patheffects as pe
 import numpy as np
 from cycler import cycler
 
-# import seaborn
 from matplotlib.backends.backend_pdf import PdfPages
 import os
 import itertools
@@ -48,13 +46,13 @@ tec_cm_blue = LinearSegmentedColormap.from_list('tec', ['xkcd:dark grey blue', '
 tec_cm_blue = cm.get_cmap(tec_cm_blue, 5)
 tec_cm4 = ListedColormap(np.vstack((tec_cm(np.linspace(0, 1, 5)),
                                      tec_cm_blue(np.linspace(0, 1, 5)))), name='tec')
-#tec_cm = LinearSegmentedColormap.from_list('tec',['xkcd:aubergine', 'lavender'])
 
 hatch = ['','/','.','|','x','-']
 
 #%% Helper functions
 def plot_arrange(fleet):
     """Figure out subplot arrangement based on number of regions."""
+
     ord_reg = [reg for reg in fleet.sets.reg]
     cat_type = CategoricalDtype(categories = ord_reg, ordered=True)
 
@@ -74,10 +72,13 @@ def plot_arrange(fleet):
             empty_spots = (plt_array[0] * plt_array[1]) - len(ord_fleetreg)
     return plt_array, empty_spots, cat_type
 
+
 def remove_subplots(ax, empty_spots):
     """Remove extra (empty) subplots from layout."""
+
     for i in range(empty_spots):
         ax[-1, -1+i].remove()  # remove from bottom row, rightmost subplot first
+
 
 def fix_age_legend(ax, pp, cropx, max_year, title='Vehicle ages'):
     """Customize legend formatting for stock figures."""
@@ -101,8 +102,10 @@ def fix_age_legend(ax, pp, cropx, max_year, title='Vehicle ages'):
     if cropx and ax.get_xlim()[1] == 80:
         ax.set_xlim(right=max_year)
 
+
 def plot_subplots(fig, axes, grouped_df, title, labels=None, cmap='jet', xlabel='year'):
-    """Plotting of input parameters by segment."""
+    """Plot input parameters by segment."""
+
     for (key, ax) in zip(grouped_df.groups.keys(), axes.flatten()):
         d = grouped_df.get_group(key)
         if d.index.nlevels == 3:
@@ -140,9 +143,28 @@ def plot_subplots(fig, axes, grouped_df, title, labels=None, cmap='jet', xlabel=
 
 
 def sort_ind(ind, cat_type, fleet):
+    """Sort Index by region.
+
+    Parameters
+    ----------
+    ind : pd.Index or pd.MultiIndex
+        Index to sort.
+    cat_type : CategoricalDType
+        Ordered CategoricalDType to use as sort pattern.
+    fleet : FleetModel
+        FleetModel instantiation.
+
+    Returns
+    -------
+    ind : pd.Index or pd.MultiIndex
+        Reordered index.
+
+    """
     if isinstance(ind, pd.MultiIndex):
         # TODO: fix for multiindex - making one level categorical does not fix the order of elements in that level
         #  maybe need to rebuild the index from scratch after converting to categorical?
+
+        # find levels with reg or fleetreg
         for i, lvl in enumerate(ind.levels):
             if (ind.levels[i].name == 'reg') or (ind.levels[i].name == 'fleetreg'):
                 lvl_num = i
@@ -195,15 +217,18 @@ def fix_tuple_axis_labels(fig, axes, axis_label, label_level=1, isAxesSubplot=Fa
         for ax in axes:
             reduce_tuple(ax)
 
+
 def get_ref_ax(axes):
     if axes.ndim == 2:
         return axes[0,-1]
     elif axes.ndim == 1:
         return axes[-1]
 
+
 def flip(items, ncol):
     """Make legend entries fill by row rather than columns."""
     return itertools.chain(*[items[i::ncol] for i in range(ncol)])
+
 
 def trunc_colormap(cmap, min_val=0, max_val=1, n=50):
     """
@@ -253,9 +278,7 @@ def vis_GAMS(fleet, fp, filename, param_values, export_png, export_pdf=True, max
     suppress_vis : bool, optional
         Turn off interactive mode for pyplot. The default is False.
     """
-    # TODO: split into input/output visualization; add plotting of CO2 and stocks together
 
-    os.chdir(fp)
     pp = PdfPages('output_vis_' + filename + '.pdf')
     plt.rcParams.update({'figure.max_open_warning': 0})  # suppress max 20 figures warning
     if suppress_vis:
@@ -272,13 +295,6 @@ def vis_GAMS(fleet, fp, filename, param_values, export_png, export_pdf=True, max
         for i, (key, value) in enumerate(param_values.items()):
             plt.text(0.05, 0.85-i*(0.05), key, fontsize=14)
             plt.text(0.15, 0.85-i*(0.05), str(value), fontsize=14)
-        "df_param = pd.DataFrame.from_dict(param_values)"
-        "df_param = df_param.T"
-
-        # param_table = plt.table(cellText=df_param.values, colLabels=['scenario \n name', 'values'], rowLabels=df_param.index, colWidths=[0.1, 0.9], cellLoc='left', loc=8)
-        # param_table.auto_set_font_size(False)
-        # param_table.set_fontsize(14)
-        # param_table.scale(1, 2.5)
         export_fig(ax, pp, export_pdf, export_png, 'tec-seg-cohort')
     else:
         print('Could not make parameter table in export PDF')
@@ -366,21 +382,13 @@ def vis_GAMS(fleet, fp, filename, param_values, export_png, export_pdf=True, max
             ax.xaxis.set_major_locator(IndexLocator(10, 0))
             ax.xaxis.set_tick_params(rotation=45)
 
-        # plot_subplots(tmp, 'Stock additions, by segment, technology and region', ['BEV', 'iCEV'])
-        # (fleet.stock_add.sum(axis=1).unstack('seg').unstack('tec').groupby(['reg']).plot(kind='area', cmap=paired, title=f'Stock additions, by segment, technology and region')
         fix_tuple_axis_labels(fig, axes, 'year')
         remove_subplots(axes, empty_spots)
-        # axes[1, 2].remove()  # remove 6th subplot
 
         ref_ax = get_ref_ax(axes)
         fix_age_legend(ref_ax, pp, cropx, max_year, 'Vehicle technology and segment')
         fig.text(0, 0.5, f'Vehicles added to stock \n {units} of vehicles', rotation='vertical', ha='center', va='center')
 
-        # ax.set_ylabel(f'Vehicles added to stock \n {units} of vehicles')
-        # if fleet.stock_add.sum(axis=1).max() > 1e6:
-        #     ymax = np.ceil((fleet.stock_add.sum(axis=1)).max() / 1e6)
-        # else:
-        #     ymax = np.ceil((fleet.stock_add.sum(axis=1)).max())
         plt.ylim(bottom=0)
 
         fig.suptitle('Stock additions, by segment, technology and region', y=0.995)
@@ -454,10 +462,8 @@ def vis_GAMS(fleet, fp, filename, param_values, export_png, export_pdf=True, max
 
     #%% Segment shares of BEVs by region
     """--- Plot market share of BEVs by segment and region ---"""
-    # TODO: check if this calculation is correct (cross-check from first principles)
     try:
         fig, axes = plt.subplots(plt_array[0], plt_array[1], sharex=True, sharey=True)
-        # tmp = (fleet.add_share.div(fleet.add_share.sum(axis=1, level=['seg']), axis=1, level=['seg','reg']))
 
         tmp = fleet.add_share.div(fleet.add_share.sum(axis=1, level='seg'), axis=1, level='seg')
         tmp = tmp.drop('ICE', axis=1, level='tec')
@@ -997,7 +1003,7 @@ def vis_GAMS(fleet, fp, filename, param_values, export_png, export_pdf=True, max
         new_labels = []
         for label in labels:
             new_labels.append(str(label)[1:-3].replace(",", "").replace("'","").capitalize())
-        new_labels[0] = f'Total primary material available'
+        new_labels[0] = 'Total primary material available'
 
         # rearrange legend entries
         label_order = [1, 2, 0]
@@ -1006,7 +1012,7 @@ def vis_GAMS(fleet, fp, filename, param_values, export_png, export_pdf=True, max
 
         axes[-1].legend(handles, new_labels, loc=2, bbox_to_anchor=(0, -0.7, 1, 0.2),
                         ncol=2, mode='expand', borderaxespad=0, handlelength=3,
-                       title=f'Material source used for stock additions')
+                       title='Material source used for stock additions')
 
         plt.xlabel('year', fontsize=10)
         plt.xticks(fontsize=10)
@@ -1117,8 +1123,7 @@ def vis_GAMS(fleet, fp, filename, param_values, export_png, export_pdf=True, max
 
     #%%  Input parameter checking
 def vis_input(fleet, fp, filename, param_values, export_png, export_pdf=True, max_year=50, cropx=False, suppress_vis=False):
-    """
-    Visualize model results and input.
+    """Visualize model results and input.
 
     Parameters
     ----------
@@ -1141,9 +1146,8 @@ def vis_input(fleet, fp, filename, param_values, export_png, export_pdf=True, ma
     suppress_vis : bool, optional
         Turn off interactive mode for pyplot. The default is False.
     """
-    # TODO: split into input/output visualization; add plotting of CO2 and stocks together
-    """--- Divider page for input parameter checking ---"""
 
+    """--- Cover page for input parameter checking ---"""
     os.chdir(fp)
     pp = PdfPages('input_params_vis_' + filename + '.pdf')
     plt.rcParams.update({'figure.max_open_warning': 0})  # suppress max 20 figures warning
@@ -1512,7 +1516,6 @@ def vis_input(fleet, fp, filename, param_values, export_png, export_pdf=True, ma
 
     pp.close()
     plt.show()
-#        plt.clf()
 
     """For later: introduce figure plotting vehicle stock vs emissions"""
 

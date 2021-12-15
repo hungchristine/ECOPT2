@@ -5,11 +5,9 @@ There is nothing very special here. All based on (as of 2019-04-23):
 
 """
 
-import numpy as np
 import pandas as pd
 import gams
 import warnings
-from gams import *
 
 def list2set(db, var, name, comment='', verbose=True):
     """

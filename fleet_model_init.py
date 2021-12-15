@@ -1,8 +1,10 @@
 # -*- coding: utf-8 -*-
+
 """
-This file contains the definition of three dataclasses: SetsClass,
-ParametersClass and RawDataClass.  The former two caontain the sets and
-parameters forwarded to GAMS, respectively. RawDataClass contains the
+Defines three dataclasses: SetsClass, ParametersClass and RawDataClass.
+
+The SetsClass and ParametersClass contain the sets and parameters
+forwarded to GAMS, respectively. RawDataClass contains the
 intermediate data used to calculate parameters.
 """
 
@@ -84,15 +86,36 @@ class SetsClass:
 
     @classmethod
     def from_yaml(cls, filepath):
-        print('do_stuff')
+        """Read user-defined sets and indices from YAML file.
+
+        Sets and their indices are to be saved as dicts in YAML.
+        Dict keys must match SetsClass field names.
+
+        Parameters
+        ----------
+        filepath : str
+            Filepath to YAML file containing user-defined sets and indices as dicts.
+
+
+        Returns
+        -------
+        SetsClass
+            Initialized SetsClass from YAML file.
+        """
+
+        with open(filepath, 'r') as stream:
+            try:
+                sets = yaml.safe_load(stream)
+                return cls(**sets)
+            except Exception as e:
+                log.error(f'Could not load sets from YAML. \n{e}')
 
     @classmethod
     def from_excel(cls, filepath, sheet=0):
-        """
-        Read user-defined sets and indices from Excel Worksheet.
+        """Read user-defined sets and indices from Excel Worksheet.
 
-        The first row of the sheet is assumed to be the set names,
-        with the valid index values below
+        The first row of the sheet is assumed to be the set names, which must
+        match the SetsClass field names, with the valid index values below
 
         Parameters
         ----------
@@ -107,6 +130,7 @@ class SetsClass:
         SetsClass
             Initialized SetsClass from Excel file.
         """
+
         # list of sets required in Excel file for initialization
         set_list = ['tec', 'newtec', 'enr', 'seg', 'mat_cat',
                     'reg', 'fleetreg',
@@ -127,7 +151,7 @@ class SetsClass:
             log.warning(f'Set(s) {err} not found in Excel file')
 
         # generate dict of sets (remove nan from dataframe due to differing set lengths)
-        mat_dict = {}
+        mat_dict = {}  # special case for materials
         mat_checklist = all_sets['mat_cat'].dropna(how='all', axis=0).values  # used to validate materials
         sets_dict = {}
         for ind in all_sets.columns:
@@ -147,14 +171,14 @@ class SetsClass:
 
         # validate initialization period and optimization period
         if len(set(sets_dict['inityear']).intersection(set(sets_dict['optyear']))):
-            log.warning('Overlap in inityear and optyear members. May result in infeasibility.')
+            log.warning('---- Overlap in inityear and optyear members. May result in infeasibility.')
 
         return cls(**sets_dict)
 
 
 @dataclass
 class RawDataClass:
-    """ Contains any raw data used to further calculate or construct parameters.
+    """Contains any raw data used to further calculate or construct parameters.
 
     Converts e.g., dicts and floats to timeseries in pd.Series format
     """
@@ -182,15 +206,6 @@ class RawDataClass:
     tec_add_gradient: float = 0.2
 
     enr_glf_terms: pd.Series= None
-
-    # enr_cint_src: str = os.path.join('Data','load_data','el_footprints_pathways.csv')
-
-    @classmethod
-    def from_dict(cls, src_dict:Dict):
-        return cls(**src_dict)
-
-    #TODO: move the operations from fleet_model here; calculation of veh_partab, glf terms, etc etc
-
 
 @dataclass
 class ParametersClass:
@@ -246,6 +261,7 @@ class ParametersClass:
         ParametersClass
             Initialized ParametersClass object.
         """
+
         return cls(**experiment)
 
     @classmethod
@@ -271,6 +287,7 @@ class ParametersClass:
             Initialized collection of parameters.
 
         """
+
         if filepath.endswith('xlsx') or filepath.endswith('.xls'):
             return cls.from_excel(filepath, experiment)
         elif filepath.endswith('yml') or filepath.endswith('.yaml'):
@@ -348,13 +365,15 @@ class ParametersClass:
                    'veh_factors': ['veheq', 'tec', 'seg'],
                    'enr_veh': ['enr', 'tec'],
                    'veh_pay': ['cohort', 'age', 'year'],
-                   'enr_cint': ['fleetreg', 'enr']
+                   'enr_cint': ['fleetreg', 'enr'],
                    }
         # read parameter values in from Excel
         params_dict = {}
         raw_data_dict = {}
+
         # by default, skip first row, assume single index/column headers
         # MultiIndex cases fixed later in FleetModel object
+        log.info('Loading parameter values from Excel...')
         all_params = pd.read_excel(filepath, sheet_name=None, skiprows=[0], header=[0])
         param_attrs = [f.name for f in fields(cls)]
         for param, value in all_params.items():
@@ -378,8 +397,11 @@ class ParametersClass:
                 if param.lower() in param_attrs:
                     params_dict[param.lower()] = value
                 else:
+                    # any sheets in Excel that are not ParameterClass fields are sent to RawDataClass
                     raw_data_dict[param.lower()] = value
+
         # add user-specified values in experiment dict to params_dict and raw_data_dict
+        # add experiment values and override duplicate entries with experiment values
         for exp_param, value in experiment.items():
             # separate ready-to-go parameters from intermediate data
             if exp_param in param_attrs:
@@ -387,9 +409,8 @@ class ParametersClass:
             else:
                 raw_data_dict[exp_param] = value
 
-        # add experiment values and override duplicate entries with experiment values
         my_obj = cls(**params_dict)
-        my_obj.raw_data = RawDataClass.from_dict(raw_data_dict)
+        my_obj.raw_data = RawDataClass(**raw_data_dict)
 
         return my_obj
 
@@ -408,33 +429,25 @@ class ParametersClass:
         Returns
         -------
         None.
-
         """
+
         attrs = dir(self.raw_data)
 
         if (self.veh_oper_dist is not None) and (self.raw_data.pkm_scenario is not None):
-            log.warning('Vehicle operating distance over specified. Both an annual vehicle mileage and an IAM scenario are specified.')
-        # self.build_veh_pay()  # establish self.veh_pay
-
-        if (self.raw_data.B_term_prod) and (self.raw_data.B_term_oper_EOL) and (self.raw_data.r_term_factors) and (self.raw_data.u_term_factors):
-            # TODO: check either the above terms exist, or that there is already a veh_partab in the excel file
-            # B_term_prod
-            # B_term_oper_EOL
-            # r_term_factors
-            # u_term_factors
-            # self.build_BEV()
-            # self.veh_partab = self.raw_data.veh_factors.copy()
+            log.warning('----- Vehicle operating distance overspecified. Both an annual vehicle mileage and an IAM scenario are specified.')
 
             self.veh_partab = self.build_veh_partab()
 
         if self.raw_data.eur_batt_share:
-            # multiply manufacturing constraint, critical material supply by eur_batt_share
+            # multiply manufacturing constraint and critical material supply by eur_batt_share
+            # allows e.g., expressing constraints as global values, with a regional market share
             self.virg_mat_supply *= self.raw_data.eur_batt_share
             self.manuf_cnstrnt *= self.raw_data.eur_batt_share
 
-        if isinstance(self.veh_oper_dist, float) or isinstance(self.veh_oper_dist, int):
+        # TODO: expand veh_oper_dist to be tec and reg specific (also in GAMS)
+        if isinstance(self.veh_oper_dist, (float, int)):
             # calculate veh_oper_dist
-            # given a single value for veh_oper_dist, assumes that value applies for every region and year
+            # given a single value for veh_oper_dist, assumes that value applies for every region, year and technology
             self.veh_oper_dist = pd.Series([self.veh_oper_dist for i in range(len(sets.modelyear))], index=sets.modelyear)
             self.veh_oper_dist.index.name = 'year'
         elif isinstance(self.veh_oper_dist, list) or isinstance(self.veh_oper_dist, dict) or isinstance(self.veh_oper_dist, pd.DataFrame):
@@ -456,7 +469,6 @@ class ParametersClass:
             self.raw_data.fleet_vkm  = self.raw_data.passenger_demand / self.raw_data.occupancy_rate
             self.raw_data.fleet_vkm.index = sets.modelyear
             self.raw_data.fleet_vkm.index.name = 'year'
-            self.veh_oper_dist = self.raw_data.fleet_vkm / self.veh_stck_tot.T.sum()  # assume uniform distribution of annual distance travelled vs vehicle age and region
             if self.veh_oper_dist.mean() > 25e3:
                 log.warning('Warning, calculated annual vehicle mileage is above 25000 km, check fleet_km and veh_stck_tot')
 
@@ -491,7 +503,6 @@ class ParametersClass:
             self.enr_cint = self.enr_cint.to_frame()
             self.enr_cint.dropna(how='all', axis=0, inplace=True)
 
-        # if (isinstance(self.raw_data.tec_add_gradient, float) or isinstance(self.raw_data.tec_add_gradient, int)) and (self.veh_add_grd is None):
         if (isinstance(self.raw_data.tec_add_gradient, float)) and (self.veh_add_grd is None):
             self.veh_add_grd = {}
             for element in product(*[sets.grdeq, sets.tec]):
@@ -513,11 +524,10 @@ class ParametersClass:
 
         Returns
         -------
-        None.
+        index: pd.DataFrame
+            Correspondence between current year, cohort and age
 
         """
-        # get this from parameters.py
-        # self.veh_pay = stuff
 
         top_year = int(sets.optyear[-1])
         start_year = int(sets.inityear[0])
@@ -597,7 +607,7 @@ class ParametersClass:
 
         """
         # TODO: separate A-terms for battery and rest-of-vehicle and apply different b-factors
-        #  TODO: allow for series of B-term values
+        # TODO: allow for series of B-term values
 
         # Fetch sigmoid A terms from RawDataClass
         self.raw_data.veh_factors.columns.names = ['comp']
@@ -680,10 +690,8 @@ class ParametersClass:
         self.veh_lift_cdf = pd.Series(norm.cdf(sets.age_int, self.raw_data.veh_avg_age, self.raw_data.veh_age_stdev), index=sets.age)
         self.veh_lift_cdf.index = self.veh_lift_cdf.index.astype('str')
 
-        # self.veh_lift_age = pd.Series(1 - self.veh_lift_cdf)
         # Calculate normalized survival function
         self.veh_lift_age = pd.Series(self.calc_steadystate_vehicle_age_distributions(sets.age_int, self.raw_data.veh_avg_age, self.raw_data.veh_age_stdev), index=sets.age)
-        # self.veh_lift_pdf = pd.Series(self.calc_steadystate_vehicle_age_distributions(sets.age_int, self.raw_data.veh_avg_age, self.raw_data.veh_age_stdev), index=sets.age)
         self.veh_lift_sc = pd.Series(norm.sf(sets.age_int, self.raw_data.veh_avg_age, self.raw_data.veh_age_stdev), index=sets.age)
         self.veh_lift_pdf = pd.Series(norm.pdf(sets.age_int, self.raw_data.veh_avg_age, self.raw_data.veh_age_stdev), index=sets.age)
 
@@ -691,6 +699,7 @@ class ParametersClass:
 
         self.veh_lift_mor = pd.Series(self.calc_probability_of_vehicle_retirement(sets.age_int, self.veh_lift_age), index=sets.age)
         self.veh_lift_mor.index = self.veh_lift_mor.index.astype('str')
+
 
     def calc_steadystate_vehicle_age_distributions(self, ages, average_expectancy=10.0, standard_dev=3.0):
         """
@@ -753,7 +762,7 @@ class ParametersClass:
 
         # The total (100%) minus the cumulation of all the cars retired by the time they reach a certain age
         h = 1 - norm.cdf(ages, loc=average_expectancy, scale=standard_dev)
-        # h = 1 - veh_lift_cdf()
+
         # Normalize to represent a _fraction_ of the total fleet
         q = h / h.sum()
         return q
@@ -847,8 +856,8 @@ class ParametersClass:
         Construct DataFrame based on energy carbon intensities time series.
 
         Interpolate output from electricity carbon intensities (in decades)
-        for annual time-step resolution. Set up DataFrame for GAMS database
-        insertion.
+        for annual time-step resolution. Also sets up DataFrame for GAMS
+        database insertion.
 
         Returns
         -------
@@ -886,60 +895,26 @@ class ParametersClass:
         None.
 
         """
-        # TODO: move conversion of list to dict to post_init?
+
         if isinstance(self.veh_stck_int_seg, list):
             # convert to dict with explicit connection to segments
             self.veh_stck_int_seg = {seg: share for seg, share in zip(sets.seg, self.veh_stck_int_seg)}
         if isinstance(self.veh_stck_int_seg, dict):
             if sum(self.veh_stck_int_seg.values()) != 1:
                 print('\n *****************************************')
-                log.warning('Vehicle segment shares (VEH_STCK_INT_SEG) do not sum to 1!')
         if (isinstance(self.veh_stck_int_tec, list) or isinstance(self.veh_stck_int_tec, pd.Series)):
             tec_sum = sum(self.veh_stck_int_tec)
         elif (isinstance(self.veh_stck_int_tec, dict)):
             tec_sum = sum(self.veh_stck_int_tec.values())
         else:
             print('\n *****************************************')
-            log.warning(f'veh_stck_int_tec is an invalid format. It is {type(self.veh_stck_int_tec)}; only dict or list allowed')
-            # print(w)
+            log.warning(f'----- veh_stck_int_tec is an invalid format. It is {type(self.veh_stck_int_tec)}; only dict or list allowed')
             tec_sum = np.nan
         if tec_sum != 1:
             print('\n *****************************************')
-            log.warning('Vehicle powertrain technology shares (VEH_STCK_INT_TEC) do not sum to 1!')
-
+            log.warning('----- Vehicle powertrain technology shares (VEH_STCK_INT_TEC) do not sum to 1!')
             print(self.veh_stck_int_tec)
         if any(v is None for k, v in self.__dict__.items()):
             missing = [k for k, v in self.__dict__.items() if v is None]
             print('\n *****************************************')
-            log.warning(f'The following parameters are missing values: {missing}')
-
-
-
-    # @staticmethod
-    # def check_sum(it):
-    #     """
-
-
-    #     Parameters
-    #     ----------
-    #     it : list or dict
-    #         iterable of values to check sum of.
-
-    #     Returns
-    #     -------
-    #     None.
-
-    #     """
-    #     if isinstance(it, list):
-
-    #     return True
-    #     return False
-        # Check all regions are populated
-        # Check all vehicles are populated
-        # Shares sum to 1
-        #
-
-@dataclass
-class VariablesClass:
-    answer1: list = None
-    answer2: list = None
+            log.warning(f'----- The following parameters are missing values: {missing}')

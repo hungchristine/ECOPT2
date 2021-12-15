@@ -12,26 +12,18 @@ import traceback
 import pandas as pd
 import numpy as np
 from scipy.stats import norm
-import matplotlib
-import matplotlib.pyplot as plt
-from matplotlib import cm
-from matplotlib.colors import LinearSegmentedColormap, ListedColormap
-from matplotlib.ticker import (MultipleLocator, IndexLocator, IndexFormatter)
 
-# import seaborn
-from matplotlib.backends.backend_pdf import PdfPages
 from datetime import datetime
-
-import itertools
 
 import gams
 import gmspy
 from fleet_model_init import SetsClass, ParametersClass
 
 log = logging.getLogger(__name__)
+
+
 class FleetModel:
-    """
-    Instance of a fleet model experiment.
+    """Instance of a fleet model experiment.
 
     Contains all input to GAMS, stores all results from GAMS, and performs
     visualization of inputs and results.
@@ -91,8 +83,7 @@ class FleetModel:
                  data_from_message=None,
                  gdx_file=None
                  ):
-        """
-        Initialize with experiment values.
+        """Initialize with experiment values.
 
         If .gdx filepath given, intialize from gdx, otherwise, initialize from YAML file.
 
@@ -115,11 +106,9 @@ class FleetModel:
         -------
         None.
         """
-
         # Instantiate filepaths
         self.home_fp = os.path.dirname(os.path.realpath(__file__))
 
-#       self.gdx_file = 'C:\\Users\\chrishun\\Box Sync\\YSSP_temp\\EVD4EUR_input.gdx'#EVD4EUR_ver098.gdx'  # for reading in inputs from gdx file
         self.gms_file = os.path.join(self.home_fp, r'EVD4EUR.gms') # GAMS model file
         self.import_fp = os.path.join(self.home_fp, r'GAMS_input_new.xls')
         self.export_fp = os.path.join(self.home_fp, r'Model run data')
@@ -153,11 +142,6 @@ class FleetModel:
         -------
         None.
         """
-        # battery_specs, fuelcell_specs and lightweighting are not (yet) in use
-        # self.battery_specs = pd.DataFrame() # possible battery_sizes (and acceptable segment assignments, CO2 production emissions, critical material content, mass)
-        # self.fuelcell_specs = pd.DataFrame() # possible fuel cell powers (and acceptable segment assignments, CO2 production emissions, critical material content, fuel efficiency(?), mass)
-        # self.lightweighting = pd.DataFrame() # lightweighting data table - lightweightable materials and coefficients for corresponding lightweighting material(s)
-
         if data_from_message is not None:
             # Not currently implemented
             self.el_intensity = data_from_message # regional el-mix intensities as time series from MESSAGE
@@ -198,27 +182,15 @@ class FleetModel:
 
         self.parameters.recovery_pct.index = self.parameters.recovery_pct.index.astype('str')
 
-        #TODO: remove hardcoding of European share
         self.parameters.virg_mat_supply.index = self.parameters.virg_mat_supply.index.astype('str')
         self.parameters.virg_mat_supply.columns = self.parameters.virg_mat_supply.columns.droplevel(['mat_cat'])
 
         # --------------- Expected GAMS Outputs ------------------------------
         self.totc = None
-        self.BEV_fraction = pd.DataFrame()
-        self.ICEV_fraction = pd.DataFrame()
-        self.BEV_ADD_blaaaah = pd.DataFrame()
         self.VEH_STCK = pd.DataFrame()
 
         log.info('Imported parameters')
-        """ experiment specifications """
-        self.recycling_losses = pd.DataFrame() # vector of material-specific recycling loss factors
-        self.fossil_scenario = pd.DataFrame() # adoption of unconventional sources for fossil fuel chain
-        self.hydrogen_scenario = pd.DataFrame()
 
-        self.battery_density = None # time series of battery energy densities
-        self.lightweighting_scenario = None # lightweighting scenario - yes/no (or gradient, e.g., none/mild/aggressive?)
-
-    @classmethod
     def _from_gdx(self, gdx_file):
         """
         Instantiate FleetModel object via an existing GAMS .gdx file.
@@ -337,10 +309,8 @@ class FleetModel:
                 try:
                     self._p_dict[p] = gmspy.param2df(p, db=gams_db)
                 except ValueError as e:
-                    # print('\n *****************************************')
                     log.error(f'p_dict ValueError in {p}. {e}')
                 except AttributeError:
-                    # print('\n *****************************************')
                     log.warning(f'p_dict AttributeError in {p}! Probably no records for this parameter.')
                     pass
                 except Exception as E:
@@ -359,11 +329,9 @@ class FleetModel:
                     self._v_dict[v] = gams_db[v].first_record().level
                 else:
                     log.error('-----  v_dict ValueError in {v}!')
-                    # print(f'Warning!: v_dict ValueError in {v}!')
                 pass
             except TypeError: # This error is specifically for seg_add
                 log.warning(f'----- v-dict TypeError in {v}! Probably no records for this variable.')
-                # print(f'-----Warning! v-dict TypeError in {v}! Probably no records for this variable.')
                 pass
             except Exception as E:
                 print(E)
@@ -380,12 +348,7 @@ class FleetModel:
                 else:
                     log.warning(f'-----  e_dict ValueError in {e}!')
             except:
-                print('*****************************************')
                 log.error(f'----- Error in {e}. {sys.exc_info()[0]}')
-
-                # print(f'-----Warning: Error in {e}')
-                # print(sys.exc_info()[0])
-                # print('\n')
                 pass
 
         log.info('Finished loading')
@@ -459,8 +422,7 @@ class FleetModel:
             self.mat_mix = self._v_dict['MAT_MIX']
             self.mat_co2 = self._v_dict['MAT_CO2']
         except Exception as e:
-            print('INFO: could not load material related variables. Check model.')
-            print(e)
+            log.warning(f'----- Error loading variables from .gdx. {e}')
 
         # Prepare model output dataframes for visualization
         self.stock_df = self._v_dict['VEH_STCK']
@@ -498,17 +460,8 @@ class FleetModel:
             self.bau_emissions = self._p_dict['BAU_EMISSIONS']
             self.bau_emissions.index.rename(['modelyear'], inplace=True)
 
-            # self.mat_req_virg = self._p_dict['MAT_REQ_VIRG']
-            # self.mat_req_virg = pd.concat([self.mat_req_virg], axis=1, keys=['primary'])
-            # self.mat_req_virg.where(cond=self.mat_req_virg>=0, other=np.nan, inplace=True)  # replace negative values with np.nan
-            # if self.mat_req_virg.isnull().sum().sum() > 0:
-            #     print('-----INFO: supply of secondary materials greater than demand of materials')
-            #     print('\n')
-            # self.mat_recycled = self._p_dict['MAT_RECYCLED']
-            # self.mat_recycled = pd.concat([self.mat_recycled], axis=1, keys=['recycled'])
             self.mat_demand = self._p_dict['MAT_REQ_TOT']
             self.mat_demand = pd.concat([self.mat_demand], axis=1, keys=['total'])
-            # self.resources_pp = pd.concat([self.mat_demand, self.mat_req_virg, self.mat_recycled], axis=1)
         except TypeError as e:
             log.warning(f"Could not find post-processing parameter(s). {e}")
 
@@ -540,6 +493,7 @@ class FleetModel:
     def figure_calculations(self):
         """
         Calculate lifecycle intensity by cohort for quality check.
+        """ Calculate lifecycle intensity by cohort for quality check.
 
         Calculate average operating emissions intensity by using total
         lifetime operating emissions by cohort, divided by original stock
@@ -547,18 +501,19 @@ class FleetModel:
 
         Returns
         -------
-        None.
+        Average lifecycle emissions.
         """
-        ####  Used by main.py to aggregate key indicators across experiments.
 
-        # Calculate operating emissions by cohort (i.e., prodyear)
+        """Test calculation for average lifetime vehicle (~12 years)."""
+     # Estimate operating emissions by cohort (i.e., prodyear)
         try:
+            # sum total operating emissions for each cohort, by region, technology and segment
             operation_em = self.veh_oper_cohort.sum(level=['prodyear', 'fleetreg', 'tec', 'seg']).sum(axis=1)
             operation_em.sort_index(axis=0, level=0, inplace=True)
             op = operation_em.loc['2000':'2050']
 
-            # Calculate stock
-            init_stock = self.veh_stck_add.loc(axis=1)[0]
+            # Calculate initial stock
+            init_stock = self.veh_stck_add.loc(axis=1)[0]  # retrieve all stock added (age=0) in cohort year
             init_stock.replace(0, np.nan)
             init_stock.dropna(axis=0, inplace=True)
             init_stock.index = init_stock.index.reorder_levels([3, 2, 0, 1])
@@ -567,5 +522,7 @@ class FleetModel:
             self.op_intensity = op / init_stock
             self.op_intensity.sort_index(inplace=True)
         except Exception as e:
-            print('\n *****************************************')
-            log.error(f'Error in calculating operating emissions by cohort. Perhaps post-processing parameters not loaded? {e}')
+            print('\n*****************************************')
+            log.error(f'----- Error in calculating operating emissions by cohort. Perhaps post-processing parameters not loaded? {e}')
+
+        return self.op_emissions_avg.add(self.veh_prod_cint, axis=0)
