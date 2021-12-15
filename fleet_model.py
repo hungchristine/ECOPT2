@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Created on Sun Apr 21 13:27:57 2019
 
@@ -46,34 +45,11 @@ class FleetModel:
     Methods
     -------
         read_gams_db()
-            description
+            Imports all entries in GAMS database
         import_model_results()
-            description
-        build_BEV()
-            description
-        BEV_weight()
-            description
-        build_veh_partab()
-            description
+            Import results from a .gdx file to FleetModel instance and cleans data for visualization
         figure_calculations()
-            DE
-
-    Placeholder methods
-    -------------------
-        read_all_sets()
-            DEPRECATED
-        get_output_from_GAMS()
-            DEPRECATED
-        calc_op_emissions()
-        calc_EOL_emissions()
-        calc_cint_operation()
-        calc_eint_oper()
-        calc_veh_mass()
-        vehicle_builder()
-        calc_crit_materials()
-        post_processing()
-        import_from_MESSAGE()
-        elmix()
+            Exports key indicators across experiments
     """
 
     def __init__(self,
@@ -155,16 +131,10 @@ class FleetModel:
         self.parameters.enr_veh = self._process_df_to_series(self.parameters.enr_veh)
         self.parameters.veh_pay = self._process_df_to_series(self.parameters.veh_pay)
 
-        # Temporary introduction of seg-specific VEH_PARTAB from Excel; will later be read in from YAML
-#        self.veh_partab = pd.DataFrame(pd.read_excel(self.import_fp,sheet_name = 'genlogfunc',usecols='A:G',index_col=[0,1,2],skipfooter=6)).stack()
         if type(self.parameters.raw_data.r_term_factors) == float:
             self.parameters.raw_data.r_term_factors = {'BEV': self.parameters.raw_data.r_term_factors, 'ICE': self.parameters.raw_data.r_term_factors}
         if type(self.parameters.raw_data.u_term_factors) == float or type(self.parameters.raw_data.u_term_factors) == int:
             self.parameters.raw_data.u_term_factors = {'BEV': self.parameters.raw_data.u_term_factors, 'ICE': self.parameters.raw_data.u_term_factors}
-
-        """# ACEA.be has segment division for Western Europe
-        # https://www.acea.be/statistics/tag/category/segments-body-country
-        # More detailed age distribution (https://www.acea.be/uploads/statistic_documents/ACEA_Report_Vehicles_in_use-Europe_2018.pdf)"""
 
         self.growth_constraint = 0  # growth_constraint
         self.gro_cnstrnt = [self.growth_constraint for i in range(len(self.sets.modelyear))]
@@ -197,7 +167,8 @@ class FleetModel:
 
         Use gmpsy module to retrieve set values from .gdx file. Load
         database using GAMS API, generate dicts containing parameter and
-        variable values, and assign to FleetModel attributes.
+        variable values, and assign to FleetModel attributes. Useful for
+        visualizing.
 
         Parameters
         ----------
@@ -208,7 +179,7 @@ class FleetModel:
         -------
         None.
         """
-        # TODO: generalize to allow loading input OR results .gdx
+
         # Build fleet object from gdx file (contains model inputs and outputs)
         # For visualization
 
@@ -234,8 +205,7 @@ class FleetModel:
 
         # Retrieve GAMS-calculated parameters and variables
         self.import_model_results()
-
-        log.info('Loaded FleetModel object from {gdx_file}')
+        log.info(f'Loaded FleetModel object from {gdx_file}')
 
 
     @staticmethod
@@ -476,13 +446,6 @@ class FleetModel:
         self.op_emissions = self.op_emissions.reorder_levels(order=['tec', 'seg', 'fleetreg', 'prodyear']) # reorder MultiIndex to add production emissions
 
         self.LC_emissions = self.op_emissions.add(self.veh_prod_cint)
-
-        add_gpby = self.stock_add.sum(axis=1).unstack('seg').unstack('tec')
-        self.add_share = add_gpby.div(add_gpby.sum(axis=1), axis=0)
-
-        # Export technology shares in 2030 to evaluate speed of uptake
-        self.shares_2030 = self.add_share.loc(axis=0)[:, '2030']
-        self.shares_2050 = self.add_share.loc(axis=0)[:, '2050']
 
         self.enr_cint = self._p_dict['ENR_CINT']
         self.enr_cint = self.enr_cint.stack()
