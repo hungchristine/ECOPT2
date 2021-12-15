@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Created on Thu Apr 25 17:26:23 2019
 
@@ -8,7 +7,7 @@ import logging
 import sys
 from importlib import reload
 reload(logging)  # override built-in logging config
-
+from enum import Enum
 
 from itertools import product
 from datetime import datetime
@@ -26,23 +25,10 @@ from fleet_model_init import SetsClass, ParametersClass
 import visualization as vis
 
 
-# Housekeeping: set up experiment options
-demo = True
-export = False  # export cross-scenario results
-visualize_input = False # visualize input factors for debugging
-
-# unit test consists of static LCA factors
-# (straight line in lieu of logistic function)
-if demo:
-    yaml_name = 'GAMS_input_demo'
-else:
-    # yaml_name = 'unit_test'
-    yaml_name = 'GAMS_input'
-
 # Make timestamp and directory for scenario run results for output files
 now = datetime.now().isoformat(timespec='minutes').replace(':', '_')  # timestamp for run IDs
 
-# Set up logging
+# Set up logging - both stream to console and to log file
 log_fp = os.path.join(os.path.curdir, 'output', now+'_log.log')
 formatter = logging.Formatter('%(levelname)s [%(name)s] - %(message)s')
 log = logging.getLogger()
@@ -56,17 +42,31 @@ stream_log.setFormatter(formatter)
 log.addHandler(file_log)
 log.addHandler(stream_log)
 
+# Housekeeping: set up experiment options of filepaths
+class Experiment(Enum):
+    """ Define experiment being run and therefore YAML input file name. """
 
-# Make output YAML less ugly, see https://stackoverflow.com/a/30682604
-yaml.SafeDumper.ignore_aliases = lambda *args: True
+    DEMO = 'GAMS_input_demo'
+    UNIT = 'unit_test' # unit test consists of static LCA factors # (straight line in lieu of logistic function)
+    NORMAL = 'GAMS_input'
 
-if 'unit_test' in yaml_name:
-    fp = os.path.join(os.path.curdir, 'output', 'unit_test_' + now)
+experiment_type = Experiment.DEMO # must be one of 'DEMO', 'UNIT', 'NORMAL'
+export = False  # whether to export cross-scenario results
+visualize_input = False # visualize input factors for debugging
+
+yaml_name = experiment_type.value
+
+if experiment_type == Experiment.UNIT:
+    fp = os.path.join(os.path.curdir, 'output', 'Unit_test_' + now)
+elif experiment_type == Experiment.DEMO:
+    fp = os.path.join(os.path.curdir, 'output','Demo_'+now)
 else:
     fp = os.path.join(os.path.curdir, 'output','Run_'+now)
 
 input_file = os.path.join(os.path.curdir, yaml_name + '.yaml')
 
+# Make output YAML less ugly, see https://stackoverflow.com/a/30682604
+yaml.SafeDumper.ignore_aliases = lambda *args: True
 
 try:
     os.mkdir(fp)
@@ -83,10 +83,6 @@ def run_experiment():
     parameter combinations)
 
     """
-    # Load parameter values for each experiment from YAML
-    # r'C:\Users\chrishun\Box Sync\YSSP_temp\temp_input.yaml'
-    # r'C:\Users\chrishun\Box Sync\YSSP_temp\temp_input_presubmission.yaml'
-#    with open(r'C:\Users\chrishun\Box Sync\YSSP_temp\GAMS_input.yaml', 'r') as stream:
 
     with open(input_file, 'r') as stream:
         try:
@@ -150,7 +146,7 @@ def run_experiment():
         run_id = f'{exp_id_list[i]}'
         run_id_list.append(run_id)
 
-        if demo:
+        if experiment_type == Experiment.DEMO:
             sets = SetsClass.from_file(os.path.join(os.path.curdir, 'data', 'sets_demo.xlsx'))
             params = ParametersClass.from_file(os.path.join(os.path.curdir, 'data', 'GAMS_input_demo.xlsx'), experiment=experiment)
         else:
