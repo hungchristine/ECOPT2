@@ -692,7 +692,7 @@ def vis_GAMS(fleet, fp, filename, param_values, export_png=False, export_pdf=Tru
         plot_stock_add = plot_stock_add.unstack(['tec', 'fleetreg']).droplevel(axis=1, level=0)
 
         plot_stock_add.plot(ax=ax, kind='area', cmap=tec_cm4, lw=0, legend=True, title='Stock additions by technology and region')
-        ax.set_xbound(0, 80)
+        ax.set_xbound(0, 50)
         ax.set_ybound(lower=0)
         # TODO: fix region order workaround
         # fix_age_legend(ax, pp, cropx, max_year, 'Vehicle technology and region')
