@@ -403,7 +403,7 @@ EQ_VIRG_MAT_SUPPLY(optyear,mat_prod)..                MAT_MIX(optyear, mat_prod)
 * incumbent technology excluded
 
 EQ_STCK_GRD(newtec,seg,fleetreg,modelyear)$(ord(modelyear)>card(inityear))..     VEH_STCK_ADD(newtec,seg,fleetreg,modelyear,new)
-    =l= ((1 + VEH_ADD_GRD('IND', newtec)) * VEH_STCK_ADD(newtec,seg,fleetreg,modelyear-1,new)) + SCALAR_CONST
+    =l= ((1 + VEH_ADD_GRD('IND', newtec)) * VEH_STCK_ADD(newtec,seg,fleetreg,modelyear-1,new)) + 100
 %SLACK_ADD% + SLACK_TEC_ADD(newtec,seg,fleetreg,modelyear,new)
 ;
 
