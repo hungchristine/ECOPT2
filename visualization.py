@@ -759,13 +759,17 @@ def vis_GAMS(fleet, fp, filename, param_values, export_png=False, export_pdf=Tru
 
             # plot use of materials
             plot_resources = fleet.resources.loc[:, (slice(None), resource)]
+            plot_resources.loc['2020'] = np.nan # add 2020 to properly align plots
+            plot_resources.sort_index(ascending=True, inplace=True)
             plot_resources.plot(ax=ax1, kind='area', lw=0, cmap='jet')
+
             plot_virg_mat = fleet.parameters.virg_mat_supply.filter(like=resource, axis=1)
             plot_virg_mat = plot_virg_mat.loc['2020':].sum(axis=1)
-            plot_virg_mat.plot(ax=ax1, kind='line')
+            plot_virg_mat.plot(ax=ax1, lw=4, kind='line', alpha=0.7)
 
             # plot fleet evolution
-            (fleet.stock_df_plot.sum(axis=1).unstack('seg').sum(axis=1).unstack('tec').sum(level='year')/1e6).loc['2020':].plot(ax=ax2, kind='area', cmap=tec_cm, lw=0)
+            fleet_evol = (fleet.stock_df_plot.sum(axis=1).unstack('seg').sum(axis=1).unstack('tec').sum(level='year')/1e6).loc['2020':]
+            fleet_evol.plot(ax=ax2, kind='area', cmap=tec_cm, lw=0)
 
             ax1.set_ylabel(f'{resource} used in new batteries \n {units} {resource}', fontsize=14)
             ax2.set_ylabel('Vehicles, millions', fontsize=14, labelpad=25)
@@ -809,6 +813,8 @@ def vis_GAMS(fleet, fp, filename, param_values, export_png=False, export_pdf=Tru
         gpby_class = {supp: mat for mat, li in fleet.sets.mat_prod.items() for supp in li}
 
         resource_use = fleet.resources * 1000 # convert to kg
+        resource_use.loc['2020'] = np.nan
+        resource_use.sort_index(ascending=True, inplace=True)
 
         # get total available primary supplies of each material category
         prim_supply = (fleet.parameters.virg_mat_supply.groupby(gpby_class, axis=1).sum() * fleet.parameters.raw_data.eur_batt_share)*1000 # priamry supply is in t
@@ -834,7 +840,7 @@ def vis_GAMS(fleet, fp, filename, param_values, export_png=False, export_pdf=Tru
 
             plot_resources.plot(ax=axes[i], kind='area', lw=0, stacked=True,
                                 cmap='jet', legend=False, alpha=0.9)
-            plot_prim_supply.plot(ax=axes[i], ls='-.', lw=2, color='deepskyblue')
+            plot_prim_supply.plot(ax=axes[i], ls='-.', lw=2, alpha=0.7)
 
             axes[i].set_title(f'{mat} used in new batteries',
                               fontsize=10, fontweight='bold')
