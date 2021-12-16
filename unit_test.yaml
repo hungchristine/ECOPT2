@@ -1,0 +1,70 @@
+veh_stck_int_seg:
+ def:
+  - 0.08
+  - 0.21
+  - 0.26
+  - 0.08
+  - 0.03
+  - 0.34 
+  
+tec_add_gradient:
+ def: 1.
+ 
+bev_capac:
+ baseline:
+  A: 17.6
+  B: 42.2
+  C: 42.2
+  D: 59.9
+  E: 75
+  F: 95
+  
+B_term_prod:
+ def:
+  PROD_EINT:
+   ICE: 
+    full_veh: 1
+   BEV: 
+    batt: 1
+    ROV: 1
+  PROD_CINT_CSNT: 
+   ICE: 
+    full_veh: 1
+   BEV:
+    batt: 1
+    ROV: 1
+
+B_term_oper_EOL: 
+ def: 
+  OPER_EINT:
+   ICE: 1
+   BEV: 1
+  EOLT_CINT:
+   ICE: 1
+   BEV: 1
+   
+r_term_factors:
+   def: 
+    BEV: 1
+    ICE: 1
+    
+u_term_factors:
+ def:
+  ICE: 2025
+  BEV: 2025
+
+ enr_partab:
+  def:
+   ELC:
+    A: 1
+    B: 1
+    r: 1
+    u: 2020
+   FOS:
+    A: 0.3
+    B: 1
+    r: 1
+    u: 2035
+
+eur_batt_share:
+ def: 1
