@@ -1,4 +1,4 @@
-***
+*
 * EVD4EUR Model
 * =============
 *
@@ -21,25 +21,22 @@ optyear(year)   years for optimization (2020-2050)
 inityear(year)  years for initialization (2000-2020)
 age             age of vehicle
 tec             technology - superset
-newtec(tec)    new technologies to replace incumbent
+newtec(tec)     new technologies to replace incumbent
 enr             energy carrier
 reg             region or country group - superset
 fleetreg(reg)   model regions of BEV operation
 seg             segment or size class
 mat_prod        producers or sources for all critical materials 
-mat_cat        critical material categories
+mat_cat         critical material categories
 sigvar          variables for sigmoid equations
 veheq           equations for vehicle parameters
 demeq           equations for demand parameters
 grdeq           parameters for gradient of change (fleet additions) - individual (IND) for each tech or related to all tech (ALL)
 mat(mat_cat, mat_prod)      critical material
-*    /
-*    Li.(Li1,Li2)
-*    Co.(Co1,Co2)
-*    /
 ;
+
 SINGLETON SETS
-new(age)
+new(age)        new vehicles (age 0)
 ;
 
 *---- ABBREIVATIONS USED *-----------------------------------------------------------------------------------
@@ -106,7 +103,7 @@ $macro genlogfnc(A,B,r,t,u) A + (B-A)/(1+exp(-r*(t-u)));
 ** (tau) u is time the of maximum gradient of Y
 *;
 *
-*
+
 PARAMETERS
 **-----------------------------------------------------------------------------------
 **
@@ -128,15 +125,18 @@ ENR_VEH(enr,tec)                     feasible combinations of vehicle technology
 
 ***All VEHICLES ----------------------------------------------------------------------
 
+CONST(seg,fleetreg)               Used as "seed" for additions to stock based on initial fleet size
+
 **PRODUCTION
 VEH_PROD_EINT(tec,seg,prodyear)        Electricity intensity of vehicle prod                [kwh el required per vehicle produced]
 VEH_PROD_CINT_CSNT(tec,seg,prodyear)   Constant term for CO2 int. of vehicle production     [t CO2-eq per vehicle produced]
 VEH_PROD_CINT(tec,seg,prodyear)        CO2 intensity of vehicle production                  [t CO2-eq per vehicle produced]
 
 **OPERATION
-VEH_OPER_EINT(tec,seg,prodyear)                               Energy intensity of vehicle operation   [kwh per km]
-VEH_OPER_CINT(tec,enr,seg,fleetreg,age,modelyear,prodyear)    CO2 intensity of vehicle operation     [t CO2 per km]
+VEH_OPER_EINT(tec,seg,prodyear)                               Energy intensity of vehicle operation     [kwh per km]
+VEH_OPER_CINT(tec,enr,seg,fleetreg,age,modelyear,prodyear)    CO2 intensity of vehicle operation        [t CO2 per km]
 OPER_TRIAL(tec,enr,seg,prodyear,age,modelyear)
+
 **EOL
 VEH_EOLT_CINT(tec,seg,year)            CO2 intensity of ICE vehicle EOL                     [t CO2-eq per vehicle in EOL treatment]
 
@@ -145,8 +145,8 @@ VEH_EOLT_CINT(tec,seg,year)            CO2 intensity of ICE vehicle EOL         
 BEV_CAPAC(seg)                   Correspondence of battery capacities used in each segment  [kWh]
 
 **DEMAND --------------------
-VEH_STCK_TOT(year,reg)           Number of vehicles                                     [#]
-VEH_OPER_DIST(year)              Annual driving distance per vehicles                   [km]
+VEH_STCK_TOT(year,reg)           Number of vehicles                            [#]
+VEH_OPER_DIST(year)              Annual driving distance per vehicles          [km]
 
 ** LIFETIME -----------------
 VEH_LIFT_PDF(age)                Age PDF
@@ -161,26 +161,25 @@ VEH_STCK_INT_SEG(seg)            Initial stock distribution by segment
 VEH_STCK_INT(tec,seg,reg,age)    Initial size of stock of vehicles by age cohort and segment
 
 ** CONSTRAINTS -------
-VEH_ADD_GRD(grdeq,newtec)       Parameter for gradient of change constraint (fleet additions) - individual (IND) for each tech or related to all tech (ALL)
-MANUF_CNSTRNT(year)              Annual manufacturing capacity (for batteries destined for Europe) [GWh]
-MAT_CONTENT(year,mat_cat)       Critical material content per kWh by production year [kg kWh-1]
-RECOVERY_PCT(year,mat_cat)      Recovery of critical materials from battery recycling processes in wt%
-VIRG_MAT_SUPPLY(year,mat_prod)   Primary critical material resources available in a given year [in kt]
-MAT_CINT(year,mat_prod)          Carbon intensity of each material by source [kg CO2e kg mat]
+VEH_ADD_GRD(grdeq,newtec)        Parameter for gradient of change constraint (fleet additions) - individual (IND) for each tech or related to all tech (ALL)
+MANUF_CNSTRNT(year)              Annual manufacturing capacity (for batteries destined for Europe)          [GWh]
+MAT_CONTENT(year,mat_cat)        Critical material content per kWh by production year                       [kg kWh-1]
+RECOVERY_PCT(year,mat_cat)       Recovery of critical materials from battery recycling processes in wt%
+VIRG_MAT_SUPPLY(year,mat_prod)   Primary critical material resources available in a given year              [t]
+MAT_CINT(year,mat_prod)          Carbon intensity of each material by source                                [kg CO2e kg^-1 mat]
 
 ** POST-PROCESSING --------
 TOT_BEVS(year)                   Total number of BEVs in Europe
-TOT_BATT_MANUF(year)             Total battery capacity required by year [MWh]
-TOT_BATT_RECYCLED(year)          Total battery capacity retired each year [kWh]
-MAT_REQ_TOT(year, mat_cat)      Total resources required by year [kg]
+TOT_BATT_MANUF(year)             Total battery capacity required by year         [MWh]
+TOT_BATT_RECYCLED(year)          Total battery capacity retired each year        [kWh]
+MAT_REQ_TOT(year, mat_cat)       Total resources required by year                [kg]
 VEH_STCK_TOT_CHECK(modelyear)
 VEH_STCK_COHORT(tec,seg,fleetreg,prodyear,age,modelyear)       Total stock by technology segment region and cohort
 VEH_OPER_COHORT(tec,seg,fleetreg,prodyear,modelyear,age)       Total fleet operating emissions by technology segment region and cohort
 VEH_EOLT_COHORT(tec,seg,fleetreg,prodyear,modelyear,age)       Total end-of-life emissions by technology segment region and cohort
-TOT_OPER_EINT(tec,seg,fleetreg,modelyear)
-*ANN_TOTC(modelyear)              Total CO2 emissions from LDVs by year                              [t CO2-eq]
+TOT_OPER_EINT(tec,seg,fleetreg,modelyear)                      Total fleet operatin energy by technology segment and region
 VEH_TOT_ADD(fleetreg, year)      Total vehicles added by region
-VEH_TOT_REM(fleetreg, year)
+VEH_TOT_REM(fleetreg, year)      Total vehicles retired by region
 VEH_STCK_CHK(fleetreg,year)
 VEH_STCK_GRD(tec,seg,fleetreg,optyear)
 BAU_PROD(modelyear)
@@ -188,11 +187,6 @@ BAU_OPER(modelyear)
 BAU_EOL(modelyear)
 BAU_EMISSIONS(modelyear)
 
-test(mat_cat, modelyear)
-test2(age, prodyear, modelyear)
-FILT_ADD(tec,seg,fleetreg,year,age)
-FILT_STCK(tec,seg,fleetreg,year,age)
-FILT_REM(tec,seg,fleetreg,year,age)
 ;
 
 * Load in parameter values from .gdx file [dummy data]
@@ -248,23 +242,11 @@ VEH_OPER_EINT(tec,seg,prodyear) = genlogfnc(VEH_PARTAB('OPER_EINT',tec,seg,'A'),
 VEH_OPER_CINT(tec,enr,seg,fleetreg,age,modelyear,prodyear)$(ENR_VEH(enr,tec)) = VEH_OPER_EINT(tec,seg,prodyear)*VEH_PAY(prodyear,age,modelyear)*(ENR_CINT(enr,fleetreg,modelyear)/1000);
 
 *----- End-of-life phase emissions
-*10.10.2019:  Used to prodyear, rather than modelyear
-* Assume constant for all regions for now
 VEH_EOLT_CINT(tec,seg,modelyear) = genlogfnc(VEH_PARTAB('EOLT_CINT',tec,seg,'A'),VEH_PARTAB('EOLT_CINT',tec,seg,'B'),VEH_PARTAB('EOLT_CINT',tec,seg,'r'),YEAR_PAR(modelyear),VEH_PARTAB('EOLT_CINT',tec,seg,'u'));
 
 
 VEH_STCK_INT(tec,seg,fleetreg,age) = (VEH_STCK_INT_TEC(tec)*VEH_LIFT_PDF(age)*VEH_STCK_INT_SEG(seg))*VEH_STCK_TOT('2000',fleetreg);
-*mat_content(year,'Li') = 0.11;
-*mat_content(year,'Co') = 0.05;
 
-*----- TEMPORARY ASSIGNMENT OF LITHIUM RECYCLING PARAMETERS AS CONSTANTS
-$ontext
-MAT_CONTENT(modelyear, 'Li') = 0.111;
-MAT_CONTENT(modelyear, 'Co') = 0.05;
-RECOVERY_PCT(modelyear, mat) = 0.5;
-VIRG_MAT(optyear, 'Li') = 5e20;
-VIRG_MAT(optyear, 'Co') = 3e20;
-$offtext
 
 *-----------------------------------------------------------------------------------
 *
@@ -281,34 +263,33 @@ FREE VARIABLES
 TOTC                                        Total CO2 emissions for the whole system over the whole period
 TOTC_OPT                                    Total CO2 emissions for the whole system over optimization period
 VEH_STCK_DELTA(year,fleetreg)               Net change in stock from one year to the next
-TOT_PRIMARY_MAT(year, mat_cat)             Total primary resources required by year [kg]
+TOT_PRIMARY_MAT(year, mat_cat)              Total primary resources required by year [kg]
 
-SLACK_ADD(tec,seg,fleetreg,year,age)        Slack variable for additions to stock
+* Slack variables for debugging
+SLACK_ADD(tec,seg,fleetreg,year,age)        
 SLACK_TEC_ADD(newtec, seg,fleetreg,year,age)
 SLACK_SEG_ADD(seg,fleetreg,year)
 SLACK_RECYCLED_BATT(year, fleetreg, age)
 SLACK_VIRG_MAT(year, mat_prod)
 SLACK_NEW_BATT_CAP(year)
-
-chck(tec,seg, fleetreg, modelyear) 
 ;
 
 POSITIVE VARIABLES
-VEH_STCK(tec,seg,fleetreg,year,age)              Number of vehicles of a given age in a given year
-VEH_STCK_REM(tec,seg,fleetreg,year,age)          Number of vehicles of a given age retired in a given year
-VEH_TOTC(tec,seg,fleetreg,year)                  Total CO2 emissions of vehicles per year by technology              [t CO2-eq]
-VEH_STCK_ADD(tec,seg,fleetreg,year,age)          Stock additions (new car sales)
+VEH_STCK(tec,seg,fleetreg,year,age)        Number of vehicles of a given age in a given year
+VEH_STCK_REM(tec,seg,fleetreg,year,age)    Number of vehicles of a given age retired in a given year
+VEH_TOTC(tec,seg,fleetreg,year)            Total CO2 emissions of vehicles per year by technology              [t CO2-eq]
+VEH_STCK_ADD(tec,seg,fleetreg,year,age)    Stock additions (new car sales)
 
-VEH_PROD_TOTC(tec,seg,fleetreg,year)             Total CO2 emissions from production of vehicles per year            [t CO2-eq]
-VEH_OPER_TOTC(tec,seg,fleetreg,year)             Total CO2 emissions from operations of vehicles per year            [t CO2-eq]
-VEH_EOLT_TOTC(tec,seg,fleetreg,year)             Total CO2 emissions from vehicle end of life treatment per year     [t CO2-eq]
+VEH_PROD_TOTC(tec,seg,fleetreg,year)       Total CO2 emissions from production of vehicles per year            [t CO2-eq]
+VEH_OPER_TOTC(tec,seg,fleetreg,year)       Total CO2 emissions from operations of vehicles per year            [t CO2-eq]
+VEH_EOLT_TOTC(tec,seg,fleetreg,year)       Total CO2 emissions from vehicle end of life treatment per year     [t CO2-eq]
 
-RECYCLED_BATT(year,fleetreg, age)           Total battery capacity sent to recycling per year                        [kWh]
-RECYCLED_MAT(year, mat_cat)                Materials recovered from recycled batteries
-MAT_REQ(year,mat_cat)                      Total amount of critical materials needed for new vehicles               [kg]
+RECYCLED_BATT(year,fleetreg, age)          Total battery capacity sent to recycling per year                   [kWh]
+RECYCLED_MAT(year, mat_cat)                Materials recovered from recycled batteries                         [kg]
+MAT_REQ(year,mat_cat)                      Total amount of critical materials needed for new vehicles          [kg]
 
-MAT_MIX(year, mat_prod)                     Production mixes for virgin materials                                    [kg]
-MAT_CO2(year, mat_prod)                     Total CO2 emissions from virgin material production per year             [t CO2e kg^-1]
+MAT_MIX(year, mat_prod)                    Production mixes for virgin materials                               [t]
+MAT_CO2(year, mat_prod)                    Total CO2 emissions from virgin material production per year        [t CO2e kg^-1]
 ;
 
 
@@ -388,78 +369,66 @@ EQ_STCK_ADD(modelyear,fleetreg)$(ord(modelyear)>card(inityear))..               
 
 
 EQ_STCK_BAL(tec,seg,fleetreg,modelyear,age)$(ord(modelyear) > card(inityear))..      VEH_STCK(tec,seg,fleetreg,modelyear,age)  =e= VEH_STCK(tec,seg,fleetreg,modelyear-1,age-1) + VEH_STCK_ADD(tec,seg,fleetreg,modelyear,age) - VEH_STCK_REM(tec,seg,fleetreg,modelyear,age);
-
-
-*-----calculate segment market shares-----
-*** What works:
-* 1. original EQ_STCK_ADD, EQ_SEG_GRD with VEH_TOT_ADD (with EQ_TOT_ADD commented out)
-* 2. original EQ_STCK_ADD, EQ_TOT_ADD and EQ_SEG_GRD with =l= and VEH_STCK_ADD
-                                        
+                                 
 
 *** Constraints -----------------------------------------------------------------------
 
-
+*--------------------------------------
 * B - Battery manufacturing constraint;
 
 * total capacity added per year must be less than the battery manufacturing capacity
 * MANUF_CNSTRNT input is in GWh; BEV_CAPAC is in kWh
-* dummy manufacturing constraint to trigger on dummy fleet...
-EQ_NEW_BATT_CAP(optyear)..                            MANUF_CNSTRNT(optyear)*1e6 =g= sum((seg, fleetreg),VEH_STCK_ADD('BEV',seg,fleetreg,optyear,new)*BEV_CAPAC(seg))
+EQ_NEW_BATT_CAP(optyear)..                            MANUF_CNSTRNT(optyear)*1e6 =g= sum((seg, fleetreg), VEH_STCK_ADD('BEV',seg,fleetreg,optyear,new) * BEV_CAPAC(seg))
 %SLACK_NEW_BATT_CAP% - SLACK_NEW_BATT_CAP(optyear)
 ;
 
+*-----------------------------------------------
+* C - Material balance constraint - total supply
+* Amount of virgin + recycled material to produce new batteries; see intermediate calculations below
+EQ_MAT_SUPPLY(optyear, mat_cat)..                    TOT_PRIMARY_MAT(optyear, mat_cat) + RECYCLED_MAT(optyear, mat_cat) =e= MAT_REQ(optyear, mat_cat);
 
+EQ_MAT_TOT_PRIMARY(mat_cat, optyear)..               TOT_PRIMARY_MAT(optyear, mat_cat) =e= sum(mat_prod$mat(mat_cat, mat_prod), MAT_MIX(optyear, mat_prod));
+
+*------------------------------------------------
+* D - Critical material primary supply constraint
+* demand of virgin resources from each source must be less than or equal to available supply; see intermediate calculations below
+* primary resources provided in kt, mat_mix in t
+EQ_VIRG_MAT_SUPPLY(optyear,mat_prod)..                MAT_MIX(optyear, mat_prod)
+                                                        =l= VIRG_MAT_SUPPLY(optyear, mat_prod) * 1000
+%SLACK_VIRG_MAT% + SLACK_VIRG_MAT(optyear, mat_prod)
+;
+
+*---------------------------------
 * E - Technology uptake constraint
 * incumbent technology excluded
+
 EQ_STCK_GRD(newtec,seg,fleetreg,modelyear)$(ord(modelyear)>card(inityear))..     VEH_STCK_ADD(newtec,seg,fleetreg,modelyear,new)
-    =l= ((1 + VEH_ADD_GRD('IND', newtec)) * VEH_STCK_ADD(newtec,seg,fleetreg,modelyear-1,new)) + 100
+    =l= ((1 + VEH_ADD_GRD('IND', newtec)) * VEH_STCK_ADD(newtec,seg,fleetreg,modelyear-1,new)) + SCALAR_CONST
 %SLACK_ADD% + SLACK_TEC_ADD(newtec,seg,fleetreg,modelyear,new)
 ;
 
+*------------------------------------------------------
 * F - Segment share constraint (segments kept constant)
 * try to remove - allow for ICEV smart cars (e.g.,) to be replaced by a BEV Model X...
 EQ_SEG_GRD(seg,fleetreg,modelyear)$(ord(modelyear)>card(inityear))..          sum(tec, VEH_STCK_ADD(tec,seg,fleetreg,modelyear,new))
     =e= VEH_STCK_INT_SEG(seg) * sum((tec,segj), VEH_STCK_ADD(tec,segj,fleetreg,modelyear,new));
 
 
-*------ Lithium/elemental resource availability constraints;
-
+*------ Lithium/elemental resource availability calculations for constraints C and D
 * Calculate amount of batteries retired each year in kWh
 EQ_RECYCLED_BATT(optyear,fleetreg, age)..             RECYCLED_BATT(optyear,fleetreg, age) =e= sum((seg), VEH_STCK_REM('BEV',seg,fleetreg,optyear, age)* BEV_CAPAC(seg))
-*%SLACK_RECYCLED_BATT% + SLACK_RECYCLED_BATT(optyear, fleetreg, age)
 ;
 
 * Calculate amount of materials recovered from end-of-life batteries for recycling (i.e., to new batteries)
-EQ_RECYCLED_MAT(optyear,mat_cat)..                   RECYCLED_MAT(optyear, mat_cat) =e= sum((prodyear,age), sum((fleetreg), RECYCLED_BATT(optyear, fleetreg, age))*VEH_PAY(prodyear, age, optyear)* MAT_CONTENT(optyear, mat_cat))*RECOVERY_PCT(optyear, mat_cat)
-*/1000
+EQ_RECYCLED_MAT(optyear,mat_cat)..                   RECYCLED_MAT(optyear, mat_cat) =e= sum((prodyear,age), sum((fleetreg), RECYCLED_BATT(optyear, fleetreg, age)) * VEH_PAY(prodyear, age, optyear) * MAT_CONTENT(optyear, mat_cat)) * RECOVERY_PCT(optyear, mat_cat)
 ;
-* Calculate total amount of materials available (virgin and recycled)
-*eq_tot_mats(mat_cat,year)..          sum(mat_prod$mat(mat_cat,mat_prod), mat_mix(year,mat_prod)) =e= battery(mat_cat,year);
 
 * Material supply balance
 * Total amount of material required calculated from new vehicles entering the market, in kg
 EQ_MAT_REQ(optyear, mat_cat)..                       MAT_REQ(optyear, mat_cat) =e= sum((seg, fleetreg), VEH_STCK_ADD('BEV',seg,fleetreg,optyear,new)*BEV_CAPAC(seg)) * MAT_CONTENT(optyear, mat_cat)
-*/1000
 %SLACK_NEW_BATT_CAP% + SLACK_NEW_BATT_CAP(optyear) * MAT_CONTENT(optyear, mat_cat)
 ;
 
-* Amount of virgin + recycled material to produce new batteries
-EQ_MAT_SUPPLY(optyear, mat_cat)..                    TOT_PRIMARY_MAT(optyear, mat_cat) + RECYCLED_MAT(optyear, mat_cat) =e= MAT_REQ(optyear, mat_cat);
-
-EQ_MAT_TOT_PRIMARY(mat_cat, optyear)..               TOT_PRIMARY_MAT(optyear, mat_cat) =e= sum(mat_prod$mat(mat_cat, mat_prod), MAT_MIX(optyear, mat_prod));
-
-* D - Critical material primary supply constraint
-* demand of virgin resources from each source must be less than or equal to available supply
-EQ_VIRG_MAT_SUPPLY(optyear,mat_prod)..                MAT_MIX(optyear, mat_prod)
-                                                        =l= VIRG_MAT_SUPPLY(optyear, mat_prod)*1000
-%SLACK_VIRG_MAT% + SLACK_VIRG_MAT(optyear, mat_prod)
-;
-
-
-$ontext
-virgin material supply + recycled material must be greater than the material demand
-EQ_MAT_REQ(optyear, mat)..                                VIRG_MAT(optyear, mat) + sum((prodyear,age), sum((reg), RECYCLED_BATT(optyear, reg, age))*VEH_PAY(prodyear, age, optyear)*MAT_CONTENT(prodyear, mat))*RECOVERY_PCT(optyear, mat) =g= sum((seg, reg), VEH_STCK_ADD('BEV',seg,reg,optyear,'0')*BEV_CAPAC(seg))*MAT_CONTENT(optyear, mat);
-$offtext
 
 
 *** EMISSION and ENERGY MODELS incl OBJ. FUNCTION -------------------------------------------------
@@ -483,7 +452,6 @@ EQ_VEH_OPER_TOTC(tec,seg,fleetreg,modelyear)..             VEH_OPER_TOTC(tec,seg
 EQ_VEH_EOLT_TOTC(tec,seg,fleetreg,modelyear)..             VEH_EOLT_TOTC(tec,seg,fleetreg,modelyear) =e= sum( (agej), VEH_STCK_REM(tec,seg,fleetreg,modelyear,agej))*VEH_EOLT_CINT(tec,seg,modelyear)
 ;
 
-chck.fx(newtec,seg, fleetreg, modelyear) = ((1 + VEH_ADD_GRD('IND',newtec)) * VEH_STCK_ADD.l(newtec,seg,fleetreg,modelyear-1,new));
 
 *-----------------------------------------------------------------------------------
 *
@@ -493,35 +461,33 @@ chck.fx(newtec,seg, fleetreg, modelyear) = ((1 + VEH_ADD_GRD('IND',newtec)) * VE
 
 * Defining name of model(s) and what equations are used in each model
 
-MODEL EVD4EUR_Basic "default model run in normal mode" /ALL/
-      seg_test "model without segment constraint" /EVD4EUR_Basic - EQ_SEG_GRD/
-      tec_test "model without growth constraint" /EVD4EUR_Basic - EQ_STCK_GRD/
- 
-      no_mat "model with no critical material constraints" /EVD4EUR_Basic - EQ_RECYCLED_MAT - EQ_RECYCLED_BATT - EQ_MAT_REQ - EQ_MAT_TOT_PRIMARY - EQ_MAT_SUPPLY - EQ_VIRG_MAT_SUPPLY/
+MODEL EVD4EUR_Basic     "default model run in normal mode"      /ALL/
+;
 
-      manuf_test "model without manufacturing capacity constraint" /EVD4EUR_Basic - EQ_NEW_BATT_CAP/
-      fleet_test "model without growth or manufacturing constraint" /tec_test - EQ_NEW_BATT_CAP/
-      mat_test "model without material constraint" /EVD4EUR_Basic - EQ_MAT_SUPPLY/
-      primary_mat_test "model without primary material supply constraint" /EVD4EUR_Basic - EQ_VIRG_MAT_SUPPLY/
-      test_model /no_mat - EQ_SEG_GRD/
-*      test /no_mat - EQ_STCK_GRD/
-      no_constraints "model without constraints" /no_mat - EQ_SEG_GRD - EQ_STCK_GRD - EQ_NEW_BATT_CAP/
-      
+* Troubleshooting models
+MODEL 
+      seg_test          "model without segment constraint"      /EVD4EUR_Basic - EQ_SEG_GRD/
+      tec_test          "model without growth constraint"       /EVD4EUR_Basic - EQ_STCK_GRD/
+ 
+      no_mat            "model with no critical material constraints"       /EVD4EUR_Basic - EQ_RECYCLED_MAT - EQ_RECYCLED_BATT - EQ_MAT_REQ - EQ_MAT_TOT_PRIMARY - EQ_MAT_SUPPLY - EQ_VIRG_MAT_SUPPLY/
+
+      manuf_test        "model without manufacturing capacity constraint"       /EVD4EUR_Basic - EQ_NEW_BATT_CAP/
+      fleet_test        "model without growth or manufacturing constraint"      /tec_test - EQ_NEW_BATT_CAP/
+      mat_test          "model without material constraint"                     /EVD4EUR_Basic - EQ_MAT_SUPPLY/
+      primary_mat_test  "model without primary material supply constraint"      /EVD4EUR_Basic - EQ_VIRG_MAT_SUPPLY/
+      test_model        "model with only manufacturing and growth constraints"  /no_mat - EQ_SEG_GRD/
+      no_constraints    "model without constraints"                             /no_mat - EQ_SEG_GRD - EQ_STCK_GRD - EQ_NEW_BATT_CAP/
 ;
 
 
 * Defining model run options and solver
 
 *OPTION RESLIM = 2000000;
-*OPTION THREADS = 40;
 
-*OPTION sysout = off;
 *OPTION limrow = 0;
 *OPTION limcol = 0;
 *OPTION PROFILE = 0;
-* set to PROFILE = 2 for debugging speed
-
-*EVD4EUR_Basic.optfile = 1;
+* set to PROFILE = 2 for debugging 
 
 Scalar ms 'model status', ss 'solve status';
 
@@ -543,6 +509,14 @@ ss = EVD4EUR_Basic.solvestat;
 *ms = tec_test.modelstat;
 *ss = tec_test.solvestat;
 
+*SOLVE no_mat USING LP MINIMIZING TOTC_OPT;
+*ms = no_mat.modelstat;
+*ss = no_mat.solvestat;
+
+*SOLVE manuf_test USING LP MINIMIZING TOTC_OPT;
+*ms = manuf_test.modelstat;
+*ss = manuf_test.solvestat;
+
 *SOLVE fleet_test USING LP MINIMIZING TOTC_OPT;
 
 *SOLVE mat_test USING LP MINIMIZING TOTC_OPT;
@@ -551,14 +525,6 @@ ss = EVD4EUR_Basic.solvestat;
 
 *SOLVE primary_mat_test USING LP MINIMIZING TOTC_OPT;
 *SOLVE test_model USING LP MINIMIZING TOTC_OPT;
-
-*SOLVE no_mat USING LP MINIMIZING TOTC_OPT;
-*ms = no_mat.modelstat;
-*ss = no_mat.solvestat;
-
-*SOLVE manuf_test USING LP MINIMIZING TOTC_OPT;
-*ms = manuf_test.modelstat;
-*ss = manuf_test.solvestat;
 
 *SOLVE no_constraints USING LP MINIMIZING TOTC_OPT;
 *ms = no_constraints.modelstat;
