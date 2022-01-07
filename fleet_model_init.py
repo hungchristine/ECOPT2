@@ -725,6 +725,7 @@ class ParametersClass:
         # self.veh_lift_age = pd.Series()
         # self.raw_data.veh_avg_age = alpha * gamma(1+beta^-1)
         # self.raw_data.veh_age_stdev^2 = alpha^2 * (gamma(1+2*beta^-1) - gamma(1+beta^-1)^2)
+
         self.veh_lift_cdf = pd.Series(norm.cdf(sets.age_int, self.raw_data.veh_avg_age, self.raw_data.veh_age_stdev), index=sets.age)
         self.veh_lift_cdf.index = self.veh_lift_cdf.index.astype('str')
 

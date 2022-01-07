@@ -10,9 +10,9 @@ veh_stck_int_seg:
   - 0.34 
   
 tec_add_gradient:
- def: 0.2
- aggr: 0.3
- slow: 0.005
+ #def: 0.03
+ aggr: 0.2
+ #slow: 0.005
  
 bev_capac:
  def:
@@ -22,6 +22,13 @@ bev_capac:
   D: 75
   E: 75
   F: 95 
+# large_cap:
+#  A: 42.2
+#  B: 42.2
+#  C: 59.9
+#  D: 75
+#  E: 100
+#  F: 100
   
 # Generalized logistic function terms for vehicle energy and carbon intensity
 # of production; as % of A (initial) value
@@ -43,7 +50,7 @@ B_term_prod:
 B_term_oper_EOL: 
  def: 
   OPER_EINT:
-   ICE: 0.75
+   ICE: 0.82
    BEV: 0.9
   EOLT_CINT:
    ICE: 0.9
@@ -64,3 +71,6 @@ eur_batt_share:
  
 veh_oper_dist:
   def: 12000
+
+#enr_cint_src:
+#  def:'el_footprints_pathways.csv'
