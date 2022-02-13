@@ -62,7 +62,7 @@ def plot_arrange(fleet):
     """Figure out subplot arrangement based on number of regions."""
 
     ord_reg = [reg for reg in fleet.sets.reg]
-    cat_type = CategoricalDtype(categories = ord_reg, ordered=True)
+    cat_type = CategoricalDtype(categories=ord_reg, ordered=True)
 
     ord_fleetreg = [reg for reg in fleet.sets.fleetreg]
 
@@ -169,9 +169,6 @@ def sort_ind(ind, cat_type, fleet):
 
     """
     if isinstance(ind, pd.MultiIndex):
-        # TODO: fix for multiindex - making one level categorical does not fix the order of elements in that level
-        #  maybe need to rebuild the index from scratch after converting to categorical?
-
         # find levels with reg or fleetreg
         for i, lvl in enumerate(ind.levels):
             if (ind.levels[i].name == 'reg') or (ind.levels[i].name == 'fleetreg'):
@@ -560,11 +557,12 @@ def vis_GAMS(fleet, fp, filename, param_values, export_png=False, export_pdf=Tru
 
     #%% Regionalized fleet emissions
     try:
-        fleet.emissions.sort_index(axis=1, level=0, ascending=False, inplace=True)
-
         fig, ax = plt.subplots(1,1, figsize=(14,9), dpi=300)
 
         plot_emiss = fleet.veh_totc.sum(level=['fleetreg', 'tec'])
+        plot_emiss.index = plot_emiss.index.swaplevel('fleetreg', 'tec')
+        plot_emiss.index = sort_ind(plot_emiss.index, cat_type, fleet).sortlevel(0, sort_remaining=True)[0]
+
         ax.set_prop_cycle(paired_cycler)
 
         (plot_emiss/1e6).T.plot(ax=ax, kind='area', lw=0) #'Dark2')
@@ -634,11 +632,9 @@ def vis_GAMS(fleet, fp, filename, param_values, export_png=False, export_pdf=Tru
 
     #%% Total stocks by region
     """--- Plot total stocks by region ---"""
-    # TODO: set to categorical index for legend
     try:
         tmp = fleet.stock_df_plot.sum(axis=1).unstack('fleetreg').sum(axis=0, level=['year'])
-        tmp.columns = sort_ind(tmp.columns, cat_type, fleet)
-        ax = tmp.plot(kind='area', cmap='jet', lw=0, title='Total stocks by region')
+        tmp.columns = sort_ind(tmp.columns, cat_type, fleet).sort_values()
         ax.set_xbound(0, 80)
         ax.set_ybound(lower=0)
         fix_age_legend(ax, pp, cropx, max_year, 'Region')
@@ -652,7 +648,10 @@ def vis_GAMS(fleet, fp, filename, param_values, export_png=False, export_pdf=Tru
     #%% Total stocks by segment and technology
     """--- Plot total stocks by age, segment and technology ---"""
     try:
-        ax = fleet.stock_df_plot.sum(axis=1).unstack('seg').unstack('tec').sum(axis=0, level='year').plot(kind='area', cmap=paired, lw=0, title='Total stocks by segment and technology')
+        fig, ax = plt.subplots(1,1, dpi=300)
+        plot_data = fleet.stock_df_plot.sum(axis=1).unstack('seg').unstack('tec').sum(axis=0, level='year')
+        plot_data.plot(kind='area', ax=ax, cmap=paired, lw=0,
+                            title='Total stocks by segment and technology')
         ax.set_xbound(0, 80)
         ax.set_ybound(lower=0)
         fix_age_legend(ax, pp, cropx, max_year, 'Vehicle segment and technology')
@@ -668,15 +667,17 @@ def vis_GAMS(fleet, fp, filename, param_values, export_png=False, export_pdf=Tru
 
     #        ax = fleet.stock_df_plot.sum(axis=1).unstack('seg').unstack('tec').unstack('reg').plot(kind='area',cmap=paired,title='Total stocks by segment, technology and region')
     try:
+        fig, ax = plt.subplots(1,1, dpi=300)
+
         stock_tec_seg_reg = fleet.stock_df_plot.sum(axis=1).unstack('seg').unstack('tec').unstack('fleetreg')
-        stock_tec_seg_reg = stock_tec_seg_reg.stack(['seg', 'tec'])
-        stock_tec_seg_reg.columns = sort_ind(stock_tec_seg_reg.columns, cat_type, fleet)
-        stock_tec_seg_reg = stock_tec_seg_reg.unstack(['seg','tec']).reorder_levels(['seg','tec','fleetreg'], axis=1).sort_index(axis=1, level=['seg','tec'])
-        ax = stock_tec_seg_reg.plot(kind='area', cmap='jet', lw=0, title='Total stocks by segment, technology and region')
+        stock_tec_seg_reg.columns = sort_ind(stock_tec_seg_reg.columns, cat_type, fleet).sortlevel(0, sort_remaining=True)[0]  # sortlevel returns one-element tuple
+        stock_tec_seg_reg.columns = stock_tec_seg_reg.columns.swaplevel('fleetreg', 'tec')
+
+        stock_tec_seg_reg.plot(kind='area', ax=ax, cmap='jet', lw=0,
+                               title='Total stocks by segment, technology and region')
         ax.set_xbound(0, 80)
         ax.set_ybound(lower=0)
 
-        # TODO: fix region order
         fix_age_legend(ax, pp, cropx, max_year, 'Vehicle segment, technology and region')
         export_fig(fp, ax, pp, export_pdf, export_png, png_name=ax.get_title())
 
@@ -693,12 +694,10 @@ def vis_GAMS(fleet, fp, filename, param_values, export_png=False, export_pdf=Tru
         plot_stock_add = fleet.stock_add.sum(level=['tec', 'fleetreg', 'prodyear'])
         plot_stock_add = plot_stock_add.loc[:, (plot_stock_add != 0).any(axis=0)]
         plot_stock_add = plot_stock_add.unstack(['tec', 'fleetreg']).droplevel(axis=1, level=0)
-
+        plot_stock_add.columns = sort_ind(plot_stock_add.columns, cat_type, fleet).sortlevel(0, sort_remaining= True)[0]
         plot_stock_add.plot(ax=ax, kind='area', cmap=tec_cm4, lw=0, legend=True, title='Stock additions by technology and region')
         ax.set_xbound(0, 50)
         ax.set_ybound(lower=0)
-        # TODO: fix region order workaround
-        # fix_age_legend(ax, pp, cropx, max_year, 'Vehicle technology and region')
         plt.xlabel('year')
         plt.ylabel('Vehicles added to stock')
         pp.savefig()
@@ -712,6 +711,7 @@ def vis_GAMS(fleet, fp, filename, param_values, export_png=False, export_pdf=Tru
     """--- Plot total stocks by segment, technology and region ---"""
     try:
         fig, ax = plt.subplots(1, 1, dpi=300)
+
         plot_stock = fleet.veh_stck.sum(axis=1).unstack(['tec', 'fleetreg']).sum(level=['year'])
 
         plot_stock = plot_stock.stack('tec')  # remove MultiIndex to set Categorical type for regions
@@ -720,7 +720,6 @@ def vis_GAMS(fleet, fp, filename, param_values, export_png=False, export_pdf=Tru
         plot_stock.plot(ax=ax, kind='area', cmap=tec_cm4, lw=0, legend=True, title='Total stock by technology and region')
         ax.set_xbound(0, 80)
         ax.set_ybound(lower=0)
-        # TODO: fix region order workaround
 
         fix_age_legend(ax, pp, cropx, max_year, 'Vehicle technology and region')
 
