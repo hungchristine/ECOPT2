@@ -312,7 +312,8 @@ def vis_GAMS(fleet, fp, filename, param_values, export_png=False, export_pdf=Tru
     #%% Stock additions by segment, technology and region (absolute)
     """--- Plot stock additions by segment, technology and region ---"""
     try:
-        fig, axes = plt.subplots(plt_array[0], plt_array[1], sharex=True, sharey='row')
+        fig, axes = plt.subplots(plt_array[0], plt_array[1],
+                                 sharex=True, sharey='row', dpi=300)
 
         tmp = fleet.stock_add.sum(axis=1).unstack('seg').unstack('tec').loc['2020':]
 
@@ -357,7 +358,8 @@ def vis_GAMS(fleet, fp, filename, param_values, export_png=False, export_pdf=Tru
     #%% market shares by segment and technology (normalized)
     """--- Plot stock addition shares by segment and technology ---"""
     try:
-        fig, axes = plt.subplots(plt_array[0], plt_array[1], sharex=True, sharey=True)
+        fig, axes = plt.subplots(plt_array[0], plt_array[1],
+                                 sharex=True, sharey=True, dpi=300)
         tmp = fleet.add_share
         tmp.index = sort_ind(tmp.index, cat_type, fleet)
         tmp = tmp.groupby(['fleetreg'], sort=False)
@@ -373,7 +375,6 @@ def vis_GAMS(fleet, fp, filename, param_values, export_png=False, export_pdf=Tru
 
         fix_tuple_axis_labels(fig, axes, 'year')
         remove_subplots(axes, empty_spots)
-        # axes[1, 2].remove()  # remove 6th subplot
         ref_ax = get_ref_ax(axes)
         fix_age_legend(ref_ax, pp, cropx, max_year, 'Vehicle technology and segment')
         fig.text(0, 0.5, 'Total market share', rotation='vertical', ha='center', va='center')
@@ -389,7 +390,8 @@ def vis_GAMS(fleet, fp, filename, param_values, export_png=False, export_pdf=Tru
     #%% market shares by segment and technology (un-normalized)
     """--- Plot tech split of stock additions by segment ---"""
     try:
-        fig, axes = plt.subplots(len(fleet.sets.seg), len(tmp.groups.keys()), sharex=True, sharey=True)
+        fig, axes = plt.subplots(len(fleet.sets.seg), len(tmp.groups.keys()),
+                                 sharex=True, sharey=True, dpi=300)
         tmp = fleet.add_share.div(fleet.add_share.sum(axis=1, level='seg'), axis=1, level='seg')
         tmp.index = sort_ind(tmp.index, cat_type, fleet)
         tmp = tmp.groupby(['fleetreg'], sort=False)
@@ -404,16 +406,16 @@ def vis_GAMS(fleet, fp, filename, param_values, export_png=False, export_pdf=Tru
                 axes[row,col].set_ybound(0,1)
                 axes[row,col].yaxis.set_ticklabels([])
                 if not col:
-                    # annotations for top row
-                    axes[row,col].text(-7, 0.5, seg, va='center')
+                    axes[row,col].text(-10, 0.5, seg, va='center')
                 if not row:
+                    # annotations for top row
                     axes[row,col].text(25, 1.1, reg, ha='center')
         fix_tuple_axis_labels(fig, axes, 'year')
         remove_subplots(axes, empty_spots) # remove extraneous/empty subplots
 
         ref_ax = get_ref_ax(axes)
         fix_age_legend(ref_ax,  pp, cropx, max_year, 'Vehicle technology')
-        fig.text(0, 0.5, 'Segment market share \n(0-100%)', rotation='vertical', ha='center', va='center')
+        fig.text(0.05, 0.5, 'Segment market share \n(0-100%)', rotation='vertical', ha='center', va='center')
         fig.suptitle('Stock additions, by technology, vehicle segment and region, \n as share of segment stock', y=1.05)
 
     except Exception as e:
@@ -424,7 +426,8 @@ def vis_GAMS(fleet, fp, filename, param_values, export_png=False, export_pdf=Tru
     #%% Segment shares of BEVs by region
     """--- Plot market share of BEVs by segment and region ---"""
     try:
-        fig, axes = plt.subplots(plt_array[0], plt_array[1], sharex=True, sharey=True)
+        fig, axes = plt.subplots(plt_array[0], plt_array[1],
+                                 sharex=True, sharey=True, dpi=300)
 
         tmp = fleet.add_share.div(fleet.add_share.sum(axis=1, level='seg'), axis=1, level='seg')
         tmp = tmp.drop('ICE', axis=1, level='tec')
@@ -458,7 +461,8 @@ def vis_GAMS(fleet, fp, filename, param_values, export_png=False, export_pdf=Tru
     #%% Regional shares of BEVs by segment
     """--- Plot market share of BEVs by segment and region ---"""
     try:
-        fig, axes = plt.subplots(3, 2, figsize=(9,9), sharex=True, sharey='row')
+        fig, axes = plt.subplots(3, 2, figsize=(9,9),
+                                 sharex=True, sharey='row', dpi=300)
         plt.subplots_adjust(top=0.95, hspace=0.25, wspace=0.05)
 
         tmp = fleet.stock_add.div(fleet.stock_add.sum(level=['seg', 'tec', 'prodyear']))
@@ -467,7 +471,8 @@ def vis_GAMS(fleet, fp, filename, param_values, export_png=False, export_pdf=Tru
         tmp.index = sort_ind(tmp.index, cat_type, fleet)
         tmp = tmp.unstack('fleetreg').droplevel('age', axis=1).droplevel('tec', axis=0).dropna(how='all', axis=1).groupby(['seg'])
 
-        # TODO: fix region order
+        alpha = np.linspace(1,0.1, len(fleet.sets.fleetreg))
+
         i = 0
         for (key, ax) in zip(tmp.groups.keys(), axes.flatten()):
             cmap = (dark(i/dark.N))  # use BEV segment colours
@@ -477,12 +482,13 @@ def vis_GAMS(fleet, fp, filename, param_values, export_png=False, export_pdf=Tru
                                colors=[cmap]*len(fleet.sets.fleetreg),
                                ec='w',
                                lw=1)
-            for country_area, patt in zip(pl, hatch[:len(fleet.sets.fleetreg)]):
-                country_area.set_hatch(2*patt)  # set hatching for each region
+            for country_area, al in zip(pl, alpha):
+                country_area.set_alpha(al)  # set alpha for each region
 
+            # ax.xaxis.set_major_locator(IndexLocator(10, 0))
+            # ax.xaxis.set_minor_locator(IndexLocator(2, 0))
             ax.set_xbound(2020, 2050)
-            ax.xaxis.set_major_locator(IndexLocator(10, 0))
-            ax.xaxis.set_minor_locator(IndexLocator(2, 0))
+
             ax.xaxis.set_tick_params(rotation=45)
             ax.yaxis.set_major_formatter(PercentFormatter(1.0))
             ax.set_ybound(0, 1)
@@ -492,7 +498,7 @@ def vis_GAMS(fleet, fp, filename, param_values, export_png=False, export_pdf=Tru
         ref_ax = get_ref_ax(axes)
         legend_elem = []
         for i in range(len(fleet.sets.fleetreg)):
-            legend_elem.append(Patch(facecolor=dark(0), hatch=2*hatch[i], ec='w',label=fleet.sets.fleetreg[i]))
+            legend_elem.append(Patch(facecolor=dark(0), alpha=alpha[i], ec='w',label=fleet.sets.fleetreg[i]))
         leg = axes[0,-1].legend(handles=legend_elem, title='Region',
                                 title_fontsize='medium', borderpad=1,
                                 loc=2, labelspacing=1.5, handlelength=4, bbox_to_anchor=(1.01, 1))
@@ -500,7 +506,7 @@ def vis_GAMS(fleet, fp, filename, param_values, export_png=False, export_pdf=Tru
         for patch in leg.get_patches():
             patch.set_height(20)
             patch.set_y(-6)
-        fig.suptitle('Regional share of BEVs by segment ', y=0.995)
+        fig.suptitle('Regional share of BEV market shares by segment ', y=0.995)
 
         export_fig(fp, ax, pp, export_pdf, export_png, png_name=fig._suptitle.get_text())
 
@@ -514,7 +520,7 @@ def vis_GAMS(fleet, fp, filename, param_values, export_png=False, export_pdf=Tru
     try:
         fleet.emissions.sort_index(axis=1, level=0, ascending=False, inplace=True)
 
-        fig = plt.figure(figsize=(14,9))
+        fig = plt.figure(figsize=(14,9), dpi=300)
 
         gs = matplotlib.gridspec.GridSpec(2, 1, height_ratios=[1,3], hspace=0.05)
         ax2 = fig.add_subplot(gs[0])  # vehicle plot
@@ -557,7 +563,7 @@ def vis_GAMS(fleet, fp, filename, param_values, export_png=False, export_pdf=Tru
 
     #%% Regionalized fleet emissions
     try:
-        fig, ax = plt.subplots(1,1, figsize=(14,9), dpi=300)
+        fig, ax = plt.subplots(1,1, dpi=300)
 
         plot_emiss = fleet.veh_totc.sum(level=['fleetreg', 'tec'])
         plot_emiss.index = plot_emiss.index.swaplevel('fleetreg', 'tec')
@@ -579,6 +585,10 @@ def vis_GAMS(fleet, fp, filename, param_values, export_png=False, export_pdf=Tru
         plt.xticks(fontsize=14)
         plt.yticks(fontsize=14)
 
+        fix_age_legend(ax, pp, cropx, max_year, 'Technology and region')
+
+        fig.suptitle('Fleet emissions by region and technology', y=0.95)
+
         export_fig(fp, ax, pp, export_pdf, export_png, png_name='LC_emissions')
 
     except Exception as e:
@@ -589,7 +599,11 @@ def vis_GAMS(fleet, fp, filename, param_values, export_png=False, export_pdf=Tru
     #%% Operation emissions by tec, benchmarked against regulation emissions targets
     """--- Plot operation emissions by tec ---"""
     try:
-        ax = (fleet.emissions.loc[:, 'Operation'] / 1e6).plot(kind='area', cmap=LinearSegmentedColormap.from_list('temp', colors=['silver', 'grey']), lw=0)
+        fig, ax = plt.subplots(1,1, dpi=300)
+
+        plot_data = (fleet.emissions.loc[:, 'Operation'] / 1e6)
+        cmap = LinearSegmentedColormap.from_list('temp', colors=['silver', 'grey'])
+        plot_data.plot(kind='area', ax=ax, cmap=cmap, lw=0)
 
         # plot regulation levels
         plt.hlines(442, xmin=0.16, xmax=0.6, linestyle='dotted', color='darkslategrey', label='EU 2030 target, \n 20% reduction from 2008 emissions', transform=ax.get_yaxis_transform())
@@ -607,7 +621,7 @@ def vis_GAMS(fleet, fp, filename, param_values, export_png=False, export_pdf=Tru
                             'BEV',
                             'EU 2030 target, \n20% reduction from 2008 emissions',
                             'EU 2050 target, \n60% reduction from 1990 emissions'
-                            ], loc=2, bbox_to_anchor= (1.05, 1.02))
+                            ], loc=2, bbox_to_anchor= (1.01, 1.01))
         export_fig(fp, ax, pp, export_pdf, export_png, png_name='operation_emissions')
 
     except Exception as e:
@@ -617,12 +631,14 @@ def vis_GAMS(fleet, fp, filename, param_values, export_png=False, export_pdf=Tru
 
     #%% Total stocks by segment
     """--- Plot total stocks by segment ---"""
-    # TODO: fix legend order of segments? (one column?)
     try:
-        ax = fleet.stock_df_plot.sum(axis=1).unstack('seg').sum(axis=0, level=['year']).plot(kind='area', cmap='jet', lw=0, title='Total stocks by segment')
+        fig, ax = plt.subplots(1,1, dpi=300)
+        plot_data = fleet.stock_df_plot.sum(axis=1).unstack('seg').sum(axis=0, level=['year'])
+        plot_data.plot(kind='area', ax=ax, cmap='jet', lw=0, title='Total stocks by segment')
         ax.set_xbound(0, 80)
         ax.set_ybound(lower=0)
-        fix_age_legend(ax, pp, cropx, max_year, 'Vehicle segments')
+        # fix_age_legend(ax, pp, cropx, max_year, 'Vehicle segments')
+        ax.legend(loc=2, bbox_to_anchor=(1.01,1), title='Vehicle segment')
         export_fig(fp, ax, pp, export_pdf, export_png, png_name=ax.get_title())
 
     except Exception as e:
@@ -633,11 +649,15 @@ def vis_GAMS(fleet, fp, filename, param_values, export_png=False, export_pdf=Tru
     #%% Total stocks by region
     """--- Plot total stocks by region ---"""
     try:
+        fig, ax = plt.subplots(1,1, dpi=300)
+
         tmp = fleet.stock_df_plot.sum(axis=1).unstack('fleetreg').sum(axis=0, level=['year'])
         tmp.columns = sort_ind(tmp.columns, cat_type, fleet).sort_values()
+        tmp.plot(kind='area', ax=ax, cmap='jet', lw=0, title='Total stocks by region')
         ax.set_xbound(0, 80)
         ax.set_ybound(lower=0)
-        fix_age_legend(ax, pp, cropx, max_year, 'Region')
+        # fix_age_legend(ax, pp, cropx, max_year, 'Region')
+        ax.legend(loc=2, bbox_to_anchor=(1.01,1), title='Region')
         export_fig(fp, ax, pp, export_pdf, export_png, png_name=ax.get_title())
 
     except Exception as e:
@@ -698,6 +718,9 @@ def vis_GAMS(fleet, fp, filename, param_values, export_png=False, export_pdf=Tru
         plot_stock_add.plot(ax=ax, kind='area', cmap=tec_cm4, lw=0, legend=True, title='Stock additions by technology and region')
         ax.set_xbound(0, 50)
         ax.set_ybound(lower=0)
+
+        fix_age_legend(ax, pp, cropx, max_year, 'Vehicle technology and region')
+
         plt.xlabel('year')
         plt.ylabel('Vehicles added to stock')
         pp.savefig()
