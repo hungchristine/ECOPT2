@@ -229,6 +229,7 @@ class ParametersClass:
     veh_add_grd: Union[float, pd.Series, pd.DataFrame] = None
 
     enr_cint: Union[pd.Series, pd.DataFrame] = None
+    enr_cint_iam: Union[pd.Series, pd.DataFrame] = None # move to rawdataclass?
 
     raw_data: RawDataClass = None
 
@@ -383,7 +384,8 @@ class ParametersClass:
                    'veh_factors': ['veheq', 'tec', 'seg'],
                    'enr_veh': ['enr', 'tec'],
                    'veh_pay': ['cohort', 'age', 'year'],
-                   'enr_cint': ['fleetreg', 'enr'],
+                   'enr_cint_iam': ['reg', 'enr'],
+                   'enr_cint': ['reg', 'enr'],
                    }
         # read parameter values in from Excel
         params_dict = {}
@@ -502,11 +504,16 @@ class ParametersClass:
                                              index=sets.modelyear,
                                              columns=sets.mat_cat)
 
-        if (self.raw_data.enr_glf_terms is not None) and self.enr_cint is not None:
-            log.warning('----- Source for energy pathways may be overspecified; both enr_glf_terms and enr_cint are specified')
-        elif self.enr_cint is not None:
+        if (self.raw_data.enr_glf_terms is not None) and (self.enr_cint is not None or self.enr_cint_IAM is not None):
+            log.warning('----- Source for energy pathways may be overspecified; both enr_glf_terms and enr_cint are specified. Using enr_cint.')
+        if self.enr_cint_iam is not None:
             # for building enr_cint from IAM pathways (see electricity_clustering.py)
-            self.build_enr_cint()
+            self.enr_cint_iam = self.interpolate_decades(self.enr_cint_iam)
+            if self.enr_cint is not None:
+                if len(self.enr_cint.columns)<len(sets.modelyear):
+                    self.enr_cint = self.interpolate_decades(self.enr_cint)
+                self.enr_cint = pd.concat([self.enr_cint_iam, self.enr_cint])
+
         elif self.raw_data.enr_glf_terms is not None:
             # build enr_cint from generalized logistic function
             mi = pd.MultiIndex.from_product([sets.reg, sets.enr, sets.modelyear], names=['reg', 'enr', 'modelyear'])
@@ -889,8 +896,7 @@ class ParametersClass:
         g[-1] = 1.0
 
         return g
-
-    def build_enr_cint(self):
+    def interpolate_decades(self, df):
         """
         Construct DataFrame based on energy carbon intensities time series.
 
@@ -905,20 +911,24 @@ class ParametersClass:
         """
         # electricity_clustering.py produces electricity pathways with decade resolution
         # this method interpolates between decades for an annual resolution
-        self.enr_cint.columns = self.enr_cint.columns.astype('int64')
+        df.columns = df.columns.astype('int64')
 
         # insert year headers
-        for decade in self.enr_cint.columns:
+        for decade in df.columns:
             for i in np.arange(1, 10):
-                self.enr_cint[decade + i] = np.nan
-        self.enr_cint[2019] = self.enr_cint[2020]  # TODO: fill with historical data for pre-2020 period
+                df[decade + i] = np.nan
+        df[2019] = df[2020]  # TODO: fill with historical data for pre-2020 period
+        df[2080] = df[2079]
 
         # interpolate between decades to get annual resolution
-        self.enr_cint = self.enr_cint.astype('float64').sort_index(axis=1).interpolate(axis=1) # sort year orders and interpolate
-        self.enr_cint.columns = self.enr_cint.columns.astype(str)  # set to strings for compatibility with GAMS
+        df = df.astype('float64').sort_index(axis=1).interpolate(axis=1) # sort year orders and interpolate
+        df.columns = df.columns.astype(str)  # set to strings for compatibility with GAMS
 
-        self.enr_cint = self.enr_cint.stack()  # reg, enr, year
+        df = df.stack()  # reg, enr, year ['enr', 'reg', 'year']
+        df.index.rename('year', level=-1, inplace=True)
+        df.index = df.index.reorder_levels(['enr', 'reg', 'year'])  # match correct set order for enr_cint
 
+        return df
 
     def validate_data(self, sets):
         """

@@ -1421,15 +1421,15 @@ cluster_footprints = cluster_footprints.set_index('', append=True)
 cluster_footprints = cluster_footprints / 1000
 
 cluster_footprints.to_csv(os.path.join(data_fp, 'el_footprints_pathways.csv'))
-fp = os.path.join(data_fp, 'GAMS_input_demo.xlsx')
+fp = os.path.join(data_fp, 'GAMS_input.xlsx')
 with pd.ExcelWriter(fp, mode='a') as writer:
     workBook = writer.book
     try:
-        workBook.remove(workBook['enr_cint'])
+        workBook.remove(workBook['enr_cint_IAM'])
     except:
             print("Worksheet does not exist")
     finally:
-        cluster_footprints.to_excel(writer, 'enr_cint', startrow=1)
+        cluster_footprints.to_excel(writer, 'enr_cint_IAM', startrow=1)
         writer.save()
 
 #%%
