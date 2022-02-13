@@ -1018,8 +1018,7 @@ def vis_input(fleet, fp, filename, param_values, export_png, export_pdf=True, ma
     # Todo:  plot crossover in LC emissions between ICEV and BEV by segment
 
     """--- Cover page for input parameter checking ---"""
-    os.chdir(fp)
-    pp = PdfPages('input_params_vis_' + filename + '.pdf')
+    pp = PdfPages(fp+'input_params_vis_' + filename + '.pdf')
     plt.rcParams.update({'figure.max_open_warning': 0})  # suppress max 20 figures warning
     if suppress_vis:
         plt.ioff()
@@ -1038,20 +1037,24 @@ def vis_input(fleet, fp, filename, param_values, export_png, export_pdf=True, ma
         plot_data['vehicles removed'] = -fleet.stock_rem.unstack(['seg', 'tec']).sum(axis=1)
         plot_data['total vehicles'] = fleet.veh_stck.unstack(['seg', 'tec']).sum(axis=1)
         grouped_plot_data = plot_data.groupby('fleetreg')
+
         for key, ax in zip(grouped_plot_data.groups.keys(), axes.flatten()):
             df = grouped_plot_data.get_group(key)
             df.index = df.index.droplevel('fleetreg')
-            ax.plot(df)
+            plot_lines = ax.plot(df)
             ax.set_title(f'{key}')
             ax.xaxis.set_major_locator(IndexLocator(10, 0))
             ax.set_xbound(0, 30)
             ax.xaxis.set_tick_params(rotation=45)
-        patches, labels = axes[0, 0].get_legend_handles_labels()
-        fig.legend(patches, labels, bbox_to_anchor=(1.0, 0.8), loc='upper left', borderaxespad=0.)
+        labels = ['Added', 'Removed', 'Total stock']
+        fig.legend(plot_lines, labels, loc='upper left', bbox_to_anchor=(0.85, 0.91), )
+        fig.suptitle('Vehicle dynamics, technology and region', y=0.9)
         remove_subplots(axes, empty_spots)
+
     except Exception as e:
+        print('\n *****************************************')
+        print('Error with input figure: fleet dynamics')
         print(e)
-        print('failed printing fleet dynamics')
 
     """ Plot fleet """
     try:
@@ -1068,19 +1071,19 @@ def vis_input(fleet, fp, filename, param_values, export_png, export_pdf=True, ma
             ax.xaxis.set_tick_params(rotation=45)
 
     except Exception as e:
+        print('\n *****************************************')
+        print('Error with input figure: fleet dynamics')
         print(e)
-        print('failed printing fleet dynamics')
-
 
     """ Plot evolution of lifecycle emissions """
     try:
-        fig, axes = plt.subplots(len(fleet.sets.fleetreg), len(fleet.sets.tecs),
+        fig, axes = plt.subplots(len(fleet.sets.fleetreg), len(fleet.sets.tec),
                                  sharey=True, sharex=True,
-                                 figsize=(2*len(fleet.sets.tecs)+1, 2*len(fleet.sets.fleetreg)+2))
+                                 figsize=(2*len(fleet.sets.tec)+1, 2*len(fleet.sets.fleetreg)+2))
         plt.subplots_adjust(top=0.85, hspace=0.25, wspace=0.05)
 
         for i, reg in enumerate(fleet.sets.fleetreg):
-            for j, tec in enumerate(fleet.sets.tecs):
+            for j, tec in enumerate(fleet.sets.tec):
                 plot_data = fleet.LC_emissions.unstack('seg').loc(axis=0)[tec, '2000':'2050', reg]
                 plot_data.plot(ax=axes[i,j], legend=False)
                 axes[i,j].set_title(f'{tec}, {reg}', fontsize=10, fontweight='bold')
