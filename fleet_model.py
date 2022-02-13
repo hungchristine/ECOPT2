@@ -443,6 +443,11 @@ class FleetModel:
 
             self.mat_demand = self._p_dict['MAT_REQ_TOT']
             self.mat_demand = pd.concat([self.mat_demand], axis=1, keys=['total'])
+
+            self.batt_demand = self._p_dict['TOT_BATT_MANUF']
+            self.batt_demand.index.rename(['modelyear'], inplace=True)
+            # reset index (which is currently a single-level MultiIndex)
+            self.batt_demand.index = self.batt_demand.index.get_level_values(0)
         except TypeError as e:
             log.warning(f"Could not find post-processing parameter(s). {e}")
 
