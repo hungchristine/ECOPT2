@@ -392,7 +392,7 @@ def vis_GAMS(fleet, fp, filename, param_values, export_png=False, export_pdf=Tru
     #%% market shares by segment and technology (un-normalized)
     """--- Plot tech split of stock additions by segment ---"""
     try:
-        fig, axes = plt.subplots(len(fleet.sets.seg), plt_array[1], sharex=True, sharey=True)
+        fig, axes = plt.subplots(len(fleet.sets.seg), len(tmp.groups.keys()), sharex=True, sharey=True)
         tmp = fleet.add_share.div(fleet.add_share.sum(axis=1, level='seg'), axis=1, level='seg')
         tmp.index = sort_ind(tmp.index, cat_type, fleet)
         tmp = tmp.groupby(['fleetreg'], sort=False)
@@ -450,7 +450,7 @@ def vis_GAMS(fleet, fp, filename, param_values, export_png=False, export_pdf=Tru
         fix_age_legend(ref_ax, pp, cropx, max_year, 'Vehicle segment')
         handles, labels = ref_ax.get_legend_handles_labels()
         labels = [label.strip('()').split(',')[0] for label in labels]
-        ref_ax.legend(handles, labels)
+        ref_ax.legend(handles, labels, loc=2, bbox_to_anchor=(1.01, 1))
         fig.suptitle('Market share of BEVs by segment and region', y=0.995)
 
     except Exception as e:
@@ -592,7 +592,6 @@ def vis_GAMS(fleet, fp, filename, param_values, export_png=False, export_pdf=Tru
     """--- Plot operation emissions by tec ---"""
     try:
         ax = (fleet.emissions.loc[:, 'Operation'] / 1e6).plot(kind='area', cmap=LinearSegmentedColormap.from_list('temp', colors=['silver', 'grey']), lw=0)
-        ax.set_xbound(0, 50)
 
         # plot regulation levels
         plt.hlines(442, xmin=0.16, xmax=0.6, linestyle='dotted', color='darkslategrey', label='EU 2030 target, \n 20% reduction from 2008 emissions', transform=ax.get_yaxis_transform())
@@ -601,12 +600,16 @@ def vis_GAMS(fleet, fp, filename, param_values, export_png=False, export_pdf=Tru
 
         if cropx:
             plt.xlim(right=max_year)
+
+        ax.set_xbound(0, 50)
+        ax.set_ybound(0)
+
         handles, labels = ax.get_legend_handles_labels()
         ax.legend(handles, ['ICEV',
                             'BEV',
                             'EU 2030 target, \n20% reduction from 2008 emissions',
                             'EU 2050 target, \n60% reduction from 1990 emissions'
-                            ], bbox_to_anchor= (1.05, 1.02))
+                            ], loc=2, bbox_to_anchor= (1.05, 1.02))
         export_fig(fp, ax, pp, export_pdf, export_png, png_name='operation_emissions')
 
     except Exception as e:
@@ -1053,6 +1056,7 @@ def vis_input(fleet, fp, filename, param_values, export_png, export_pdf=True, ma
     """ Plot fleet """
     try:
         fig, axes = plt.subplots(len(fleet.sets.seg), len(fleet.sets.fleetreg), sharex=True, sharey=True, figsize=(8,20))
+        fig.suptitle('Vehicle dynamics, technology and region', y=0.85)
         plt.subplots_adjust(top=0.85, hspace=0.25, wspace=0.05)
         grouped_plot_data = fleet.veh_stck.groupby(['seg', 'fleetreg'])
         for key, ax in zip(grouped_plot_data.groups.keys(), axes.flatten()):
