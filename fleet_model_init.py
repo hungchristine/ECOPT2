@@ -201,7 +201,7 @@ class RawDataClass:
 
     bev_int_shr: float = 0.0018  # from Eurostat; assume remaining is ICE
 
-    recycle_rate: float = 0.75
+    recycle_rate: Union[float, pd.Series] = 0.75
 
     # other parameters
     occupancy_rate: Union[float, pd.Series] = 2.
@@ -472,8 +472,8 @@ class ParametersClass:
         if self.raw_data.eur_batt_share:
             # multiply manufacturing constraint and critical material supply by eur_batt_share
             # allows e.g., expressing constraints as global values, with a regional market share
-            self.virg_mat_supply *= self.raw_data.eur_batt_share
-            self.manuf_cnstrnt *= self.raw_data.eur_batt_share
+            self.virg_mat_supply = self.virg_mat_supply.mul(self.raw_data.eur_batt_share, axis=0)
+            self.manuf_cnstrnt = self.manuf_cnstrnt.mul(self.raw_data.eur_batt_share, axis=0)
 
         # TODO: expand veh_oper_dist to be tec and reg specific (also in GAMS)
         if self.raw_data.pkm_scenario:
@@ -498,7 +498,7 @@ class ParametersClass:
             self.veh_oper_dist = pd.Series(self.veh_oper_dist)
         self.veh_oper_dist.index.name = 'year'
 
-        if self.raw_data.recycle_rate is not None:
+        if self.raw_data.recycle_rate is not None and isinstance(self.raw_data.recycle_rate, float):
             self.recovery_pct = [[self.raw_data.recycle_rate]*len(sets.mat_cat) for year in range(len(sets.modelyear))]
             self.recovery_pct = pd.DataFrame(self.recovery_pct,
                                              index=sets.modelyear,
