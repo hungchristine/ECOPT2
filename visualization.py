@@ -984,6 +984,54 @@ def vis_GAMS(fleet, fp, filename, param_values, export_png=False, export_pdf=Tru
         print('Error with figure: Primary production mixes for critical materials')
         print(e)
 
+    #%% Manufacturing constraint
+    """--- Plot total new battery capacity and manfuacturing constraint ---"""
+    try:
+        fig, ax = plt.subplots(1, 1, dpi=300)
+
+        if fleet.batt_demand.max()[0] <= 1:
+            plot_resources *= 1e3
+            plot_prim_supply *= 1e3
+            units = 'MWh'
+            ylabel = 'MWh new batteries per year'
+        else:
+            units = 'GWh'
+            ylabel = 'GWh new batteries per year'
+
+        dem = ax.stackplot(fleet.batt_demand.index, fleet.batt_demand[0],
+                           lw=0, labels=['New battery demand'])
+        constr = ax.plot(fleet.parameters.manuf_cnstrnt.index,
+                         fleet.parameters.manuf_cnstrnt,
+                         lw=2.5, ls='--', color='k', alpha=0.7,
+                         label='Manufacturing Capacity')
+
+        ax.set_ylabel(ylabel)
+        ax.set_ybound(lower=0, upper=fleet.parameters.manuf_cnstrnt.max()[0]*1.1)
+        ax.set_xlim(0, 50)
+        ax.xaxis.set_major_locator(MultipleLocator(10))
+        # if cropx:
+        #     axes[i].set_xlim(right=max_year)
+
+        ax.legend(loc=2, bbox_to_anchor=(0, -0.4, 1, 0.2),
+                  ncol=2, mode='expand', borderaxespad=0, handlelength=3)
+
+        plt.xlabel('year', fontsize=10)
+        plt.xticks(fontsize=10)
+        plt.yticks(fontsize=10)
+        fig.align_ylabels()
+
+        fig.suptitle('New battery demand', y=0.95)
+
+        export_fig(fp, ax, pp, export_pdf, export_png, png_name=fig._suptitle.get_text())
+
+    except Exception as e:
+        print('\n *****************************************')
+        print('Error with figure: New battery constraints')
+        print(e)
+
+
+
+
     pp.close()
     plt.show()
 
@@ -1028,6 +1076,28 @@ def vis_input(fleet, fp, filename, param_values, export_png, export_pdf=True, ma
         pp.savefig()
 
     plt_array, empty_spots, cat_type = plot_arrange(fleet)
+
+    """ Plot total fleet"""
+    try:
+        fig, axes = plt.subplots(3, 1, sharex=True, figsize=(5,6))
+        plot_data = {}
+        plot_data['fleetreg'] = fleet.veh_stck.groupby(['fleetreg', 'year']).sum().sum(axis=1)
+        plot_data['seg'] = fleet.veh_stck.groupby(['seg', 'year']).sum().sum(axis=1)
+        plot_data['tec'] = fleet.veh_stck.groupby(['tec', 'year']).sum().sum(axis=1)
+        cms = ['tab10', dark , tec_cm]
+
+        for key, cmap, ax in zip(plot_data.keys(), cms, axes.flatten()):
+            plot_data[key].unstack(key).plot(ax=ax, kind='area', stacked=True, cmap=cmap)
+            ax.set_title(f'{key}')
+            ax.set_xbound(0, 50)
+            ax.xaxis.set_tick_params(rotation=45)
+            ax.legend(loc='center left', bbox_to_anchor=(1, 0.5))
+        fig.suptitle('Vehicle stock, by region, segment or tec', y=0.995)
+
+    except Exception as e:
+        print('\n *****************************************')
+        print('Error with input figure: fleet stock')
+        print(e)
 
     """ Plot fleet dynamics"""
     try:
