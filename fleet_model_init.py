@@ -476,14 +476,6 @@ class ParametersClass:
             self.manuf_cnstrnt *= self.raw_data.eur_batt_share
 
         # TODO: expand veh_oper_dist to be tec and reg specific (also in GAMS)
-        if isinstance(self.veh_oper_dist, (float, int)):
-            # calculate veh_oper_dist
-            # given a single value for veh_oper_dist, assumes that value applies for every region, year and technology
-            self.veh_oper_dist = pd.Series([self.veh_oper_dist for i in range(len(sets.modelyear))], index=sets.modelyear)
-        elif isinstance(self.veh_oper_dist, dict):
-            self.veh_oper_dist = pd.Series(self.veh_oper_dist)
-        self.veh_oper_dist.index.name = 'year'
-
         if self.raw_data.pkm_scenario:
             # calculate veh oper dist
             self.raw_data.passenger_demand = self.raw_data.all_pkm_scen.T[self.raw_data.pkm_scenario]
@@ -497,6 +489,14 @@ class ParametersClass:
             self.veh_oper_dist = self.raw_data.fleet_vkm / self.veh_stck_tot.T.sum()  # assumes uniform distribution of annual distance travelled vs vehicle age and region
             if self.veh_oper_dist.mean() > 25e3:
                 log.warning('Warning, calculated annual vehicle mileage is above 25000 km, check fleet_km and veh_stck_tot')
+
+        if isinstance(self.veh_oper_dist, (float, int)):
+            # calculate veh_oper_dist
+            # given a single value for veh_oper_dist, assumes that value applies for every region, year and technology
+            self.veh_oper_dist = pd.Series([self.veh_oper_dist for i in range(len(sets.modelyear))], index=sets.modelyear)
+        elif isinstance(self.veh_oper_dist, dict):
+            self.veh_oper_dist = pd.Series(self.veh_oper_dist)
+        self.veh_oper_dist.index.name = 'year'
 
         if self.raw_data.recycle_rate is not None:
             self.recovery_pct = [[self.raw_data.recycle_rate]*len(sets.mat_cat) for year in range(len(sets.modelyear))]
@@ -573,7 +573,8 @@ class ParametersClass:
         """
 
         top_year = int(sets.optyear[-1])
-        start_year = int(sets.inityear[0])
+        # start_year = int(sets.inityear[0])
+        start_year = int(sets.cohort[0])
         prod_year = start_year - int(sets.age[-1])
         ind = []
         for year in range(start_year, top_year + 1):
