@@ -411,7 +411,6 @@ def vis_GAMS(fleet, fp, filename, param_values, export_png=False, export_pdf=Tru
                     # annotations for top row
                     axes[row,col].text(25, 1.1, reg, ha='center')
         fix_tuple_axis_labels(fig, axes, 'year')
-        remove_subplots(axes, empty_spots) # remove extraneous/empty subplots
 
         ref_ax = get_ref_ax(axes)
         fix_age_legend(ref_ax,  pp, cropx, max_year, 'Vehicle technology')
