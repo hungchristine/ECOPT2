@@ -365,10 +365,12 @@ class FleetModel:
         self.veh_oper_eint = self.veh_oper_eint.stack().to_frame()
         self.veh_oper_eint.index.rename(['tec', 'seg', 'year'], inplace=True)
 
-        self.veh_oper_cint = self._p_dict['VEH_OPER_CINT']
-        self.veh_oper_cint = self.veh_oper_cint.stack().to_frame()
-        self.veh_oper_cint.index.names = ['tec', 'enr', 'seg', 'fleetreg', 'age', 'modelyear', 'prodyear']
-
+        try:
+            self.veh_oper_cint = self._p_dict['VEH_OPER_CINT']
+            self.veh_oper_cint = self.veh_oper_cint.stack().to_frame()
+            self.veh_oper_cint.index.names = ['tec', 'enr', 'seg', 'fleetreg', 'age', 'modelyear', 'prodyear']
+        except:
+            log.warning('Invalid input for veh_oper_cint')
 
         # Import model results
         try:
@@ -507,7 +509,7 @@ class FleetModel:
 
         except Exception as e:
             print('\n ******************************')
-            log.error(f'----- Error in calculting scenario results. {e}')
+            log.error(f'----- Error in calculating scenario results. {e}')
 
 
     def avg_LCemiss(self, age=12):

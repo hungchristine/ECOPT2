@@ -87,7 +87,7 @@ def run_experiment():
     with open(input_file, 'r') as stream:
         try:
             params = yaml.safe_load(stream)
-            log.info(f'Successfully read experiment parameter values from {input_file}.yaml file')
+            log.info(f'Successfully read experiment parameter values from {input_file} file')
         except yaml.YAMLError as exc:
             print('\n *****************************************')
             log.error(f'----- Could not read parameter values from YAML file. {exc}')
@@ -192,8 +192,10 @@ def run_experiment():
             fm.figure_calculations()  # run extra calculations for cross-experiment figures
             fig_fp = os.path.join(fp, f'exp_{i}_figs')
             os.mkdir(fig_fp)
+            log.info("Starting visualization of results")
             vis.vis_GAMS(fm, fig_fp, run_id, experiment, export_png=True, export_pdf=True)
             if visualize_input:
+                log.info("Starting visualization of input parameters")
                 vis.vis_input(fm, fp, run_id, experiment, export_png=False, export_pdf=False, max_year=50, cropx=True, suppress_vis=False)
         except Exception:
             print('\n *****************************************')
