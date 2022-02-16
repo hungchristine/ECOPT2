@@ -507,17 +507,21 @@ class ParametersClass:
         if (self.raw_data.enr_glf_terms is not None) and (self.enr_cint is not None or self.enr_cint_IAM is not None):
             log.warning('----- Source for energy pathways may be overspecified; both enr_glf_terms and enr_cint are specified. Using enr_cint.')
         if self.enr_cint_iam is not None:
+            self.check_region_sets(self.enr_cint_iam.index.get_level_values('reg'), 'enr_cint_iam', sets.reg)
             # for building enr_cint from IAM pathways (see electricity_clustering.py)
             self.enr_cint_iam = self.interpolate_decades(self.enr_cint_iam)
             if self.enr_cint is not None:
+                self.check_region_sets(self.enr_cint.index.get_level_values('reg'), 'enr_cint', sets.reg)
                 if len(self.enr_cint.columns)<len(sets.modelyear):
                     self.enr_cint = self.interpolate_decades(self.enr_cint)
                 self.enr_cint = pd.concat([self.enr_cint_iam, self.enr_cint])
 
         elif self.raw_data.enr_glf_terms is not None:
+            self.check_region_sets(self.raw_data.enr_glf_terms.index.get_level_values('reg'), 'enr_glf_terms', sets.reg)
             # build enr_cint from generalized logistic function
             mi = pd.MultiIndex.from_product([sets.reg, sets.enr, sets.modelyear], names=['reg', 'enr', 'modelyear'])
             self.enr_cint = pd.Series(index=mi)
+
 
             # complete enr_cint parameter with fossil fuel chain and electricity in production regions
             # using terms for general logisitic function
@@ -969,3 +973,32 @@ class ParametersClass:
             missing = [k for k, v in self.__dict__.items() if v is None]
             print('\n *****************************************')
             log.warning(f'----- The following parameters are missing values: {missing}')
+
+        self.check_region_sets(self.veh_stck_tot.columns, 'veh_stck_tot', sets.fleetreg)
+
+    @staticmethod
+    def check_region_sets(par_ind, par_name, reg_set):
+        """
+        Check a given parameter for extra or missing regions.
+
+        Parameters
+        ----------
+        par_ind : pandas Index
+            Parameter index to check.
+        par_name : str
+            Name of parameter being checked (for troubleshooting)
+        reg_set : list
+            Established list of regions or countries to check.
+
+        Returns
+        -------
+        None.
+
+        """
+
+        missing_regs = set(reg_set) - set(par_ind) # regions in set not represented in parameter
+        extra_regs = set(par_ind) - set(reg_set)  # regions in parameter not in intialized set
+        if len(missing_regs):
+            log.error(f'Missing region {missing_regs} in parameter {par_name}')
+        elif len(set(par_ind) - set(reg_set)):
+            log.warning(f'Region {extra_regs} are in parameter {par_name}, but not declared as a set')
