@@ -187,6 +187,7 @@ class RawDataClass:
 
     pkm_scenario: str = None
     all_pkm_scen: pd.DataFrame = None
+    veh_pkm: pd.DataFrame = None
     fleet_vkm: pd.DataFrame = None
     batt_portfolio: pd.DataFrame = None
     veh_factors: pd.DataFrame = None
@@ -453,7 +454,9 @@ class ParametersClass:
 
         attrs = dir(self.raw_data)
 
-        if (self.veh_oper_dist is not None) and (self.raw_data.pkm_scenario is not None):
+        self.veh_stck_tot = self.interpolate_years(self.veh_stck_tot, sets, axis=0)
+
+        if (self.veh_oper_dist is not None) and ((self.raw_data.veh_pkm is not None) or (self.raw_data.pkm_scenario is not None)):
             log.warning('----- Vehicle operating distance overspecified. Both an annual vehicle mileage and an IAM scenario are specified.')
 
         if self.veh_pay is None:
@@ -476,27 +479,32 @@ class ParametersClass:
             self.manuf_cnstrnt = self.manuf_cnstrnt.mul(self.raw_data.eur_batt_share, axis=0)
 
         # TODO: expand veh_oper_dist to be tec and reg specific (also in GAMS)
-        if self.raw_data.pkm_scenario:
-            # calculate veh oper dist
-            self.raw_data.passenger_demand = self.raw_data.all_pkm_scen.T[self.raw_data.pkm_scenario]
-            self.raw_data.passenger_demand.reset_index()
-            self.raw_data.passenger_demand *= 1e9
-            self.raw_data.passenger_demand.name = ''
+        if self.raw_data.veh_pkm:
+            self.veh_oper_dist = self.interpolate_years(self.raw_data.veh_pkm, sets).div(self.veh_stck_tot)
+        # if self.raw_data.pkm_scenario:
+        #     # calculate veh oper dist
+        #     self.raw_data.passenger_demand = self.raw_data.all_pkm_scen.T[self.raw_data.pkm_scenario]
+        #     self.raw_data.passenger_demand.reset_index()
+        #     self.raw_data.passenger_demand *= 1e9
+        #     self.raw_data.passenger_demand.name = ''
 
-            self.raw_data.fleet_vkm  = self.raw_data.passenger_demand / self.raw_data.occupancy_rate
-            self.raw_data.fleet_vkm.index = sets.modelyear
-            self.raw_data.fleet_vkm.index.name = 'year'
-            self.veh_oper_dist = self.raw_data.fleet_vkm / self.veh_stck_tot.T.sum()  # assumes uniform distribution of annual distance travelled vs vehicle age and region
+        #     self.raw_data.fleet_vkm  = self.raw_data.passenger_demand / self.raw_data.occupancy_rate
+        #     self.raw_data.fleet_vkm.index = sets.modelyear
+        #     self.raw_data.fleet_vkm.index.name = 'year'
+        #     self.veh_oper_dist = self.raw_data.fleet_vkm / self.veh_stck_tot.T.sum()  # assumes uniform distribution of annual distance travelled vs vehicle age and region
             if self.veh_oper_dist.mean() > 25e3:
                 log.warning('Warning, calculated annual vehicle mileage is above 25000 km, check fleet_km and veh_stck_tot')
+            elif self.veh_oper_dist.mean() < 1e4:
+                log.warning('Warning, calculated annual vehicle mileage is less than 10000 km, check fleet_km and veh_stck_tot')
 
         if isinstance(self.veh_oper_dist, (float, int)):
             # calculate veh_oper_dist
             # given a single value for veh_oper_dist, assumes that value applies for every region, year and technology
-            self.veh_oper_dist = pd.Series([self.veh_oper_dist for i in range(len(sets.modelyear))], index=sets.modelyear)
+            ind = pd.MultiIndex.from_product([sets.modelyear, sets.fleetreg])
+            self.veh_oper_dist = pd.Series([self.veh_oper_dist for i in range(len(ind))], index=ind)
         elif isinstance(self.veh_oper_dist, dict):
             self.veh_oper_dist = pd.Series(self.veh_oper_dist)
-        self.veh_oper_dist.index.name = 'year'
+        self.veh_oper_dist.index.names = ['year', 'fleetreg']
 
         if self.raw_data.recycle_rate is not None and isinstance(self.raw_data.recycle_rate, float):
             self.recovery_pct = [[self.raw_data.recycle_rate]*len(sets.mat_cat) for year in range(len(sets.modelyear))]
@@ -506,16 +514,19 @@ class ParametersClass:
 
         if (self.raw_data.enr_glf_terms is not None) and (self.enr_cint is not None or self.enr_cint_IAM is not None):
             log.warning('----- Source for energy pathways may be overspecified; both enr_glf_terms and enr_cint are specified. Using enr_cint.')
-        if self.enr_cint_iam is not None:
-            self.check_region_sets(self.enr_cint_iam.index.get_level_values('reg'), 'enr_cint_iam', sets.reg)
-            # for building enr_cint from IAM pathways (see electricity_clustering.py)
-            self.enr_cint_iam = self.interpolate_decades(self.enr_cint_iam)
-            if self.enr_cint is not None:
-                self.check_region_sets(self.enr_cint.index.get_level_values('reg'), 'enr_cint', sets.reg)
-                if len(self.enr_cint.columns)<len(sets.modelyear):
-                    self.enr_cint = self.interpolate_decades(self.enr_cint)
-                self.enr_cint = pd.concat([self.enr_cint_iam, self.enr_cint])
 
+        if self.enr_cint is not None or self.enr_cint_IAM is not None:
+            if self.enr_cint_iam is not None:
+                self.check_region_sets(self.enr_cint_iam.index.get_level_values('reg'), 'enr_cint_iam', sets.reg)
+                # for building enr_cint from IAM pathways (see electricity_clustering.py)
+                self.enr_cint_iam = self.interpolate_years(self.enr_cint_iam, sets)
+                self.enr_cint_iam.index = self.enr_cint_iam.index.reorder_levels(['enr', 'reg', 'year'])  # match correct set order for enr_cint
+
+            if self.enr_cint is not None:
+                    self.check_region_sets(self.enr_cint.index.get_level_values('reg'), 'enr_cint', sets.reg)
+                    self.enr_cint = self.interpolate_years(self.enr_cint, sets)
+                    self.enr_cint.index = self.enr_cint.index.reorder_levels(['enr', 'reg', 'year'])
+                    self.enr_cint = pd.concat([self.enr_cint_iam, self.enr_cint])
         elif self.raw_data.enr_glf_terms is not None:
             self.check_region_sets(self.raw_data.enr_glf_terms.index.get_level_values('reg'), 'enr_glf_terms', sets.reg)
             # build enr_cint from generalized logistic function
@@ -901,13 +912,21 @@ class ParametersClass:
         g[-1] = 1.0
 
         return g
-    def interpolate_decades(self, df):
+
+    def interpolate_years(self, df, sets, axis=1):
         """
         Construct DataFrame based on energy carbon intensities time series.
 
         Interpolate output from electricity carbon intensities (in decades)
         for annual time-step resolution. Also sets up DataFrame for GAMS
         database insertion.
+
+        Parameters
+        ----------
+        df : pandas DataFrame or Series
+            DataFrame or Series
+        axis : int
+            Axis containing years
 
         Returns
         -------
@@ -916,22 +935,32 @@ class ParametersClass:
         """
         # electricity_clustering.py produces electricity pathways with decade resolution
         # this method interpolates between decades for an annual resolution
-        df.columns = df.columns.astype('int64')
+        # if axis:
+            # df.columns = df.columns.astype('int64')
 
-        # insert year headers
-        for decade in df.columns:
-            for i in np.arange(1, 10):
-                df[decade + i] = np.nan
-        df[2019] = df[2020]  # TODO: fill with historical data for pre-2020 period
-        df[2080] = df[2079]
+            # insert year headers
+            # for decade in df.columns:
+            #     for i in np.arange(1, 10):
+            #         df[decade + i] = np.nan
+            # df[2019] = df[2020]  # TODO: fill with historical data for pre-2020 period
+            # df[2080] = df[2079]
 
-        # interpolate between decades to get annual resolution
-        df = df.astype('float64').sort_index(axis=1).interpolate(axis=1) # sort year orders and interpolate
-        df.columns = df.columns.astype(str)  # set to strings for compatibility with GAMS
+            # interpolate between decades to get annual resolution
+            # df = df.astype('float64').sort_index(axis=1).interpolate(axis=1) # sort year orders and interpolate
+            # df.columns = df.columns.astype(str)  # set to strings for compatibility with GAMS
 
-        df = df.stack()  # reg, enr, year ['enr', 'reg', 'year']
-        df.index.rename('year', level=-1, inplace=True)
-        df.index = df.index.reorder_levels(['enr', 'reg', 'year'])  # match correct set order for enr_cint
+            # df = df.stack()  # reg, enr, year ['enr', 'reg', 'year']
+            # df.index.rename('year', level=-1, inplace=True)
+
+        ind = pd.Index(sets.modelyear, name='year')
+        if axis:
+            df.columns = df.columns.astype('str')
+        else:
+            df.index = df.index.astype('str')
+        df = df.reindex(labels=ind, axis=axis)
+        df = df.astype('float64').interpolate(axis=axis, limit_direction='both')
+        df = df.stack()
+        # df.index.rename('year', level=-1, inplace=True)
 
         return df
 

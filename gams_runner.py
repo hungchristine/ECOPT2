@@ -120,7 +120,7 @@ class GAMSRunner:
             for producer in item:
                 mat.add_record((key, producer))
 
-        veh_oper_dist = gmspy.df2param(self.db, fleet.parameters.veh_oper_dist, ['year'], 'VEH_OPER_DIST')
+        veh_oper_dist = gmspy.df2param(self.db, fleet.parameters.veh_oper_dist, ['year', 'reg'], 'VEH_OPER_DIST')
         veh_stck_tot = gmspy.df2param(self.db, fleet.parameters.veh_stck_tot, ['year', 'fleetreg'], 'VEH_STCK_TOT')
         veh_stck_int_seg = gmspy.df2param(self.db, fleet.parameters.veh_stck_int_seg, ['seg'], 'VEH_STCK_INT_SEG')
         bev_capac = gmspy.df2param(self.db, fleet.parameters.bev_capac, ['seg'], 'BEV_CAPAC')

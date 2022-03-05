@@ -455,15 +455,25 @@ class FleetModel:
 
 
         self.veh_oper_dist = self._p_dict['VEH_OPER_DIST']
-        self.veh_oper_dist.index = self.veh_oper_dist.index.get_level_values(0) # recast MultiIndex as single index
+        self.veh_oper_dist = self.veh_oper_dist.stack()
+        self.veh_oper_dist.index.rename(['modelyear','fleetreg'], inplace=True)
+        # TODO: check 'ffill' with different distances
 
-        self.full_oper_dist = self.veh_oper_dist.reindex(self.veh_oper_cint.index, level='modelyear')
-        self.op_emissions = self.veh_oper_cint.multiply(self.full_oper_dist)
-        self.op_emissions.index = self.op_emissions.index.droplevel(level=['enr', 'age']) # these columns are unncessary/redundant
-        self.op_emissions = self.op_emissions.sum(level=['tec', 'seg', 'fleetreg', 'prodyear']) # sum the operating emissions over all model years for each cohort
-        self.op_emissions = self.op_emissions.reorder_levels(order=['tec', 'seg', 'fleetreg', 'prodyear']) # reorder MultiIndex to add production emissions
+        tmp_dist = self.veh_oper_dist.reindex_like(self.veh_oper_cint.reorder_levels(['modelyear', 'fleetreg', 'tec','seg','prodyear','enr','age']), method='ffill')
+        self.op_emissions = self.veh_oper_cint.mul(tmp_dist, axis=0)
+        self.full_oper_dist = tmp_dist
+        # self.full_oper_dist = self.veh_oper_dist.reindex(self.veh_oper_cint.index, level='modelyear')
+        # self.op_emissions = self.veh_oper_cint.multiply(self.full_oper_dist)
+        # self.op_emissions.index = self.op_emissions.index.droplevel(level=['enr', 'age']) # these columns are unncessary/redundant
+        # self.op_emissions = self.op_emissions.sum(level=['tec', 'seg', 'fleetreg', 'prodyear']) # sum the operating emissions over all model years for each cohort
+        # self.op_emissions = self.op_emissions.reorder_levels(order=['tec', 'seg', 'fleetreg', 'prodyear']) # reorder MultiIndex to add production emissions
 
-        self.LC_emissions = self.op_emissions.add(self.veh_prod_cint)
+        tmp_prod = self.veh_prod_cint.reindex_like(self.veh_oper_cint.reorder_levels(['tec','seg','prodyear','modelyear','enr','fleetreg','age']), method='ffill')
+        tmp_prod.fillna(method='bfill', inplace=True)  # for filling 1999
+        self.LC_emissions = self.op_emissions.add(self.veh_prod_cint.reindex_like(self.op_emissions.reorder_levels(['tec','seg','prodyear','enr','fleetreg','age','modelyear']), method='ffill'))
+        self.LC_emissions.fillna(method='bfill', inplace=True) # for filling 1999
+        self.LC_emissions = self.LC_emissions.squeeze()
+        self.LC_emissions.index = self.LC_emissions.index.droplevel(['enr','prodyear'])
 
         self.enr_cint = self._p_dict['ENR_CINT']
         self.enr_cint = self.enr_cint.stack()
@@ -529,30 +539,38 @@ class FleetModel:
         ind = self.veh_oper_cint.index
         self.veh_oper_cint.index = self.veh_oper_cint.index.set_levels(ind.levels[4].astype(int), level=4) # set ages as int
         self.veh_oper_cint.sort_index(level='age', inplace=True)
-        self.veh_oper_cint.sort_index(level='age', inplace=True)
         self.veh_oper_cint_avg = self.veh_oper_cint.reset_index(level='age')
-        self.veh_oper_cint_avg = self.veh_oper_cint_avg[self.veh_oper_cint_avg.age<=age] # then, drop ages over lifetime
-        self.veh_oper_cint_avg = self.veh_oper_cint_avg.set_index([self.veh_oper_cint_avg.index, self.veh_oper_cint_avg.age])
+        self.veh_oper_cint_avg = self.veh_oper_cint_avg[self.veh_oper_cint_avg.age <= age] # then, drop ages over selected lifetime
+        self.veh_oper_cint_avg.set_index(self.veh_oper_cint_avg.age, drop=True, append=True, inplace=True)
         self.veh_oper_cint_avg.drop(columns='age', inplace=True)
         self.veh_oper_cint_avg = self.veh_oper_cint_avg.reorder_levels(['tec','enr','seg','fleetreg','age','modelyear','prodyear'])
 
-        self.avg_oper_dist = self.full_oper_dist.reset_index(level='age')
-        self.avg_oper_dist = self.avg_oper_dist.astype({'age': 'int32'})
-        self.avg_oper_dist = self.avg_oper_dist[self.avg_oper_dist.age <= age]  # again, drop ages over lifetime
-        self.avg_oper_dist = self.avg_oper_dist.set_index([self.avg_oper_dist.index, self.avg_oper_dist.age]) # make same index for joining with self.veh_oper_cint_avg
-        self.avg_oper_dist.drop(columns='age', inplace=True)
-        self.avg_oper_dist = self.avg_oper_dist.reorder_levels(['tec','enr','seg','fleetreg','age','modelyear','prodyear'])
-        self.d = self.avg_oper_dist.join(self.veh_oper_cint_avg, lsuffix='_dist')
+        # self.avg_oper_dist = self.full_oper_dist.reset_index(level='age')
+        # self.avg_oper_dist = self.avg_oper_dist.astype({'age': 'int32'})
+        # self.avg_oper_dist = self.avg_oper_dist[self.avg_oper_dist.age <= age]  # again, drop ages over lifetime
+        # self.avg_oper_dist = self.avg_oper_dist.set_index([self.avg_oper_dist.index, self.avg_oper_dist.age]) # make same index for joining with self.veh_oper_cint_avg
+        # self.avg_oper_dist.drop(columns='age', inplace=True)
+        self.full_oper_dist = self.full_oper_dist.reorder_levels(['tec','enr','seg','fleetreg','age','modelyear','prodyear'])
+        self.full_oper_dist.index = self.full_oper_dist.index.set_levels(ind.levels[4].astype(int), level=4) # set ages as int
+        self.d = self.full_oper_dist.to_frame().join(self.veh_oper_cint_avg, lsuffix='_dist')
         self.d.columns=['dist','intensity']
         self.op_emissions_avg = self.d.dist * self.d.intensity
+        self.op_emissions_avg = self.op_emissions_avg.to_frame().reset_index('age', drop=False)
         self.op_emissions_avg.index = self.op_emissions_avg.index.droplevel(level=['enr']) # these columns are unncessary/redundant
-        self.op_emissions_avg.to_csv('op_emiss_avg_with_duplicates.csv')
-        self.op_emissions_avg = self.op_emissions_avg.reset_index().drop_duplicates().set_index(['tec','seg','fleetreg','age','modelyear','prodyear'])
-        self.op_emissions_avg.to_csv('op_emiss_avg_without_duplicates.csv')
-        self.op_emissions_avg = self.op_emissions_avg.sum(level=['tec','seg','fleetreg','prodyear']) # sum the operating emissions over all model years
-        self.op_emissions_avg = self.op_emissions_avg.reorder_levels(order=['tec','seg','fleetreg','prodyear']) # reorder MultiIndex to add production emissions
-        self.op_emissions_avg.columns = ['']
+        self.op_emissions_avg['age'] = self.op_emissions_avg['age'].astype(int)
+        self.op_emissions_avg['lifetime op emissions'] = (self.op_emissions_avg['age']+1).mul(self.op_emissions_avg[0])
+        self.op_emissions_avg.drop(columns=0, inplace=True)
+        # self.op_emissions_avg.to_csv('op_emiss_avg_with_duplicates.csv')
+        # self.op_emissions_avg = self.op_emissions_avg.reset_index().drop_duplicates().set_index(['tec','seg','fleetreg','age','modelyear','prodyear'])
+        # self.op_emissions_avg.to_csv('op_emiss_avg_without_duplicates.csv')
+        self.op_emissions_avg.set_index('age', append=True, drop=True, inplace=True)
+        self.op_emissions_avg = self.op_emissions_avg.sum(level=['tec','seg','fleetreg','prodyear','age']) # sum the operating emissions over all model years
+        self.op_emissions_avg = self.op_emissions_avg.reorder_levels(order=['tec','seg','prodyear','fleetreg','age']) # reorder MultiIndex to add production emissions
+        self.op_emissions_avg.columns = [0]
+        self.op_emissions_avg.index = self.op_emissions_avg.index.set_levels(self.op_emissions_avg.index.levels[-1].astype(str), level='age')
 
+        tmp_prod = self.veh_prod_cint.reindex_like(self.op_emissions_avg, method='ffill')
+        tmp_prod = tmp_prod.fillna(method='bfill')  # fill 1999 prodyear
 
      # Estimate operating emissions by cohort (i.e., prodyear)
         try:
@@ -574,4 +592,4 @@ class FleetModel:
             print('\n*****************************************')
             log.error(f'----- Error in calculating operating emissions by cohort. Perhaps post-processing parameters not loaded? {e}')
 
-        return self.op_emissions_avg.add(self.veh_prod_cint, axis=0)
+        return self.op_emissions_avg.add(tmp_prod, axis=0).mean(level=['tec','seg','fleetreg'])
