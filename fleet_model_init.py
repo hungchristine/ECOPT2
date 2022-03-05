@@ -266,6 +266,11 @@ class ParametersClass:
             tmp = self.veh_add_grd.stack()
             self.veh_add_grd = tmp.to_dict()
 
+        if self.veh_stck_tot.index.name == 'fleetreg':
+            self.veh_stck_tot = self.veh_stck_tot.T
+
+
+
     @classmethod
     def from_exp(cls, experiment:dict):
         """
@@ -1003,7 +1008,7 @@ class ParametersClass:
             print('\n *****************************************')
             log.warning(f'----- The following parameters are missing values: {missing}')
 
-        self.check_region_sets(self.veh_stck_tot.columns, 'veh_stck_tot', sets.fleetreg)
+        self.check_region_sets(self.veh_stck_tot.index, 'veh_stck_tot', sets.fleetreg)
 
     @staticmethod
     def check_region_sets(par_ind, par_name, reg_set):
