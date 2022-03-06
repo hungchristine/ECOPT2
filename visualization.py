@@ -788,29 +788,32 @@ def vis_GAMS(fleet, fp, filename, param_values, export_png=False, export_pdf=Tru
             ax2 = fig.add_subplot(gs[0])
             ax1 = fig.add_subplot(gs[1], sharex=ax2)
 
-            if fleet.resources.max().mean() >= 1e6:
-                fleet.resources /= 1e6
+            plot_resources = fleet.resources.loc[:, (slice(None), resource)].copy()
+            plot_virg_mat = fleet.parameters.virg_mat_supply.copy().filter(like=resource, axis=1)*1000  # primary material supply is in tons; convert to kg
+
+            if plot_resources.max().mean() >= 1e6:
+                plot_resources /= 1e6
+                plot_virg_mat /= 1e6
                 units = 'Mt'
-            elif fleet.resources.max().mean() >= 1e4:
-                fleet.resources /= 1e3
+            elif plot_resources.max().mean() >= 1e4:
+                plot_resources /= 1e3
+                plot_virg_mat /= 1e3
                 units = 't'
             else:
                 units = 'kg'
 
             # plot_df = pd.concat([fleet.resources['primary', resource], fleet.resources['recycled', resource]], axis=1)
-            if (fleet.resources.values < 0).any():
+            if (plot_resources.values < 0).any():
                 log.warning('----- Some resource demand is negative! Setting to 0. \n')
-                print(fleet.resources.loc[fleet.resources.values < 0])  # print negative values for troubleshooting; may be very small or boundary condition
+                print(plot_resources.loc[plot_resources.values < 0])  # print negative values for troubleshooting; may be very small or boundary condition
                 print('\n')
-                fleet.resources[fleet.resources < 0] = 0  # set value to 0 for plotting
+                plot_resources[plot_resources < 0] = 0  # set value to 0 for plotting
 
             # plot use of materials
-            plot_resources = fleet.resources.loc[:, (slice(None), resource)]
             plot_resources.loc['2020'] = np.nan # add 2020 to properly align plots
             plot_resources.sort_index(ascending=True, inplace=True)
             plot_resources.plot(ax=ax1, kind='area', lw=0, cmap='jet')
 
-            plot_virg_mat = fleet.parameters.virg_mat_supply.filter(like=resource, axis=1)
             plot_virg_mat = plot_virg_mat.loc['2020':].sum(axis=1)
             plot_virg_mat.plot(ax=ax1, lw=4, kind='line', alpha=0.7)
 
@@ -859,12 +862,12 @@ def vis_GAMS(fleet, fp, filename, param_values, export_png=False, export_pdf=Tru
 
         gpby_class = {supp: mat for mat, li in fleet.sets.mat_prod.items() for supp in li}
 
-        resource_use = fleet.resources * 1000 # convert to kg
+        resource_use = fleet.resources.copy()
         resource_use.loc['2020'] = np.nan
         resource_use.sort_index(ascending=True, inplace=True)
 
         # get total available primary supplies of each material category
-        prim_supply = (fleet.parameters.virg_mat_supply.groupby(gpby_class, axis=1).sum() * fleet.parameters.raw_data.eur_batt_share)*1000 # priamry supply is in t
+        prim_supply = (fleet.parameters.virg_mat_supply.groupby(gpby_class, axis=1).sum() * fleet.parameters.raw_data.eur_batt_share)*1000 # primary supply is in t, convert to kg
         prim_supply = prim_supply.loc['2020':]
 
         for i, mat in enumerate(fleet.sets.mat_prod.keys()):
@@ -935,8 +938,8 @@ def vis_GAMS(fleet, fp, filename, param_values, export_png=False, export_pdf=Tru
         plot_data = fleet.mat_mix.copy()
         level_2020 = plot_data.loc['2020'].mean() # use as baseline value to scale y-axis
         plot_data = plot_data.loc['2020':'2050']  # restrict to optimization period
-        supply_constr = fleet.parameters.virg_mat_supply.loc['2020':'2050'] * 1000 # virg_mat_supply in t, not kg
-        plot_data.sort_index(axis=1, inplace=True)  #make sure material mixes and supply constraints are in the same order
+        supply_constr = fleet.parameters.virg_mat_supply.loc['2020':'2050'] * 1000 # virg_mat_supply is in t, not kg
+        plot_data.sort_index(axis=1, inplace=True)  # make sure material mixes and supply constraints are in the same order
         supply_constr.sort_index(axis=1, inplace=True)
 
         mat_cmaps = ['Purples','Blues', 'Greens', 'Oranges', 'Reds']
@@ -966,7 +969,7 @@ def vis_GAMS(fleet, fp, filename, param_values, export_png=False, export_pdf=Tru
             # make supply constraint lines relative to actual materials used
             for j, prod in enumerate(prods):
                 if j > 0:
-                    tmp[prod] = plot_data[prods].iloc(axis=1)[j-1] + supply_constr[prods].iloc(axis=1)[j]
+                    tmp[prod] = plot_data[prods].iloc(axis=1)[0:j].sum(axis=1) + supply_constr[prods].iloc(axis=1)[j]
                 elif j == 0:
                     tmp[prod] = supply_constr[prod]
 
@@ -994,20 +997,39 @@ def vis_GAMS(fleet, fp, filename, param_values, export_png=False, export_pdf=Tru
         # construct legend for each subplot
         lines = []
         labels = []
+        max_len = max([len(i) for i in fleet.sets.mat_prod.values()])
+
         for ax, mat in zip(axes, fleet.sets.mat_prod.keys()):
+            ind = []
             labels.extend([f'$\\bf{mat}$' + ' $\\bfproducers$']) # add title for each material
             lines.extend([plt.plot([],marker="", ls="")[0]]) # adds empty handle for title for centering
             axLine, axLabel = ax.get_legend_handles_labels()
+
             # customize labels for max primary supply constraints
             for i, (line, label) in enumerate(zip(axLine, axLabel)):
                 if isinstance(line, matplotlib.lines.Line2D):
                     axLabel[i] = label + " max capacity"
+                    ind.extend([i])
+
+            # manual spacing for legend entries by adding empty plots
+            if len(axLabel) < (max_len*2):
+                start = max(ind) + 1
+                end = int(start + (max_len - len(axLabel)/2))
+                print(start)
+                print(end)
+                # add blank entries to match greatest number of material producers
+                axLine[start:start] = [plt.plot([], marker="", ls="")[0]]* (end-start)
+                axLabel[start:start] = [''] * (end-start)
+                for i in range(end-start):
+                    axLine.extend([plt.plot([], marker="", ls="")[0]])
+                    axLabel.extend([''])
+
             lines.extend(axLine)
             labels.extend(axLabel)
 
-        w = .42 * len(fleet.sets.mat_cat)
-        h = .15 * len(labels)
-        leg = axes[-1].legend(lines, labels, loc=9, bbox_to_anchor=((1-w)/2, -0.4-h, w, h),
+        leg = axes[-1].legend(lines, labels, loc=9, bbox_to_anchor=(0, -2.2, 1, 1.5),
+                              bbox_transform=axes[-1].transAxes,
+                                                  #fig.transFigure,
                               mode='expand', ncol=len(axes), borderaxespad=0, handlelength=3)
 
         for vpack in leg._legend_handle_box.get_children():
