@@ -620,7 +620,10 @@ def vis_GAMS(fleet, fp, filename, param_values, export_png=False, export_pdf=Tru
         plot_data.index = plot_data.index.droplevel('fleetreg')
         plot_data = plot_data.T
         cmap = LinearSegmentedColormap.from_list('temp', colors=['silver', 'grey'])
-        plot_data.plot(kind='area', ax=ax, cmap=cmap, lw=0)
+        cmap_cols = {'BEV':'silver', 'ICE': 'grey'}
+        for tec, c in cmap_cols.items():
+            plt.plot(plot_data[tec], kind='area',stacked=True, color=c, lw=0)
+            # plot_data.plot(kind='area', ax=ax, cmap=cmap, lw=0)
 
         # plot regulation levels
         plt.hlines(442, xmin=0.16, xmax=0.6, linestyle='dotted', color='darkslategrey', label='EU 2030 target, \n 20% reduction from 2008 emissions', transform=ax.get_yaxis_transform())
@@ -1101,7 +1104,7 @@ def vis_GAMS(fleet, fp, filename, param_values, export_png=False, export_pdf=Tru
     pp.close()
     plt.show()
 
-    #%%  Input parameter checking
+#%%  Input parameter checking
 def vis_input(fleet, fp, filename, param_values, export_png, export_pdf=True, max_year=50, cropx=False, suppress_vis=False):
     """Visualize model results and input.
 
@@ -1184,7 +1187,7 @@ def vis_input(fleet, fp, filename, param_values, export_png, export_pdf=True, ma
             ax.xaxis.set_tick_params(rotation=45)
         labels = ['Added', 'Removed', 'Total stock']
         fig.legend(plot_lines, labels, loc='upper left', bbox_to_anchor=(0.85, 0.91), )
-        fig.suptitle('Vehicle dynamics, technology and region', y=0.9)
+        fig.suptitle('Vehicle dynamics, technology and region', y=0.98)
         remove_subplots(axes, empty_spots)
 
     except Exception as e:
@@ -1354,30 +1357,31 @@ def vis_input(fleet, fp, filename, param_values, export_png, export_pdf=True, ma
         print('Error with input figure: Total vehicles by segment and technology')
         print(e)
 
-    try:
-        fig, axes = plt.subplots(3, 2, figsize=(9,9), sharex=True, sharey=True)
-        fig.text(0.04, 0.5, 'Vehicle operating emissions intensity, by region and segment \n (kg CO2-eq/km)', ha='center', va='center', rotation='vertical')
-        title = 'VEH_OPER_CINT for BEVs, by region and segment'
-        veh_op_cint_plot = fleet.veh_oper_cint.droplevel(['prodyear', 'enr']).drop_duplicates().unstack(['fleetreg']).loc(axis=0)['BEV']
-        veh_op_cint_plot = (veh_op_cint_plot.swaplevel(-2, -1, axis=0) * 1000).unstack('age')
+    # try:
+    #     fig, axes = plt.subplots(3, 2, figsize=(9,9), sharex=True, sharey=True)
+    #     fig.text(0.04, 0.5, 'Vehicle operating emissions intensity, by region and segment \n (kg CO2-eq/km)', ha='center', va='center', rotation='vertical')
+    #     title = 'VEH_OPER_CINT for BEVs, by region and segment'
+    #     veh_op_cint_plot = fleet.veh_oper_cint.droplevel(['prodyear', 'enr']).drop_duplicates().unstack(['fleetreg']).loc(axis=0)['BEV']
+    #     veh_op_cint_plot = veh_op_cint_plot.droplevel([0], axis=1)
+    #     veh_op_cint_plot = (veh_op_cint_plot.swaplevel(-2, -1, axis=0) * 1000).unstack('age')
 
-        k_r_cmap = ListedColormap(['k' for i in np.arange(0, (len(veh_op_cint_plot.columns) / 2))] +
-                                  ['r' for i in np.arange(0, (len(veh_op_cint_plot.columns) / 2))])
+    #     k_r_cmap = ListedColormap(['k' for i in np.arange(0, (len(veh_op_cint_plot.columns) / 2))] +
+    #                               ['r' for i in np.arange(0, (len(veh_op_cint_plot.columns) / 2))])
 
-        plot_subplots(fig, axes, veh_op_cint_plot.groupby(['seg']), title=title, cmap=k_r_cmap)
-        axes[0, 0].set_xbound(0, 80)
+    #     plot_subplots(fig, axes, veh_op_cint_plot.groupby(['seg']), title=title, cmap=k_r_cmap)
+    #     axes[0, 0].set_xbound(0, 80)
 
-        red_patch = matplotlib.patches.Patch(color='r', label='Low values by region')
-        blk_patch = matplotlib.patches.Patch(color='k', label='High values by region')
-        fig.legend(handles=[blk_patch, red_patch], bbox_to_anchor=(0.5, 0), loc='lower center',
-                   ncol=2, fontsize='large', borderaxespad=0.)
+    #     red_patch = matplotlib.patches.Patch(color='r', label='Low values by region')
+    #     blk_patch = matplotlib.patches.Patch(color='k', label='High values by region')
+    #     fig.legend(handles=[blk_patch, red_patch], bbox_to_anchor=(0.5, 0), loc='lower center',
+    #                ncol=2, fontsize='large', borderaxespad=0.)
 
-        pp.savefig(bbox_inches='tight')
+    #     pp.savefig(bbox_inches='tight')
 
-    except Exception as e:
-        print('\n *****************************************')
-        print('Error with input figure: BEV BEH_OPER_CINT by region and segment')
-        print(e)
+    # except Exception as e:
+    #     print('\n *****************************************')
+    #     print('Error with input figure: BEV VEH_OPER_CINT by region and segment')
+    #     print(e)
 
         """ Check each vintage cohort's LC emissions (actually just production and lifetime operation emissions) for various assumptions of lifetime (in years)"""
     #        fig, axes = plt.subplots(3,2,figsize=(9,9),sharey=True)
