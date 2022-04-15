@@ -205,35 +205,38 @@ def run_experiment():
                 os.rmdir(fp)
 
         # Save log info
-        info[run_tag] = {
-            'input_params': experiment,
-            'output': {
-                 'totc_opt': fm.totc_opt,
-                 'solver status': gams_run.ss,
-                 'model status': gams_run.ms,
-                 'first year of 100% BEV market share': fm.full_BEV_year.to_dict(),
-                  'BEV shares in 2030': fm.shares_2030.to_dict(),
-                 'totc in optimization period':fm.totc_opt # collect these from all runs into a dataframe...ditto with shares of BEV/ICE
+        try:
+            info[run_tag] = {
+                'input_params': experiment,
+                'output': {
+                     'totc_opt': fm.totc_opt,
+                     'solver status': gams_run.ss,
+                     'model status': gams_run.ms,
+                     'first year of 100% BEV market share': fm.full_BEV_year.to_dict(),
+                     'BEV shares in 2030': fm.shares_2030.to_dict(),
+                     'totc in optimization period':fm.totc_opt # collect these from all runs into a dataframe...ditto with shares of BEV/ICE
+                }
             }
-        }
 
-        # Save pertinent info to compare across scenarios in dataframe
-        fm.shares_2030.name = run_id
-        fm.shares_2050.name = run_id
-        fm.add_share.name = run_id
-        fm.veh_stck.name = run_id
+            # Save pertinent info to compare across scenarios in dataframe
+            fm.shares_2030.name = run_id
+            fm.shares_2050.name = run_id
+            fm.add_share.name = run_id
+            fm.veh_stck.name = run_id
 
-        totc_df.loc['totc_opt', run_id] = fm.totc_opt
-        stock_comp[run_id] = fm.veh_stck.stack() # fleet stock composition
-        shares_2030[run_id] = fm.shares_2030.stack().stack() # market shares in 2030
-        shares_2050[run_id] = fm.shares_2050.stack().stack()  # market shares in 2050
-        add_share[run_id] = fm.add_share.stack().stack()  # market shares
-        full_BEV_yr_df[run_id] = fm.full_BEV_year  # first year of full newtec penetration
+            totc_df.loc['totc_opt', run_id] = fm.totc_opt
+            stock_comp[run_id] = fm.veh_stck.stack() # fleet stock composition
+            shares_2030[run_id] = fm.shares_2030.stack().stack() # market shares in 2030
+            shares_2050[run_id] = fm.shares_2050.stack().stack()  # market shares in 2050
+            add_share[run_id] = fm.add_share.stack().stack()  # market shares
+            full_BEV_yr_df[run_id] = fm.full_BEV_year  # first year of full newtec penetration
 
-        # Display the info for this run
-        log.info('\n'+repr(info[run_tag])+'\n')
-        log.info(f'End of run {str(i+1)}')
-        print('\n\n\n ********** End of run ' + str(i+1) + ' ************** \n\n\n')
+            # Display the info for this run
+            log.info('\n'+repr(info[run_tag])+'\n')
+            log.info(f'End of run {str(i+1)}')
+            print('\n\n\n ********** End of run ' + str(i+1) + ' ************** \n\n\n')
+        except AttributeError as e:
+            log.error(f'Could not export run info {e}')
 
     # Write log to file
     output_fp = os.path.join(fp, f'output_{now}.yaml')

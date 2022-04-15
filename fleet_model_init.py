@@ -483,6 +483,7 @@ class ParametersClass:
             self.virg_mat_supply = self.virg_mat_supply.mul(self.raw_data.eur_batt_share, axis=0)
             self.manuf_cnstrnt = self.manuf_cnstrnt.mul(self.raw_data.eur_batt_share, axis=0)
 
+
         # TODO: expand veh_oper_dist to be tec and reg specific (also in GAMS)
         if self.raw_data.veh_pkm:
             self.veh_oper_dist = self.interpolate_years(self.raw_data.veh_pkm, sets).div(self.veh_stck_tot)
@@ -578,7 +579,6 @@ class ParametersClass:
 
         self.year_par = pd.Series([float(i) for i in sets.year], index=sets.year)
         self.calc_veh_lifetime(sets)
-
 
 
     def build_veh_pay(self, sets):
