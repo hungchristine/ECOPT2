@@ -230,7 +230,7 @@ class ParametersClass:
     veh_add_grd: Union[float, pd.Series, pd.DataFrame] = None
 
     enr_cint: Union[pd.Series, pd.DataFrame] = None
-    enr_cint_iam: Union[pd.Series, pd.DataFrame] = None # move to rawdataclass?
+    enr_cint_IAM: Union[pd.Series, pd.DataFrame] = None # move to rawdataclass?
 
     raw_data: RawDataClass = None
 
@@ -390,7 +390,7 @@ class ParametersClass:
                    'veh_factors': ['veheq', 'tec', 'seg'],
                    'enr_veh': ['enr', 'tec'],
                    'veh_pay': ['cohort', 'age', 'year'],
-                   'enr_cint_iam': ['reg', 'enr'],
+                   'enr_cint_IAM': ['reg', 'enr'],
                    'enr_cint': ['reg', 'enr'],
                    }
         # read parameter values in from Excel
@@ -522,17 +522,17 @@ class ParametersClass:
             log.warning('----- Source for energy pathways may be overspecified; both enr_glf_terms and enr_cint are specified. Using enr_cint.')
 
         if self.enr_cint is not None or self.enr_cint_IAM is not None:
-            if self.enr_cint_iam is not None:
-                self.check_region_sets(self.enr_cint_iam.index.get_level_values('reg'), 'enr_cint_iam', sets.reg)
+            if self.enr_cint_IAM is not None:
+                self.check_region_sets(self.enr_cint_IAM.index.get_level_values('reg'), 'enr_cint_IAM', sets.reg)
                 # for building enr_cint from IAM pathways (see electricity_clustering.py)
-                self.enr_cint_iam = self.interpolate_years(self.enr_cint_iam, sets)
-                self.enr_cint_iam.index = self.enr_cint_iam.index.reorder_levels(['enr', 'reg', 'year'])  # match correct set order for enr_cint
+                self.enr_cint_IAM = self.interpolate_years(self.enr_cint_IAM, sets)
+                self.enr_cint_IAM.index = self.enr_cint_IAM.index.reorder_levels(['enr', 'reg', 'year'])  # match correct set order for enr_cint
 
             if self.enr_cint is not None:
                     self.check_region_sets(self.enr_cint.index.get_level_values('reg'), 'enr_cint', sets.reg)
                     self.enr_cint = self.interpolate_years(self.enr_cint, sets)
                     self.enr_cint.index = self.enr_cint.index.reorder_levels(['enr', 'reg', 'year'])
-                    self.enr_cint = pd.concat([self.enr_cint_iam, self.enr_cint])
+                    self.enr_cint = pd.concat([self.enr_cint_IAM, self.enr_cint])
         elif self.raw_data.enr_glf_terms is not None:
             self.check_region_sets(self.raw_data.enr_glf_terms.index.get_level_values('reg'), 'enr_glf_terms', sets.reg)
             # build enr_cint from generalized logistic function
