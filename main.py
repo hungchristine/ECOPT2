@@ -49,8 +49,9 @@ class Experiment(Enum):
     DEMO = 'GAMS_input_demo'
     UNIT = 'unit_test' # unit test consists of static LCA factors # (straight line in lieu of logistic function)
     NORMAL = 'GAMS_input'
+    WORLD = 'GAMS_input_world'
 
-experiment_type = Experiment.DEMO # must be one of 'DEMO', 'UNIT', 'NORMAL'
+experiment_type = Experiment.WORLD #NORMAL # must be one of 'DEMO', 'UNIT', 'NORMAL'
 export = False  # whether to export cross-scenario results
 visualize_input = False # visualize input factors for debugging
 
@@ -149,9 +150,12 @@ def run_experiment():
         if experiment_type == Experiment.DEMO:
             sets = SetsClass.from_file(os.path.join(os.path.curdir, 'data', 'sets_demo.xlsx'))
             params = ParametersClass.from_file(os.path.join(os.path.curdir, 'data', 'GAMS_input_demo.xlsx'), experiment=experiment)
+        elif experiment_type == Experiment.WORLD:
+            sets = SetsClass.from_file(os.path.join(os.path.curdir, 'data', 'sets_world.xlsx'))
+            params = ParametersClass.from_file(os.path.join(os.path.curdir, 'data', 'GAMS_input_world.xlsx'), experiment=experiment)
         else:
             sets = SetsClass.from_file(os.path.join(os.path.curdir, 'data', 'sets.xlsx'))
-            params = ParametersClass.from_file(os.path.join(os.path.curdir, 'data', 'GAMS_input_demo_test.xlsx'), experiment=experiment)
+            params = ParametersClass.from_file(os.path.join(os.path.curdir, 'data', 'GAMS_input.xlsx'), experiment=experiment)
 
         fm = fleet_model.FleetModel(sets, params)
 
