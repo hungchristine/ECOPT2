@@ -134,10 +134,10 @@ TEC_PROD_IMPACT_INT(tec,seg,prodyear)        CO2 intensity of vehicle production
 
 **OPERATION
 VEH_OPER_EINT(tec,seg,prodyear)                               Energy intensity of vehicle operation     [kwh per km]
-VEH_OPER_CINT(tec,enr,seg,fleetreg,age,modelyear,prodyear)    CO2 intensity of vehicle operation        [t CO2 per km]
+TEC_OPER_IMPACT_INT(tec,enr,seg,fleetreg,age,modelyear,prodyear)    CO2 intensity of vehicle operation        [t CO2 per km]
 
 **EOL
-VEH_EOLT_CINT(tec,seg,year)            CO2 intensity of ICE vehicle EOL                     [t CO2-eq per vehicle in EOL treatment]
+TEC_EOLT_IMPACT_INT(tec,seg,year)            CO2 intensity of ICE vehicle EOL                     [t CO2-eq per vehicle in EOL treatment]
 
 ** FLEET -------------------------------------------------------------------------------
 ** INITIAL STOCK ------------
@@ -173,14 +173,13 @@ TOT_CAPACITY_ADDED(year)             Total battery capacity required by year    
 TOT_BATT_RECYCLED(year)          Total battery capacity retired each year        [kWh]
 MAT_REQ_TOT(year, mat_cat)       Total resources required by year                [kg]
 EXOG_TOT_STOCK_CHECK(modelyear)
-VEH_STCK_COHORT(tec,seg,fleetreg,prodyear,age,modelyear)       Total stock by technology segment region and cohort
+STOCK_BY_COHORT(tec,seg,fleetreg,prodyear,age,modelyear)       Total stock by technology segment region and cohort
 VEH_OPER_COHORT(tec,seg,fleetreg,prodyear,modelyear,age)       Total fleet operating emissions by technology segment region and cohort
 VEH_EOLT_COHORT(tec,seg,fleetreg,prodyear,modelyear,age)       Total end-of-life emissions by technology segment region and cohort
 TOT_OPER_EINT(tec,seg,fleetreg,modelyear)                      Total fleet operatin energy by technology segment and region
 VEH_TOT_ADD(fleetreg, year)      Total vehicles added by region
 VEH_TOT_REM(fleetreg, year)      Total vehicles retired by region
 VEH_STCK_CHK(fleetreg,year)
-VEH_STCK_GRD(tec,seg,fleetreg,optyear)
 BAU_PROD(modelyear)
 BAU_OPER(modelyear)
 BAU_EOL(modelyear)
@@ -240,10 +239,10 @@ TEC_PROD_IMPACT_INT(tec,seg,prodyear)$(ord(prodyear)>28) = TEC_PROD_IMPACT_INT_R
 * Assume constant for all regions for now
 VEH_OPER_EINT(tec,seg,prodyear) = genlogfnc(VEH_PARTAB('OPER_EINT',tec,seg,'A'),VEH_PARTAB('OPER_EINT',tec,seg,'B'),VEH_PARTAB('OPER_EINT',tec,seg,'r'),YEAR_PAR(prodyear),VEH_PARTAB('OPER_EINT',tec,seg,'u'));
 
-VEH_OPER_CINT(tec,enr,seg,fleetreg,age,modelyear,prodyear)$(ENR_TEC_CORRESPONDANCE(enr,tec)) = VEH_OPER_EINT(tec,seg,prodyear)*COHORT_AGE_CORRESPONDANCE(prodyear,age,modelyear)*(ENR_EMISS_INT(enr,fleetreg,modelyear)/1000);
+TEC_OPER_IMPACT_INT(tec,enr,seg,fleetreg,age,modelyear,prodyear)$(ENR_TEC_CORRESPONDANCE(enr,tec)) = VEH_OPER_EINT(tec,seg,prodyear)*COHORT_AGE_CORRESPONDANCE(prodyear,age,modelyear)*(ENR_EMISS_INT(enr,fleetreg,modelyear)/1000);
 
 *----- End-of-life phase emissions
-VEH_EOLT_CINT(tec,seg,modelyear) = genlogfnc(VEH_PARTAB('EOLT_CINT',tec,seg,'A'),VEH_PARTAB('EOLT_CINT',tec,seg,'B'),VEH_PARTAB('EOLT_CINT',tec,seg,'r'),YEAR_PAR(modelyear),VEH_PARTAB('EOLT_CINT',tec,seg,'u'));
+TEC_EOLT_IMPACT_INT(tec,seg,modelyear) = genlogfnc(VEH_PARTAB('EOLT_CINT',tec,seg,'A'),VEH_PARTAB('EOLT_CINT',tec,seg,'B'),VEH_PARTAB('EOLT_CINT',tec,seg,'r'),YEAR_PAR(modelyear),VEH_PARTAB('EOLT_CINT',tec,seg,'u'));
 
 
 *VEH_STCK_INT(tec,seg,fleetreg,age) = (INITIAL_TEC_SHARES(tec)*VEH_LIFT_PDF(age)*INITIAL_SEG_SHARES(seg))*EXOG_TOT_STOCK('2000',fleetreg);
@@ -262,7 +261,7 @@ VEH_EOLT_CINT(tec,seg,modelyear) = genlogfnc(VEH_PARTAB('EOLT_CINT',tec,seg,'A')
 
 FREE VARIABLES
 TOTC                                        Total CO2 emissions for the whole system over the whole period
-TOTC_OPT                                    Total CO2 emissions for the whole system over optimization period
+TOT_IMPACTS_OPT                                    Total CO2 emissions for the whole system over optimization period
 STOCK_CHANGE(year,fleetreg)               Net change in stock from one year to the next
 TOT_PRIMARY_MAT(year, mat_cat)              Total primary resources required by year [kg]
 
@@ -441,7 +440,7 @@ EQ_MAT_REQ(optyear, mat_cat)..                       MAT_REQ(optyear, mat_cat) =
 
 *** EMISSION and ENERGY MODELS incl OBJ. FUNCTION -------------------------------------------------
 * Objective function
-EQ_OBJ..                                              TOTC_OPT =e= sum((tec,seg,fleetreg,optyear), TOT_IMPACTS(tec,seg,fleetreg,optyear));
+EQ_OBJ..                                              TOT_IMPACTS_OPT =e= sum((tec,seg,fleetreg,optyear), TOT_IMPACTS(tec,seg,fleetreg,optyear));
 
 * Calculation of emissions from all vehicle classes per year
 EQ_VEH_TOTC(tec,seg,fleetreg,modelyear)..                  TOT_IMPACTS(tec,seg,fleetreg,modelyear) =e= PRODUCTION_IMPACTS
@@ -461,11 +460,11 @@ EQ_VEH_PROD_TOTC(tec,seg,fleetreg,modelyear)..             PRODUCTION_IMPACTS
 
 * Calculate emissions from vehicle operation
 EQ_VEH_OPER_TOTC(tec,seg,fleetreg,modelyear)..             OPERATION_IMPACTS
-(tec,seg,fleetreg,modelyear) =e= sum( (agej,enr,prodyear), TOT_STOCK(tec,seg,fleetreg,modelyear,agej) * COHORT_AGE_CORRESPONDANCE(prodyear,agej,modelyear)* VEH_OPER_CINT(tec,enr,seg,fleetreg,agej,modelyear,prodyear) *  VEH_OPER_DIST(modelyear, fleetreg));
+(tec,seg,fleetreg,modelyear) =e= sum( (agej,enr,prodyear), TOT_STOCK(tec,seg,fleetreg,modelyear,agej) * COHORT_AGE_CORRESPONDANCE(prodyear,agej,modelyear)* TEC_OPER_IMPACT_INT(tec,enr,seg,fleetreg,agej,modelyear,prodyear) *  VEH_OPER_DIST(modelyear, fleetreg));
 
 * Calculate emissions from vehicle disposal and recycling
 EQ_VEH_EOLT_TOTC(tec,seg,fleetreg,modelyear)..             EOL_IMPACTS
-(tec,seg,fleetreg,modelyear) =e= sum( (agej), STOCK_REMOVED(tec,seg,fleetreg,modelyear,agej))*VEH_EOLT_CINT(tec,seg,modelyear)
+(tec,seg,fleetreg,modelyear) =e= sum( (agej), STOCK_REMOVED(tec,seg,fleetreg,modelyear,agej))*TEC_EOLT_IMPACT_INT(tec,seg,modelyear)
 ;
 
 
@@ -504,45 +503,46 @@ MODEL
 *OPTION limcol = 0;
 *OPTION PROFILE = 0;
 * set to PROFILE = 2 for debugging 
+*tec_test.optfile=1;
 
 Scalar ms 'model status', ss 'solve status';
 
-*-----------------------------------------------------------------------------------
+*------------------------------------------------------------------------------                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     -----
 *
 * Model Execution
 *
 *-----------------------------------------------------------------------------------
 
-SOLVE EVD4EUR_Basic USING LP MINIMIZING TOTC_OPT;
+SOLVE EVD4EUR_Basic USING LP MINIMIZING TOT_IMPACTS_OPT;
 ms = EVD4EUR_Basic.modelstat;
 ss = EVD4EUR_Basic.solvestat;
 
-*SOLVE seg_test USING LP MINIMIZING TOTC_OPT;
+*SOLVE seg_test USING LP MINIMIZING TOT_IMPACTS_OPT;
 *ms = seg_test.modelstat;
 *ss = seg_test.solvestat;
 
-*SOLVE tec_test USING LP MINIMIZING TOTC_OPT; 
+*SOLVE tec_test USING LP MINIMIZING TOT_IMPACTS_OPT; 
 *ms = tec_test.modelstat;
 *ss = tec_test.solvestat;
 
-*SOLVE no_mat USING LP MINIMIZING TOTC_OPT;
+*SOLVE no_mat USING LP MINIMIZING TOT_IMPACTS_OPT;
 *ms = no_mat.modelstat;
 *ss = no_mat.solvestat;
 
-*SOLVE manuf_test USING LP MINIMIZING TOTC_OPT;
+*SOLVE manuf_test USING LP MINIMIZING TOT_IMPACTS_OPT;
 *ms = manuf_test.modelstat;
 *ss = manuf_test.solvestat;
 
-*SOLVE fleet_test USING LP MINIMIZING TOTC_OPT;
+*SOLVE fleet_test USING LP MINIMIZING TOT_IMPACTS_OPT;
 
-*SOLVE mat_test USING LP MINIMIZING TOTC_OPT;
+*SOLVE mat_test USING LP MINIMIZING TOT_IMPACTS_OPT;
 *ms = mat_test.modelstat;
 *ss = mat_test.solvestat;
 
-*SOLVE primary_mat_test USING LP MINIMIZING TOTC_OPT;
-*SOLVE test_model USING LP MINIMIZING TOTC_OPT;
+*SOLVE primary_mat_test USING LP MINIMIZING TOT_IMPACTS_OPT;
+*SOLVE test_model USING LP MINIMIZING TOT_IMPACTS_OPT;
 
-*SOLVE no_constraints USING LP MINIMIZING TOTC_OPT;
+*SOLVE no_constraints USING LP MINIMIZING TOT_IMPACTS_OPT;
 *ms = no_constraints.modelstat;
 *ss = no_constraints.solvestat;
 
@@ -559,24 +559,23 @@ TOT_CAPACITY_ADDED(modelyear) = sum((newtec,seg, fleetreg)$STOCK_ADDED.l(newtec,
 TOT_BATT_RECYCLED(modelyear) = sum((seg), sum((newtec,fleetreg, age), STOCK_REMOVED.l(newtec,seg,fleetreg,modelyear, age))* BEV_CAPAC(seg));
 MAT_REQ_TOT(modelyear, mat_cat) = sum((newtec,seg, fleetreg), STOCK_ADDED.l(newtec,seg,fleetreg,modelyear,new)*BEV_CAPAC(seg)*MAT_CONTENT(modelyear,mat_cat));
 
-VEH_STCK_GRD(newtec,seg,fleetreg,optyear) = ((1 + MAX_UPTAKE_RATE('IND',newtec)) * STOCK_ADDED.l(newtec,seg,fleetreg,optyear-1,new));
 VEH_TOT_ADD(fleetreg,modelyear) = sum((tec,seg), STOCK_ADDED.l(tec, seg, fleetreg, modelyear, new));
 VEH_TOT_REM(fleetreg, modelyear) = sum((tec,seg,age), STOCK_REMOVED.l(tec, seg, fleetreg, modelyear, age));
 VEH_STCK_CHK(fleetreg, modelyear) = sum((tec,seg,age), TOT_STOCK.l(tec,seg,fleetreg, modelyear, age));
 
 * summing the number of vehicles in fleet as check.
 EXOG_TOT_STOCK_CHECK(modelyear) = sum((tec,seg,fleetreg,age), TOT_STOCK.l(tec,seg,fleetreg,modelyear,age));
-VEH_STCK_COHORT(tec,seg,fleetreg,prodyear,agej,modelyear) $ COHORT_AGE_CORRESPONDANCE(prodyear,agej,modelyear) = (TOT_STOCK.l(tec,seg,fleetreg,modelyear,agej)*COHORT_AGE_CORRESPONDANCE(prodyear,agej,modelyear));
+STOCK_BY_COHORT(tec,seg,fleetreg,prodyear,agej,modelyear) $ COHORT_AGE_CORRESPONDANCE(prodyear,agej,modelyear) = (TOT_STOCK.l(tec,seg,fleetreg,modelyear,agej)*COHORT_AGE_CORRESPONDANCE(prodyear,agej,modelyear));
 
 * total operation emissions by cohort and model year
-VEH_OPER_COHORT(tec, seg, fleetreg, prodyear, modelyear ,age) = sum((enr), TOT_STOCK.l(tec,seg,fleetreg,modelyear,age) * COHORT_AGE_CORRESPONDANCE(prodyear,age,modelyear)* VEH_OPER_CINT(tec,enr,seg,fleetreg,age,modelyear,prodyear) * VEH_OPER_DIST(modelyear, fleetreg));
-VEH_EOLT_COHORT(tec,seg,fleetreg,prodyear,modelyear,age) = (STOCK_REMOVED.l(tec,seg,fleetreg,modelyear,age)* COHORT_AGE_CORRESPONDANCE(prodyear,age,modelyear)) * VEH_EOLT_CINT(tec,seg,modelyear);
+VEH_OPER_COHORT(tec, seg, fleetreg, prodyear, modelyear ,age) = sum((enr), TOT_STOCK.l(tec,seg,fleetreg,modelyear,age) * COHORT_AGE_CORRESPONDANCE(prodyear,age,modelyear)* TEC_OPER_IMPACT_INT(tec,enr,seg,fleetreg,age,modelyear,prodyear) * VEH_OPER_DIST(modelyear, fleetreg));
+VEH_EOLT_COHORT(tec,seg,fleetreg,prodyear,modelyear,age) = (STOCK_REMOVED.l(tec,seg,fleetreg,modelyear,age)* COHORT_AGE_CORRESPONDANCE(prodyear,age,modelyear)) * TEC_EOLT_IMPACT_INT(tec,seg,modelyear);
 TOT_OPER_EINT(tec,seg,fleetreg,modelyear) = sum((prodyear, age), TOT_STOCK.l(tec,seg,fleetreg,modelyear,age) * COHORT_AGE_CORRESPONDANCE(prodyear,age,modelyear) * VEH_OPER_EINT(tec,seg,prodyear) * VEH_OPER_DIST(modelyear, fleetreg));
 
 * calculate emissions for 0 electrification (business as usual)
 BAU_PROD(modelyear) = sum(seg, sum((tec,fleetreg), STOCK_ADDED.l(tec, seg, fleetreg, modelyear, new)) * TEC_PROD_IMPACT_INT('ICE',seg,modelyear));
-BAU_OPER(modelyear) = sum((fleetreg,age,prodyear,seg), sum((tec), TOT_STOCK.l(tec,seg,fleetreg,modelyear,age)) * VEH_OPER_CINT('ICE', 'FOS', seg, fleetreg, age, modelyear, prodyear) * COHORT_AGE_CORRESPONDANCE(prodyear,age ,modelyear) * VEH_OPER_DIST(modelyear, fleetreg));
-BAU_EOL(modelyear)  = sum(seg, sum((tec, fleetreg,age), STOCK_REMOVED.l(tec,seg,fleetreg,modelyear,age))  * VEH_EOLT_CINT('ICE',seg,modelyear));
+BAU_OPER(modelyear) = sum((fleetreg,age,prodyear,seg), sum((tec), TOT_STOCK.l(tec,seg,fleetreg,modelyear,age)) * TEC_OPER_IMPACT_INT('ICE', 'FOS', seg, fleetreg, age, modelyear, prodyear) * COHORT_AGE_CORRESPONDANCE(prodyear,age ,modelyear) * VEH_OPER_DIST(modelyear, fleetreg));
+BAU_EOL(modelyear)  = sum(seg, sum((tec, fleetreg,age), STOCK_REMOVED.l(tec,seg,fleetreg,modelyear,age))  * TEC_EOLT_IMPACT_INT('ICE',seg,modelyear));
 BAU_EMISSIONS(modelyear) = BAU_PROD(modelyear) + BAU_OPER(modelyear) + BAU_EOL(modelyear);
 
 
