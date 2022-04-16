@@ -183,14 +183,14 @@ class RawDataClass:
     Converts e.g., dicts and floats to timeseries in pd.Series format
     """
 
-    #TODO: move the operations from fleet_model here; calculation of veh_partab, glf terms, etc etc
+    #TODO: move the operations from fleet_model here; calculation of tec_parameters, glf terms, etc etc
 
     pkm_scenario: str = None
     all_pkm_scen: pd.DataFrame = None
     veh_pkm: pd.DataFrame = None
     fleet_vkm: pd.DataFrame = None
     batt_portfolio: pd.DataFrame = None
-    veh_factors: pd.DataFrame = None
+    tec_parameters_raw: pd.DataFrame = None
     B_term_prod: Union[dict, float] = None
     B_term_oper_EOL: Union[dict, float] = None
     r_term_factors: Union[dict, pd.Series] = None  # {str: float}
@@ -219,7 +219,7 @@ class ParametersClass:
     enr_tec_correspondance: Union[pd.Series, pd.DataFrame] = None
     cohort_age_correspondance: Union[pd.Series, pd.DataFrame] = None
     year_par: Union[pd.Series, pd.DataFrame] = None
-    veh_partab: Union[pd.Series, pd.DataFrame] = None
+    tec_parameters: Union[pd.Series, pd.DataFrame] = None
 
     # constraints
     manuf_cnstrnt: Union[pd.Series, pd.DataFrame] = None
@@ -387,8 +387,8 @@ class ParametersClass:
                    'virg_mat_supply': ['mat_cat', 'mat_prod'],
                    'mat_cint': ['mat_cat', 'mat_prod'],
                    'batt_portfolio':['seg', 'battery size'],
-                   'veh_factors': ['veheq', 'tec', 'seg'],
-                   # 'veh_partab': ['veheq', 'tec', 'seg'],
+                   'tec_parameters_raw': ['veheq', 'tec', 'seg'],
+                   # 'tec_parameters': ['veheq', 'tec', 'seg'],
                    'enr_tec_correspondance': ['enr', 'tec'],
                    'cohort_age_correspondance': ['cohort', 'age', 'year'],
                    'enr_impact_int_IAM': ['reg', 'enr'],
@@ -473,10 +473,10 @@ class ParametersClass:
                                                               self.raw_data.r_term_factors,
                                                               self.raw_data.u_term_factors
                                                              ))
-        if self.veh_partab is not None and has_required_data:
+        if self.tec_parameters is not None and has_required_data:
             log.warning('----- tec_parameters is overdefined')
         elif has_required_data:
-            self.veh_partab = self.build_veh_partab()
+            self.tec_parameters = self.build_tec_parameters()
 
         if self.raw_data.eur_batt_share:
             # multiply manufacturing constraint and critical material supply by eur_batt_share
@@ -645,7 +645,7 @@ class ParametersClass:
         except KeyError:
             log.info('Could not drop battery weight')
 
-    def build_veh_partab(self):
+    def build_tec_parameters(self):
         """
         Build TEC_PARAMETERS parameter containing sigmoid function terms.
 
@@ -677,14 +677,14 @@ class ParametersClass:
         # TODO: allow for series of B-term values
 
         # Fetch sigmoid A terms from RawDataClass
-        self.raw_data.veh_factors.columns.names = ['comp']
-        self.raw_data.veh_factors = self.raw_data.veh_factors.stack().to_frame('a')
+        self.raw_data.tec_parameters_raw.columns.names = ['comp']
+        self.raw_data.tec_parameters_raw = self.raw_data.tec_parameters_raw.stack().to_frame('a')
 
         # Retrieve production emission factors for chosen battery capacities and place in raw A factors (with component resolution)
         self.build_BEV()  # update self.prod_df with selected battery capacities
-        self.raw_data.veh_factors.sort_index(inplace=True)
+        self.raw_data.tec_parameters_raw.sort_index(inplace=True)
         for index, value in self.raw_data.prod_df.iteritems():
-            self.raw_data.veh_factors.loc[index, 'a'] = value
+            self.raw_data.tec_parameters_raw.loc[index, 'a'] = value
 
         # Get input for B-multiplication factors (relative to A) from YAML file
         reform = {(firstKey, secondKey, thirdKey): values for firstKey, secondDict in self.raw_data.B_term_prod.items() for secondKey, thirdDict in secondDict.items() for thirdKey, values in thirdDict.items()}
@@ -697,7 +697,7 @@ class ParametersClass:
         b_prod.index.names = ['veheq', 'tec', 'comp']
 
         # Apply B-multiplication factors to production A-factors (with component resolution)
-        temp_a = self.raw_data.veh_factors.join(b_prod, on=['veheq', 'tec', 'comp'], how='left')
+        temp_a = self.raw_data.tec_parameters_raw.join(b_prod, on=['veheq', 'tec', 'comp'], how='left')
         temp_prod_df['B'] = temp_a['a'] * temp_a[0]
         temp_prod_df.dropna(how='any', axis=0, inplace=True)
 
@@ -706,14 +706,14 @@ class ParametersClass:
         b_oper = pd.DataFrame(reform.values(), index=mi, columns=['b'])
 
         # Apply B-multiplication factors for operation and EOL A-factors
-        temp_oper_df = self.raw_data.veh_factors.join(b_oper, on=['veheq', 'tec'], how='left')
+        temp_oper_df = self.raw_data.tec_parameters_raw.join(b_oper, on=['veheq', 'tec'], how='left')
         temp_oper_df['B'] = temp_oper_df['a'] * temp_oper_df['b']
         temp_oper_df.dropna(how='any', axis=0, inplace=True)
         temp_oper_df.drop(columns=['a', 'b'], inplace=True)
 
 
         # Aggregate component A values for TEC_PARAMETERS parameter
-        A = self.raw_data.veh_factors.sum(axis=1)
+        A = self.raw_data.tec_parameters_raw.sum(axis=1)
         A = A.unstack(['comp']).sum(axis=1)
         A.columns = ['A']
 

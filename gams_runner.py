@@ -138,7 +138,7 @@ class GAMSRunner:
         cohort_age_correspondance = gmspy.df2param(self.db, fleet.parameters.cohort_age_correspondance, ['prodyear', 'age', 'year'], 'COHORT_AGE_CORRESPONDANCE')
 
         year_par = gmspy.df2param(self.db, fleet.parameters.year_par, ['year'], 'YEAR_PAR')
-        veh_partab = gmspy.df2param(self.db, fleet.parameters.veh_partab, ['veheq', 'tec', 'seg', 'sigvar'], 'VEH_PARTAB')
+        tec_parameters = gmspy.df2param(self.db, fleet.parameters.tec_parameters, ['veheq', 'tec', 'seg', 'sigvar'], 'TEC_PARAMETERS')
 
         try:
             max_uptake_rate = self.db.get_parameter('MAX_UPTAKE_RATE')

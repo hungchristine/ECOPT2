@@ -540,7 +540,7 @@ def vis_GAMS(fleet, fp, filename, param_values, export_png=False, export_pdf=Tru
         ax2 = fig.add_subplot(gs[0])  # vehicle plot
         ax1 = fig.add_subplot(gs[1], sharex=ax2)  # emissions plot
 
-        plot_ax2 = (fleet.stock_df_plot.sum(axis=1).unstack('seg').sum(axis=1).unstack('tec').sum(level='year')/1e6)
+        plot_ax2 = (fleet.tot_stock_plot.sum(axis=1).unstack('seg').sum(axis=1).unstack('tec').sum(level='year')/1e6)
         plot_ax2.plot(ax=ax2, kind='area', cmap=tec_cm, lw=0)
         (fleet.all_impacts/1e6).plot(ax=ax1, kind='area', lw=0, cmap=cmap_em)
         (fleet.bau_impacts/1e6).plot(ax=ax1, kind='line')
@@ -579,13 +579,13 @@ def vis_GAMS(fleet, fp, filename, param_values, export_png=False, export_pdf=Tru
     try:
         fig, ax = plt.subplots(1,1, dpi=300)
 
-        plot_emiss = fleet.all_impacts.sum(level=['fleetreg', 'tec'])
-        plot_emiss.index = plot_emiss.index.swaplevel('fleetreg', 'tec')
-        plot_emiss = sort_ind(plot_emiss, cat_type, fleet) #.sortlevel(0, sort_remaining=True)[0]
+        plot_impacts = fleet.impacts.sum(level=['fleetreg', 'tec'])
+        plot_impacts.index = plot_impacts.index.swaplevel('fleetreg', 'tec')
+        plot_impacts = sort_ind(plot_impacts, cat_type, fleet) #.sortlevel(0, sort_remaining=True)[0]
 
         ax.set_prop_cycle(paired_cycler)
 
-        (plot_emiss/1e6).T.plot(ax=ax, kind='area', lw=0, cmap=tec_cm4) #'Dark2')
+        (plot_impacts/1e6).T.plot(ax=ax, kind='area', lw=0, cmap=tec_cm4) #'Dark2')
         ax.set_ylabel('Lifecycle climate emissions \n Mt $CO_2$-eq', fontsize=13)
 
         if cropx:
@@ -654,7 +654,7 @@ def vis_GAMS(fleet, fp, filename, param_values, export_png=False, export_pdf=Tru
     """--- Plot total stocks by segment ---"""
     try:
         fig, ax = plt.subplots(1,1, dpi=300)
-        plot_data = fleet.stock_df_plot.sum(axis=1).unstack('seg').sum(axis=0, level=['year'])
+        plot_data = fleet.tot_stock_plot.sum(axis=1).unstack('seg').sum(axis=0, level=['year'])
         plot_data.plot(kind='area', ax=ax, cmap='jet', lw=0, title='Total stocks by segment')
         ax.set_xbound(0, 80)
         ax.set_ybound(lower=0)
@@ -672,7 +672,7 @@ def vis_GAMS(fleet, fp, filename, param_values, export_png=False, export_pdf=Tru
     try:
         fig, ax = plt.subplots(1,1, dpi=300)
 
-        tmp = fleet.stock_df_plot.sum(axis=1).unstack('fleetreg').sum(axis=0, level=['year']).T
+        tmp = fleet.tot_stock_plot.sum(axis=1).unstack('fleetreg').sum(axis=0, level=['year']).T
         tmp = sort_ind(tmp, cat_type, fleet).sort_index()
         tmp = tmp.T
         tmp.plot(kind='area', ax=ax, cmap='jet', lw=0, title='Total stocks by region')
@@ -691,7 +691,7 @@ def vis_GAMS(fleet, fp, filename, param_values, export_png=False, export_pdf=Tru
     """--- Plot total stocks by age, segment and technology ---"""
     try:
         fig, ax = plt.subplots(1,1, dpi=300)
-        plot_data = fleet.stock_df_plot.sum(axis=1).unstack('seg').unstack('tec').sum(axis=0, level='year')
+        plot_data = fleet.tot_stock_plot.sum(axis=1).unstack('seg').unstack('tec').sum(axis=0, level='year')
         plot_data.plot(kind='area', ax=ax, cmap=paired, lw=0,
                             title='Total stocks by segment and technology')
         ax.set_xbound(0, 80)
@@ -707,11 +707,11 @@ def vis_GAMS(fleet, fp, filename, param_values, export_png=False, export_pdf=Tru
     #%% Total stocks by age, segment and technology
     """--- Plot total stocks by age, segment and technology ---"""
 
-    #        ax = fleet.stock_df_plot.sum(axis=1).unstack('seg').unstack('tec').unstack('reg').plot(kind='area',cmap=paired,title='Total stocks by segment, technology and region')
+    #        ax = fleet.tot_stock_plot.sum(axis=1).unstack('seg').unstack('tec').unstack('reg').plot(kind='area',cmap=paired,title='Total stocks by segment, technology and region')
     try:
         fig, ax = plt.subplots(1,1, dpi=300)
 
-        stock_tec_seg_reg = fleet.stock_df_plot.sum(axis=1).unstack('seg').unstack('tec').unstack('fleetreg').T
+        stock_tec_seg_reg = fleet.tot_stock_plot.sum(axis=1).unstack('seg').unstack('tec').unstack('fleetreg').T
         stock_tec_seg_reg = sort_ind(stock_tec_seg_reg, cat_type, fleet)#.sortlevel(0, sort_remaining=True)[0]  # sortlevel returns one-element tuple
         stock_tec_seg_reg = stock_tec_seg_reg.T
         stock_tec_seg_reg.columns = stock_tec_seg_reg.columns.swaplevel('fleetreg', 'tec')
@@ -822,7 +822,7 @@ def vis_GAMS(fleet, fp, filename, param_values, export_png=False, export_pdf=Tru
             plot_virg_mat.plot(ax=ax1, lw=4, kind='line', alpha=0.7)
 
             # plot fleet evolution
-            fleet_evol = (fleet.stock_df_plot.sum(axis=1).unstack('seg').sum(axis=1).unstack('tec').sum(level='year')/1e6).loc['2020':]
+            fleet_evol = (fleet.tot_stock_plot.sum(axis=1).unstack('seg').sum(axis=1).unstack('tec').sum(level='year')/1e6).loc['2020':]
             fleet_evol.plot(ax=ax2, kind='area', cmap=tec_cm, lw=0)
 
             ax1.set_ylabel(f'{resource} used in new batteries \n {units} {resource}', fontsize=14)
@@ -1059,7 +1059,7 @@ def vis_GAMS(fleet, fp, filename, param_values, export_png=False, export_pdf=Tru
     try:
         fig, ax = plt.subplots(1, 1, dpi=300)
 
-        if fleet.batt_demand.max()[0] <= 1:
+        if fleet.new_capac_demand.max()[0] <= 1:
             plot_resources *= 1e3
             plot_prim_supply *= 1e3
             units = 'MWh'
@@ -1068,7 +1068,7 @@ def vis_GAMS(fleet, fp, filename, param_values, export_png=False, export_pdf=Tru
             units = 'GWh'
             ylabel = 'GWh new batteries per year'
 
-        dem = ax.stackplot(fleet.batt_demand.index, fleet.batt_demand[0],
+        dem = ax.stackplot(fleet.new_capac_demand.index, fleet.new_capac_demand[0],
                            lw=0, labels=['New battery demand'])
         constr = ax.plot(fleet.parameters.manuf_cnstrnt.index,
                          fleet.parameters.manuf_cnstrnt,
@@ -1445,23 +1445,23 @@ def vis_input(fleet, fp, filename, param_values, export_png, export_pdf=True, ma
     #
 
 
-        #stock_df_grouped =stock_df.groupby(level=[0])
-    #        for name, group in stock_df_grouped:
+        #tot_stock_grouped =tot_stock.groupby(level=[0])
+    #        for name, group in tot_stock_grouped:
     #            ax=group.plot(kind='area',cmap='Spectral_r',title=name+' stock by age')
     #            fix_age_legend(ax)
     #            pp.savefig()
 
-        #stock_df.columns = stock_df.columns.astype(int)
-        #stock_df.sort_index(axis=1,inplace=True)
-        #tot_stock_df=stock_df.sum(axis=0,level=1)
-        #ax = tot_stock_df.plot.area(cmap='Spectral_r',title='Total stocks by vehicle age',figsize = (10,6))
+        #tot_stock.columns = tot_stock.columns.astype(int)
+        #tot_stock.sort_index(axis=1,inplace=True)
+        #ot_stock_agg=tot_stock.sum(axis=0,level=1)
+        #ax = tot_stock_agg.plot.area(cmap='Spectral_r',title='Total stocks by vehicle age',figsize = (10,6))
         #fix_age_legend(ax)
         #plt.savefig('total_stocks_by_age.png',pad_inches=2)
         #pp.savefig()
 
         # Plot total stocks by technology
-    #        stock_df.sum(axis=1).unstack().T.plot(kind='area', title='Total stocks by technology')
-    #        stock_df.sum(axis=1).unstack().T.plot(title='Total stocks by technology')
+    #        tot_stock.sum(axis=1).unstack().T.plot(kind='area', title='Total stocks by technology')
+    #        tot_stock.sum(axis=1).unstack().T.plot(title='Total stocks by technology')
     #        plt.savefig('total_stocks_by_tec.png',dpi=600)
     #        pp.savefig()
 

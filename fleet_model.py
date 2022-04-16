@@ -307,6 +307,8 @@ class FleetModel:
                     self._e_dict[e] = gams_db[e].first_record().level
                 else:
                     log.warning(f'-----  e_dict ValueError in {e}!')
+            except TypeError:
+                log.warning(f'----- e_dict TypeError in {e}. Check model definition in GAMS file; it may not be in the model that was run.')
             except:
                 log.error(f'----- Error in {e}. {sys.exc_info()[0]}')
                 pass
@@ -378,8 +380,8 @@ class FleetModel:
             # self.stock_added = self._v_dict['STOCK_ADDED']
             # self.stock_removed = self._v_dict['STOCK_REMOVED']
             # self.tot_stock = self._v_dict['TOT_STOCK']
-            self.emissions = self._v_dict['TOT_IMPACTS']
-            self.annual_totc = self.emissions.sum(axis=0)
+            self.impacts = self._v_dict['TOT_IMPACTS']
+            self.annual_impacts = self.impacts.sum(axis=0)
 
             self.tot_impacts_opt = self._v_dict['TOT_IMPACTS_OPT']
 
@@ -403,29 +405,29 @@ class FleetModel:
                 log.warning(f'Could not load material related variables. Check model. {e}')
 
             # Prepare model output dataframes for visualization
-            self.stock_df = self._v_dict['TOT_STOCK']
-            self.stock_df = reorder_age_headers(self.stock_df)
+            self.tot_stock = self._v_dict['TOT_STOCK']
+            self.tot_stock = reorder_age_headers(self.tot_stock)
             self.stock_add = self._v_dict['STOCK_ADDED']
             self.stock_add = reorder_age_headers(self.stock_add)
             self.stock_add = self.stock_add.dropna(axis=1, how='any')
             self.stock_add.index.rename(['tec', 'seg', 'fleetreg', 'prodyear'], inplace=True)
             self.stock_rem = self._v_dict['STOCK_REMOVED']
             self.stock_rem = reorder_age_headers(self.stock_rem)
-            self.stock_df_plot = self.stock_df.stack().unstack('age')
-            self.stock_df_plot = reorder_age_headers(self.stock_df_plot)
-            if (self.stock_df_plot.values < 0).any():
+            self.tot_stock_plot = self.tot_stock.stack().unstack('age')
+            self.tot_stock_plot = reorder_age_headers(self.tot_stock_plot)
+            if (self.tot_stock_plot.values < 0).any():
                 # check for negative values in TOT_STOCK; throw a warning for large values.
-                if self.stock_df_plot.where((self.stock_df_plot < 0) & (np.abs(self.stock_df_plot) > 1e-1)).sum().sum() < 0:
+                if self.tot_stock_plot.where((self.tot_stock_plot < 0) & (np.abs(self.tot_stock_plot) > 1e-1)).sum().sum() < 0:
                     log.warning('----- Large negative values in TOT_STOCK found')
                     print('\n')
                 else:
                     # for smaller values, set 0 and print warning
                     print('-----Warning: Small negative values in TOT_STOCK found. Setting to 0')
                     log.warning('----- Small negative values in TOT_STOCK found. Setting to 0')
-                    self.stock_df_plot.where(~(self.stock_df_plot < 0) & ~(np.abs(self.stock_df_plot) <= 1e-1), other=0, inplace=True)
+                    self.tot_stock_plot.where(~(self.tot_stock_plot < 0) & ~(np.abs(self.tot_stock_plot) <= 1e-1), other=0, inplace=True)
                     print('\n')
 
-            self.stock_df_plot_grouped = self.stock_df_plot.groupby(['tec', 'seg'])
+            self.tot_stock_plot_grouped = self.tot_stock_plot.groupby(['tec', 'seg'])
         except ValueError as e:
             log.info(f'Could not load variables from .gdx. Perhaps input database was used? {e}')
         except Exception as e:
