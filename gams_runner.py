@@ -121,7 +121,7 @@ class GAMSRunner:
                 mat.add_record((key, producer))
 
         veh_oper_dist = gmspy.df2param(self.db, fleet.parameters.veh_oper_dist, ['year', 'reg'], 'VEH_OPER_DIST')
-        veh_stck_tot = gmspy.df2param(self.db, fleet.parameters.veh_stck_tot, ['year', 'fleetreg'], 'VEH_STCK_TOT')
+        exog_tot_stock = gmspy.df2param(self.db, fleet.parameters.exog_tot_stock, ['year', 'fleetreg'], 'EXOG_TOT_STOCK')
         initial_seg_shares = gmspy.df2param(self.db, fleet.parameters.initial_seg_shares, ['seg'], 'INITIAL_SEG_SHARES')
         bev_capac = gmspy.df2param(self.db, fleet.parameters.bev_capac, ['seg'], 'BEV_CAPAC')
 

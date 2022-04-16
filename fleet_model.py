@@ -157,7 +157,7 @@ class FleetModel:
 
         # --------------- Expected GAMS Outputs ------------------------------
         self.totc = None
-        self.veh_stck = pd.DataFrame()
+        self.tot_stock = pd.DataFrame()
 
         log.info('Imported parameters')
 
@@ -357,9 +357,9 @@ class FleetModel:
             return temp
 
         # Import the parameters that are calculated within the GAMS model
-        self.veh_prod_cint = self._p_dict['VEH_PROD_CINT']
-        self.veh_prod_cint = self.veh_prod_cint.stack().to_frame()
-        self.veh_prod_cint.index.rename(['tec', 'seg', 'prodyear'], inplace=True)
+        self.tec_prod_impact_int = self._p_dict['TEC_PROD_IMPACT_INT']
+        self.tec_prod_impact_int = self.tec_prod_impact_int.stack().to_frame()
+        self.tec_prod_impact_int.index.rename(['tec', 'seg', 'prodyear'], inplace=True)
 
         self.veh_oper_eint = self._p_dict['VEH_OPER_EINT']
         self.veh_oper_eint = self.veh_oper_eint.stack().to_frame()
@@ -374,10 +374,10 @@ class FleetModel:
 
         # Import model results
         try:
-            self.veh_stck_delta = self._v_dict['VEH_STCK_DELTA']
+            self.stock_change = self._v_dict['STOCK_CHANGE']
             # self.stock_added = self._v_dict['STOCK_ADDED']
-            # self.veh_stck_rem = self._v_dict['VEH_STCK_REM']
-            # self.veh_stck = self._v_dict['VEH_STCK']
+            # self.stock_removed = self._v_dict['STOCK_REMOVED']
+            # self.tot_stock = self._v_dict['TOT_STOCK']
             self.emissions = self._v_dict['TOT_IMPACTS']
             self.annual_totc = self.emissions.sum(axis=0)
 
@@ -403,25 +403,25 @@ class FleetModel:
                 log.warning(f'Could not load material related variables. Check model. {e}')
 
             # Prepare model output dataframes for visualization
-            self.stock_df = self._v_dict['VEH_STCK']
+            self.stock_df = self._v_dict['TOT_STOCK']
             self.stock_df = reorder_age_headers(self.stock_df)
             self.stock_add = self._v_dict['STOCK_ADDED']
             self.stock_add = reorder_age_headers(self.stock_add)
             self.stock_add = self.stock_add.dropna(axis=1, how='any')
             self.stock_add.index.rename(['tec', 'seg', 'fleetreg', 'prodyear'], inplace=True)
-            self.stock_rem = self._v_dict['VEH_STCK_REM']
+            self.stock_rem = self._v_dict['STOCK_REMOVED']
             self.stock_rem = reorder_age_headers(self.stock_rem)
             self.stock_df_plot = self.stock_df.stack().unstack('age')
             self.stock_df_plot = reorder_age_headers(self.stock_df_plot)
             if (self.stock_df_plot.values < 0).any():
-                # check for negative values in VEH_STCK; throw a warning for large values.
+                # check for negative values in TOT_STOCK; throw a warning for large values.
                 if self.stock_df_plot.where((self.stock_df_plot < 0) & (np.abs(self.stock_df_plot) > 1e-1)).sum().sum() < 0:
-                    log.warning('----- Large negative values in VEH_STCK found')
+                    log.warning('----- Large negative values in TOT_STOCK found')
                     print('\n')
                 else:
                     # for smaller values, set 0 and print warning
-                    print('-----Warning: Small negative values in VEH_STCK found. Setting to 0')
-                    log.warning('----- Small negative values in VEH_STCK found. Setting to 0')
+                    print('-----Warning: Small negative values in TOT_STOCK found. Setting to 0')
+                    log.warning('----- Small negative values in TOT_STOCK found. Setting to 0')
                     self.stock_df_plot.where(~(self.stock_df_plot < 0) & ~(np.abs(self.stock_df_plot) <= 1e-1), other=0, inplace=True)
                     print('\n')
 
@@ -468,9 +468,9 @@ class FleetModel:
         # self.op_impacts = self.op_impacts.sum(level=['tec', 'seg', 'fleetreg', 'prodyear']) # sum the operating emissions over all model years for each cohort
         # self.op_impacts = self.op_impacts.reorder_levels(order=['tec', 'seg', 'fleetreg', 'prodyear']) # reorder MultiIndex to add production emissions
 
-        tmp_prod = self.veh_prod_cint.reindex_like(self.veh_oper_cint.reorder_levels(['tec','seg','prodyear','modelyear','enr','fleetreg','age']), method='ffill')
+        tmp_prod = self.tec_prod_impact_int.reindex_like(self.veh_oper_cint.reorder_levels(['tec','seg','prodyear','modelyear','enr','fleetreg','age']), method='ffill')
         tmp_prod.fillna(method='bfill', inplace=True)  # for filling 1999
-        self.LC_emissions = self.op_impacts.add(self.veh_prod_cint.reindex_like(self.op_impacts.reorder_levels(['tec','seg','prodyear','enr','fleetreg','age','modelyear']), method='ffill'))
+        self.LC_emissions = self.op_impacts.add(self.tec_prod_impact_int.reindex_like(self.op_impacts.reorder_levels(['tec','seg','prodyear','enr','fleetreg','age','modelyear']), method='ffill'))
         self.LC_emissions.fillna(method='bfill', inplace=True) # for filling 1999
         self.LC_emissions = self.LC_emissions.squeeze()
         self.LC_emissions.index = self.LC_emissions.index.droplevel(['enr','prodyear'])
@@ -569,7 +569,7 @@ class FleetModel:
         self.op_impacts_avg.columns = [0]
         self.op_impacts_avg.index = self.op_impacts_avg.index.set_levels(self.op_impacts_avg.index.levels[-1].astype(str), level='age')
 
-        tmp_prod = self.veh_prod_cint.reindex_like(self.op_impacts_avg, method='ffill')
+        tmp_prod = self.tec_prod_impact_int.reindex_like(self.op_impacts_avg, method='ffill')
         tmp_prod = tmp_prod.fillna(method='bfill')  # fill 1999 prodyear
 
      # Estimate operating emissions by cohort (i.e., prodyear)

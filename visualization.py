@@ -760,7 +760,7 @@ def vis_GAMS(fleet, fp, filename, param_values, export_png=False, export_pdf=Tru
     try:
         fig, ax = plt.subplots(1, 1, dpi=300)
 
-        plot_stock = fleet.veh_stck.sum(axis=1).unstack(['tec', 'fleetreg']).sum(level=['year'])
+        plot_stock = fleet.tot_stock.sum(axis=1).unstack(['tec', 'fleetreg']).sum(level=['year'])
 
         plot_stock = plot_stock.stack('tec').T  # remove MultiIndex to set Categorical type for regions
         plot_stock = sort_ind(plot_stock, cat_type, fleet)
@@ -1151,9 +1151,9 @@ def vis_input(fleet, fp, filename, param_values, export_png, export_pdf=True, ma
     try:
         fig, axes = plt.subplots(3, 1, sharex=True, figsize=(5,6))
         plot_data = {}
-        plot_data['fleetreg'] = fleet.veh_stck.groupby(['fleetreg', 'year']).sum().sum(axis=1)
-        plot_data['seg'] = fleet.veh_stck.groupby(['seg', 'year']).sum().sum(axis=1)
-        plot_data['tec'] = fleet.veh_stck.groupby(['tec', 'year']).sum().sum(axis=1)
+        plot_data['fleetreg'] = fleet.tot_stock.groupby(['fleetreg', 'year']).sum().sum(axis=1)
+        plot_data['seg'] = fleet.tot_stock.groupby(['seg', 'year']).sum().sum(axis=1)
+        plot_data['tec'] = fleet.tot_stock.groupby(['tec', 'year']).sum().sum(axis=1)
         cms = ['tab10', dark , tec_cm]
 
         for key, cmap, ax in zip(plot_data.keys(), cms, axes.flatten()):
@@ -1175,7 +1175,7 @@ def vis_input(fleet, fp, filename, param_values, export_png, export_pdf=True, ma
         plot_data = pd.DataFrame(columns=['vehicles added', 'vehicles removed', 'total vehicles'])
         plot_data['vehicles added'] = fleet.stock_add.unstack(['seg','tec']).sum(axis=1)
         plot_data['vehicles removed'] = -fleet.stock_rem.unstack(['seg', 'tec']).sum(axis=1)
-        plot_data['total vehicles'] = fleet.veh_stck.unstack(['seg', 'tec']).sum(axis=1)
+        plot_data['total vehicles'] = fleet.tot_stock.unstack(['seg', 'tec']).sum(axis=1)
         grouped_plot_data = plot_data.groupby('fleetreg')
 
         for key, ax in zip(grouped_plot_data.groups.keys(), axes.flatten()):
@@ -1201,7 +1201,7 @@ def vis_input(fleet, fp, filename, param_values, export_png, export_pdf=True, ma
         fig, axes = plt.subplots(len(fleet.sets.seg), len(fleet.sets.fleetreg), sharex=True, sharey=True, figsize=(8,20))
         fig.suptitle('Vehicle dynamics, technology and region', y=0.85)
         plt.subplots_adjust(top=0.85, hspace=0.25, wspace=0.05)
-        grouped_plot_data = fleet.veh_stck.groupby(['seg', 'fleetreg'])
+        grouped_plot_data = fleet.tot_stock.groupby(['seg', 'fleetreg'])
         for key, ax in zip(grouped_plot_data.groups.keys(), axes.flatten()):
             df = grouped_plot_data.get_group(key)
             df.index = df.index.droplevel(['fleetreg', 'seg'])
@@ -1466,9 +1466,9 @@ def vis_input(fleet, fp, filename, param_values, export_png, export_pdf=True, ma
     #        pp.savefig()
 
         # Plot stock additions and removals by technology
-    #        temp_vdict_a = reorder_age_headers(v_dict['VEH_STCK_REM']).stack()
+    #        temp_vdict_a = reorder_age_headers(v_dict['STOCK_REMOVED']).stack()
     #        temp_vdict_b = reorder_age_headers(v_dict['STOCK_ADDED']).stack()
-    #        add_rem_df = pd.concat([temp_vdict_a, temp_vdict_b],axis=1,keys=('VEH_STCK_REM', 'STOCK_ADDED'))
+    #        add_rem_df = pd.concat([temp_vdict_a, temp_vdict_b],axis=1,keys=('STOCK_REMOVED', 'STOCK_ADDED'))
     #
     #        add_rem_df_2=add_rem_df.stack().unstack(level=[0,3])
     #

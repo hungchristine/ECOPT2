@@ -215,7 +215,7 @@ class RawDataClass:
 class ParametersClass:
     """Contains all parameter values for GAMS model (in ready-to-insert form)."""
 
-    veh_stck_tot: Union[pd.Series, pd.DataFrame] = None
+    exog_tot_stock: Union[pd.Series, pd.DataFrame] = None
     enr_tec_correspondance: Union[pd.Series, pd.DataFrame] = None
     cohort_age_correspondance: Union[pd.Series, pd.DataFrame] = None
     year_par: Union[pd.Series, pd.DataFrame] = None
@@ -266,8 +266,8 @@ class ParametersClass:
             tmp = self.max_uptake_rate.stack()
             self.max_uptake_rate = tmp.to_dict()
 
-        if self.veh_stck_tot.index.name == 'fleetreg':
-            self.veh_stck_tot = self.veh_stck_tot.T
+        if self.exog_tot_stock.index.name == 'fleetreg':
+            self.exog_tot_stock = self.exog_tot_stock.T
 
 
 
@@ -460,7 +460,7 @@ class ParametersClass:
 
         attrs = dir(self.raw_data)
 
-        self.veh_stck_tot = self.interpolate_years(self.veh_stck_tot, sets, axis=0)
+        self.exog_tot_stock = self.interpolate_years(self.exog_tot_stock, sets, axis=0)
 
         if (self.veh_oper_dist is not None) and ((self.raw_data.veh_pkm is not None) or (self.raw_data.pkm_scenario is not None)):
             log.warning('----- Vehicle operating distance overspecified. Both an annual vehicle mileage and an IAM scenario are specified.')
@@ -487,7 +487,7 @@ class ParametersClass:
 
         # TODO: expand veh_oper_dist to be tec and reg specific (also in GAMS)
         if self.raw_data.veh_pkm:
-            self.veh_oper_dist = self.interpolate_years(self.raw_data.veh_pkm, sets).div(self.veh_stck_tot)
+            self.veh_oper_dist = self.interpolate_years(self.raw_data.veh_pkm, sets).div(self.exog_tot_stock)
         # if self.raw_data.pkm_scenario:
         #     # calculate veh oper dist
         #     self.raw_data.passenger_demand = self.raw_data.all_pkm_scen.T[self.raw_data.pkm_scenario]
@@ -498,11 +498,11 @@ class ParametersClass:
         #     self.raw_data.fleet_vkm  = self.raw_data.passenger_demand / self.raw_data.occupancy_rate
         #     self.raw_data.fleet_vkm.index = sets.modelyear
         #     self.raw_data.fleet_vkm.index.name = 'year'
-        #     self.veh_oper_dist = self.raw_data.fleet_vkm / self.veh_stck_tot.T.sum()  # assumes uniform distribution of annual distance travelled vs vehicle age and region
+        #     self.veh_oper_dist = self.raw_data.fleet_vkm / self.exog_tot_stock.T.sum()  # assumes uniform distribution of annual distance travelled vs vehicle age and region
             if self.veh_oper_dist.mean() > 25e3:
-                log.warning('Warning, calculated annual vehicle mileage is above 25000 km, check fleet_km and veh_stck_tot')
+                log.warning('Warning, calculated annual vehicle mileage is above 25000 km, check fleet_km and exog_tot_stock')
             elif self.veh_oper_dist.mean() < 1e4:
-                log.warning('Warning, calculated annual vehicle mileage is less than 10000 km, check fleet_km and veh_stck_tot')
+                log.warning('Warning, calculated annual vehicle mileage is less than 10000 km, check fleet_km and exog_tot_stock')
 
         if isinstance(self.veh_oper_dist, (float, int)):
             # calculate veh_oper_dist
@@ -1008,7 +1008,7 @@ class ParametersClass:
             print('\n *****************************************')
             log.warning(f'----- The following parameters are missing values: {missing}')
 
-        self.check_region_sets(self.veh_stck_tot.index, 'veh_stck_tot', sets.fleetreg)
+        self.check_region_sets(self.exog_tot_stock.index, 'exog_tot_stock', sets.fleetreg)
 
     @staticmethod
     def check_region_sets(par_ind, par_name, reg_set):
