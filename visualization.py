@@ -532,7 +532,7 @@ def vis_GAMS(fleet, fp, filename, param_values, export_png=False, export_pdf=Tru
     #%% Total emissions by tec and lifecycle phase, against total stock
     """--- Plot total emissions by tec and lifecycle phase---"""
     try:
-        fleet.all_emissions.sort_index(axis=1, level=0, ascending=False, inplace=True)
+        fleet.all_impacts.sort_index(axis=1, level=0, ascending=False, inplace=True)
 
         fig = plt.figure(figsize=(14,9), dpi=300)
 
@@ -542,7 +542,7 @@ def vis_GAMS(fleet, fp, filename, param_values, export_png=False, export_pdf=Tru
 
         plot_ax2 = (fleet.stock_df_plot.sum(axis=1).unstack('seg').sum(axis=1).unstack('tec').sum(level='year')/1e6)
         plot_ax2.plot(ax=ax2, kind='area', cmap=tec_cm, lw=0)
-        (fleet.all_emissions/1e6).plot(ax=ax1, kind='area', lw=0, cmap=cmap_em)
+        (fleet.all_impacts/1e6).plot(ax=ax1, kind='area', lw=0, cmap=cmap_em)
         (fleet.bau_emissions/1e6).plot(ax=ax1, kind='line')
 
         ax1.set_ylabel('Lifecycle climate emissions \n Mt $CO_2$-eq', fontsize=13)
@@ -579,7 +579,7 @@ def vis_GAMS(fleet, fp, filename, param_values, export_png=False, export_pdf=Tru
     try:
         fig, ax = plt.subplots(1,1, dpi=300)
 
-        plot_emiss = fleet.all_emissions.sum(level=['fleetreg', 'tec'])
+        plot_emiss = fleet.all_impacts.sum(level=['fleetreg', 'tec'])
         plot_emiss.index = plot_emiss.index.swaplevel('fleetreg', 'tec')
         plot_emiss = sort_ind(plot_emiss, cat_type, fleet) #.sortlevel(0, sort_remaining=True)[0]
 
@@ -615,8 +615,8 @@ def vis_GAMS(fleet, fp, filename, param_values, export_png=False, export_pdf=Tru
     try:
         fig, ax = plt.subplots(1,1, dpi=300)
 
-        # plot_data = (fleet.all_emissions.loc[:, 'Operation'] / 1e6)
-        plot_data = fleet.veh_oper_totc.sum(level=['tec','fleetreg'], axis=0).loc(axis=0)[:,'EUR'] / 1e6
+        # plot_data = (fleet.all_impacts.loc[:, 'Operation'] / 1e6)
+        plot_data = fleet.operation_impacts.sum(level=['tec','fleetreg'], axis=0).loc(axis=0)[:,'EUR'] / 1e6
         plot_data.index = plot_data.index.droplevel('fleetreg')
         plot_data = plot_data.T
         cmap = LinearSegmentedColormap.from_list('temp', colors=['silver', 'grey'])
@@ -643,7 +643,7 @@ def vis_GAMS(fleet, fp, filename, param_values, export_png=False, export_pdf=Tru
                             'EU 2030 target, \n20% reduction from 2008 emissions',
                             'EU 2050 target, \n60% reduction from 1990 emissions'
                             ], loc=2, bbox_to_anchor= (1.01, 1.01))
-        export_fig(fp, ax, pp, export_pdf, export_png, png_name='operation_emissions')
+        export_fig(fp, ax, pp, export_pdf, export_png, png_name='operation_impacts')
 
     except Exception as e:
         print('\n *****************************************')
@@ -1257,7 +1257,7 @@ def vis_input(fleet, fp, filename, param_values, export_png, export_pdf=True, ma
 
 
     """--- Plot production emissions by tec and seg ---"""
-    prod = fleet.veh_prod_totc.stack().unstack('tec').sum(level=['seg', 'year'])#/1e9
+    prod = fleet.production_impacts.stack().unstack('tec').sum(level=['seg', 'year'])#/1e9
     prod_int = prod / fleet.stock_add.sum(axis=1).unstack('tec').sum(level=['seg', 'prodyear'])  # production emission intensity
     try:
         fig, axes = plt.subplots(3, 2, figsize=(9,9), sharex=True, sharey=True)
@@ -1265,7 +1265,7 @@ def vis_input(fleet, fp, filename, param_values, export_png, export_pdf=True, ma
         title='Total production emissions by technology and segment'
         plot_subplots(fig, axes, prod.groupby(['seg']), title=title, labels=labels)
         fig.text(0.04, 0.5, 'Production emissions \n(Mt CO2-eq)', ha='center', va='center', rotation='vertical')
-        export_fig(fp, fig, pp, export_pdf, export_png, png_name='tot_prod_emissions')
+        export_fig(fp, fig, pp, export_pdf, export_png, png_name='tot_prod_impacts')
         pp.savefig(bbox_inches='tight')
 
     except Exception as e:
@@ -1426,9 +1426,9 @@ def vis_input(fleet, fp, filename, param_values, export_png, export_pdf=True, ma
     #        pp.savefig(bbox_inches='tight')
 
         """kept commented"""
-        #for (key,ax) in zip(fleet.veh_prod_totc.unstack('tec').groupby(['seg']).groups.keys(),axes.flatten()):
-    #        for (key,ax) in zip(fleet.veh_prod_totc.unstack('tec').groupby(['seg']).groups.keys(),axes.flatten()):
-    #            fleet.veh_prod_totc.unstack('tec').groupby(['seg']).get_group(key).plot(ax=ax,cmap='jet',legend=False)
+        #for (key,ax) in zip(fleet.production_impacts.unstack('tec').groupby(['seg']).groups.keys(),axes.flatten()):
+    #        for (key,ax) in zip(fleet.production_impacts.unstack('tec').groupby(['seg']).groups.keys(),axes.flatten()):
+    #            fleet.production_impacts.unstack('tec').groupby(['seg']).get_group(key).plot(ax=ax,cmap='jet',legend=False)
     #            ax.set_xticklabels([2000,2010,2020,2030,2040,2050])
     #            ax.set_xlabel('year')
     #            ax.set_title(key,fontsize=10,fontweight='bold')
@@ -1480,9 +1480,9 @@ def vis_input(fleet, fp, filename, param_values, export_png, export_pdf=True, ma
     #        pp.savefig()
     #
     #        # Plot carbon emissions by technology and lifecycle phase
-    #        totc_df=pd.concat((v_dict['VEH_PROD_TOTC'],v_dict['VEH_OPER_TOTC'],v_dict['VEH_EOLT_TOTC'],v_dict['emissions']),axis=0,keys=('VEH_PROD_TOTC', 'VEH_OPER_TOTC', 'VEH_EOLT_TOTC', 'EMISSIONS'))
-    #        totc_df=totc_df.T.swaplevel(0,1,axis=1)
-    #        ax = totc_df.plot(figsize = (10,6))
+    #        tot_impact_df=pd.concat((v_dict['PRODUCTION_IMPACTS'],v_dict['OPERATION_IMPACTS'],v_dict['EOL_IMPACTS'],v_dict['emissions']),axis=0,keys=('PRODUCTION_IMPACTS', 'OPERATION_IMPACTS', 'EOL_IMPACTS', 'TOT_IMPACTS'))
+    #        tot_impact_df=tot_impact_df.T.swaplevel(0,1,axis=1)
+    #        ax = tot_impact_df.plot(figsize = (10,6))
     #        fix_age_legend(ax)
     #        plt.savefig('CO2.png',pad_inches=2, dpi=600)
     #        pp.savefig()

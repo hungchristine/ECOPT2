@@ -278,12 +278,12 @@ SLACK_NEW_BATT_CAP(year)
 POSITIVE VARIABLES
 VEH_STCK(tec,seg,fleetreg,year,age)        Number of vehicles of a given age in a given year
 VEH_STCK_REM(tec,seg,fleetreg,year,age)    Number of vehicles of a given age retired in a given year
-EMISSIONS(tec,seg,fleetreg,year)            Total CO2 emissions of vehicles per year by technology              [t CO2-eq]
+TOT_IMPACTS(tec,seg,fleetreg,year)            Total CO2 emissions of vehicles per year by technology              [t CO2-eq]
 STOCK_ADDED(tec,seg,fleetreg,year,age)    Stock additions (new car sales)
 
-VEH_PROD_TOTC(tec,seg,fleetreg,year)       Total CO2 emissions from production of vehicles per year            [t CO2-eq]
-VEH_OPER_TOTC(tec,seg,fleetreg,year)       Total CO2 emissions from operations of vehicles per year            [t CO2-eq]
-VEH_EOLT_TOTC(tec,seg,fleetreg,year)       Total CO2 emissions from vehicle end of life treatment per year     [t CO2-eq]
+PRODUCTION_IMPACTS(tec,seg,fleetreg,year)       Total CO2 emissions from production of vehicles per year            [t CO2-eq]
+OPERATION_IMPACTS(tec,seg,fleetreg,year)       Total CO2 emissions from operations of vehicles per year            [t CO2-eq]
+EOL_IMPACTS(tec,seg,fleetreg,year)       Total CO2 emissions from vehicle end of life treatment per year     [t CO2-eq]
 
 RECYCLED_BATT(year,fleetreg, age)          Total battery capacity sent to recycling per year                   [kWh]
 RECYCLED_MAT(year, mat_cat)                Materials recovered from recycled batteries                         [kg]
@@ -441,25 +441,31 @@ EQ_MAT_REQ(optyear, mat_cat)..                       MAT_REQ(optyear, mat_cat) =
 
 *** EMISSION and ENERGY MODELS incl OBJ. FUNCTION -------------------------------------------------
 * Objective function
-EQ_OBJ..                                              TOTC_OPT =e= sum((tec,seg,fleetreg,optyear), EMISSIONS(tec,seg,fleetreg,optyear));
+EQ_OBJ..                                              TOTC_OPT =e= sum((tec,seg,fleetreg,optyear), TOT_IMPACTS(tec,seg,fleetreg,optyear));
 
 * Calculation of emissions from all vehicle classes per year
-EQ_VEH_TOTC(tec,seg,fleetreg,modelyear)..                  EMISSIONS(tec,seg,fleetreg,modelyear) =e= VEH_PROD_TOTC(tec,seg,fleetreg,modelyear) + VEH_OPER_TOTC(tec,seg,fleetreg,modelyear) + VEH_EOLT_TOTC(tec,seg,fleetreg,modelyear);
+EQ_VEH_TOTC(tec,seg,fleetreg,modelyear)..                  TOT_IMPACTS(tec,seg,fleetreg,modelyear) =e= PRODUCTION_IMPACTS
+(tec,seg,fleetreg,modelyear) + OPERATION_IMPACTS
+(tec,seg,fleetreg,modelyear) + EOL_IMPACTS
+(tec,seg,fleetreg,modelyear);
 
 * Calculate emissions from virgin materials. Currently assumes zero emissions for recycled materials.
 EQ_MAT_TOTC(modelyear, mat_prod)..                         MAT_CO2(modelyear, mat_prod) =e= (MAT_MIX(modelyear, mat_prod) * MAT_CINT(modelyear, mat_prod))/1000
 %SLACK_VIRG_MAT% + SLACK_VIRG_MAT(modelyear, mat_prod)*1e6
                                                             ;
 * Calculate emissions from vehicle production
-EQ_VEH_PROD_TOTC(tec,seg,fleetreg,modelyear)..             VEH_PROD_TOTC(tec,seg,fleetreg,modelyear) =e= STOCK_ADDED(tec,seg,fleetreg,modelyear,new)*VEH_PROD_CINT(tec,seg,modelyear) + sum(mat_prod, MAT_CO2(modelyear, mat_prod))
+EQ_VEH_PROD_TOTC(tec,seg,fleetreg,modelyear)..             PRODUCTION_IMPACTS
+(tec,seg,fleetreg,modelyear) =e= STOCK_ADDED(tec,seg,fleetreg,modelyear,new)*VEH_PROD_CINT(tec,seg,modelyear) + sum(mat_prod, MAT_CO2(modelyear, mat_prod))
 %SLACK_ADD% + SLACK_TEC_ADD(newtec,seg,fleetreg,modelyear,new)*VEH_PROD_CINT(tec,seg,modelyear)*1e6
 ;
 
 * Calculate emissions from vehicle operation
-EQ_VEH_OPER_TOTC(tec,seg,fleetreg,modelyear)..             VEH_OPER_TOTC(tec,seg,fleetreg,modelyear) =e= sum( (agej,enr,prodyear), VEH_STCK(tec,seg,fleetreg,modelyear,agej) * COHORT_AGE_CORRESPONDANCE(prodyear,agej,modelyear)* VEH_OPER_CINT(tec,enr,seg,fleetreg,agej,modelyear,prodyear) *  VEH_OPER_DIST(modelyear, fleetreg));
+EQ_VEH_OPER_TOTC(tec,seg,fleetreg,modelyear)..             OPERATION_IMPACTS
+(tec,seg,fleetreg,modelyear) =e= sum( (agej,enr,prodyear), VEH_STCK(tec,seg,fleetreg,modelyear,agej) * COHORT_AGE_CORRESPONDANCE(prodyear,agej,modelyear)* VEH_OPER_CINT(tec,enr,seg,fleetreg,agej,modelyear,prodyear) *  VEH_OPER_DIST(modelyear, fleetreg));
 
 * Calculate emissions from vehicle disposal and recycling
-EQ_VEH_EOLT_TOTC(tec,seg,fleetreg,modelyear)..             VEH_EOLT_TOTC(tec,seg,fleetreg,modelyear) =e= sum( (agej), VEH_STCK_REM(tec,seg,fleetreg,modelyear,agej))*VEH_EOLT_CINT(tec,seg,modelyear)
+EQ_VEH_EOLT_TOTC(tec,seg,fleetreg,modelyear)..             EOL_IMPACTS
+(tec,seg,fleetreg,modelyear) =e= sum( (agej), VEH_STCK_REM(tec,seg,fleetreg,modelyear,agej))*VEH_EOLT_CINT(tec,seg,modelyear)
 ;
 
 
