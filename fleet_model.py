@@ -128,8 +128,8 @@ class FleetModel:
         self.parameters.validate_data(self.sets)
 
         #### filters and parameter aliases ####
-        self.parameters.enr_veh = self._process_df_to_series(self.parameters.enr_veh)
-        self.parameters.veh_pay = self._process_df_to_series(self.parameters.veh_pay)
+        self.parameters.enr_tec_correspondance = self._process_df_to_series(self.parameters.enr_tec_correspondance)
+        self.parameters.cohort_age_correspondance = self._process_df_to_series(self.parameters.cohort_age_correspondance)
 
         if type(self.parameters.raw_data.r_term_factors) == float:
             self.parameters.raw_data.r_term_factors = {'BEV': self.parameters.raw_data.r_term_factors, 'ICE': self.parameters.raw_data.r_term_factors}
@@ -157,7 +157,7 @@ class FleetModel:
 
         # --------------- Expected GAMS Outputs ------------------------------
         self.totc = None
-        self.VEH_STCK = pd.DataFrame()
+        self.veh_stck = pd.DataFrame()
 
         log.info('Imported parameters')
 
@@ -375,11 +375,11 @@ class FleetModel:
         # Import model results
         try:
             self.veh_stck_delta = self._v_dict['VEH_STCK_DELTA']
-            self.veh_stck_add = self._v_dict['VEH_STCK_ADD']
-            self.veh_stck_rem = self._v_dict['VEH_STCK_REM']
-            self.veh_stck = self._v_dict['VEH_STCK']
-            self.veh_totc = self._v_dict['VEH_TOTC']
-            self.annual_totc = self.veh_totc.sum(axis=0)
+            # self.stock_added = self._v_dict['STOCK_ADDED']
+            # self.veh_stck_rem = self._v_dict['VEH_STCK_REM']
+            # self.veh_stck = self._v_dict['VEH_STCK']
+            self.emissions = self._v_dict['EMISSIONS']
+            self.annual_totc = self.emissions.sum(axis=0)
 
             self.totc_opt = self._v_dict['TOTC_OPT']
 
@@ -388,9 +388,9 @@ class FleetModel:
             self.total_op_emissions = self.veh_oper_totc.sum(axis=0)
             self.veh_eolt_totc = self._v_dict['VEH_EOLT_TOTC']
 
-            self.emissions = pd.concat([self.veh_prod_totc.stack(), self.veh_oper_totc.stack(), self.veh_eolt_totc.stack()], axis=1)
-            self.emissions.columns = ['Production', 'Operation', 'End-of-life']
-            self.emissions = self.emissions.unstack(['tec', 'year']).sum().unstack([None, 'tec'])
+            self.all_emissions = pd.concat([self.veh_prod_totc.stack(), self.veh_oper_totc.stack(), self.veh_eolt_totc.stack()], axis=1)
+            self.all_emissions.columns = ['Production', 'Operation', 'End-of-life']
+            self.all_emissions = self.all_emissions.unstack(['tec', 'year']).sum().unstack([None, 'tec'])
 
             try:
                 self.recycled_batt = self._v_dict['RECYCLED_BATT']
@@ -405,7 +405,7 @@ class FleetModel:
             # Prepare model output dataframes for visualization
             self.stock_df = self._v_dict['VEH_STCK']
             self.stock_df = reorder_age_headers(self.stock_df)
-            self.stock_add = self._v_dict['VEH_STCK_ADD']
+            self.stock_add = self._v_dict['STOCK_ADDED']
             self.stock_add = reorder_age_headers(self.stock_add)
             self.stock_add = self.stock_add.dropna(axis=1, how='any')
             self.stock_add.index.rename(['tec', 'seg', 'fleetreg', 'prodyear'], inplace=True)
@@ -446,10 +446,10 @@ class FleetModel:
             self.mat_demand = self._p_dict['MAT_REQ_TOT']
             self.mat_demand = pd.concat([self.mat_demand], axis=1, keys=['total'])
 
-            self.batt_demand = self._p_dict['TOT_BATT_MANUF']
-            self.batt_demand.index.rename(['modelyear'], inplace=True)
+            self.new_capac_demand = self._p_dict['TOT_CAPACITY_ADDED']
+            self.new_capac_demand.index.rename(['modelyear'], inplace=True)
             # reset index (which is currently a single-level MultiIndex)
-            self.batt_demand.index = self.batt_demand.index.get_level_values(0)
+            self.new_capac_demand.index = self.new_capac_demand.index.get_level_values(0)
         except TypeError as e:
             log.warning(f"Could not find post-processing parameter(s). {e}")
 
@@ -475,9 +475,9 @@ class FleetModel:
         self.LC_emissions = self.LC_emissions.squeeze()
         self.LC_emissions.index = self.LC_emissions.index.droplevel(['enr','prodyear'])
 
-        self.enr_cint = self._p_dict['ENR_CINT']
-        self.enr_cint = self.enr_cint.stack()
-        self.enr_cint.index.rename(['enr', 'reg', 'year'], inplace=True)
+        self.enr_emiss_int = self._p_dict['ENR_EMISS_INT']
+        self.enr_emiss_int = self.enr_emiss_int.stack()
+        self.enr_emiss_int.index.rename(['enr', 'reg', 'year'], inplace=True)
 
         log.info('Finished importing results from GAMS run')
 
@@ -580,7 +580,7 @@ class FleetModel:
             op = operation_em.loc['2000':'2050']
 
             # Calculate initial stock
-            init_stock = self.veh_stck_add.loc(axis=1)[0]  # retrieve all stock added (age=0) in cohort year
+            init_stock = self.stock_add.loc(axis=1)[0]  # retrieve all stock added (age=0) in cohort year
             init_stock.replace(0, np.nan)
             init_stock.dropna(axis=0, inplace=True)
             init_stock.index = init_stock.index.reorder_levels([3, 2, 0, 1])

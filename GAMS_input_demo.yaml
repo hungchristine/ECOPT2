@@ -1,6 +1,6 @@
 # probably not necessary; covered by the gradient constraint
 
-veh_stck_int_seg:
+initial_seg_shares:
  def:
   - 0.08
   - 0.21

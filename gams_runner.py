@@ -122,33 +122,33 @@ class GAMSRunner:
 
         veh_oper_dist = gmspy.df2param(self.db, fleet.parameters.veh_oper_dist, ['year', 'reg'], 'VEH_OPER_DIST')
         veh_stck_tot = gmspy.df2param(self.db, fleet.parameters.veh_stck_tot, ['year', 'fleetreg'], 'VEH_STCK_TOT')
-        veh_stck_int_seg = gmspy.df2param(self.db, fleet.parameters.veh_stck_int_seg, ['seg'], 'VEH_STCK_INT_SEG')
+        initial_seg_shares = gmspy.df2param(self.db, fleet.parameters.initial_seg_shares, ['seg'], 'INITIAL_SEG_SHARES')
         bev_capac = gmspy.df2param(self.db, fleet.parameters.bev_capac, ['seg'], 'BEV_CAPAC')
 
-        veh_lift_cdf = gmspy.df2param(self.db, fleet.parameters.veh_lift_cdf, ['age'], 'VEH_LIFT_CDF')
-        veh_lift_pdf = gmspy.df2param(self.db, fleet.parameters.veh_lift_pdf, ['age'], 'VEH_LIFT_PDF')
-        veh_lift_age = gmspy.df2param(self.db, fleet.parameters.veh_lift_age, ['age'], 'VEH_LIFT_AGE')
+        # veh_lift_cdf = gmspy.df2param(self.db, fleet.parameters.veh_lift_cdf, ['age'], 'VEH_LIFT_CDF')
+        # veh_lift_pdf = gmspy.df2param(self.db, fleet.parameters.veh_lift_pdf, ['age'], 'VEH_LIFT_PDF')
+        lifetime_age_distribution = gmspy.df2param(self.db, fleet.parameters.lifetime_age_distribution, ['age'], 'LIFETIME_AGE_DISTRIBUTION')
         veh_lift_mor = gmspy.df2param(self.db, fleet.parameters.veh_lift_mor, ['age'], 'VEH_LIFT_MOR')
 
-        veh_stck_int_tec = gmspy.df2param(self.db, fleet.parameters.veh_stck_int_tec,['tec'],'VEH_STCK_INT_TEC')
+        initial_tec_shares = gmspy.df2param(self.db, fleet.parameters.initial_tec_shares,['tec'],'INITIAL_TEC_SHARES')
 
-        enr_veh = gmspy.df2param(self.db, fleet.parameters.enr_veh, ['enr', 'tec'], 'ENR_VEH')
-        enr_cint = gmspy.df2param(self.db, fleet.parameters.enr_cint, ['enr', 'reg', 'year'], 'ENR_CINT')
+        enr_tec_correspondance = gmspy.df2param(self.db, fleet.parameters.enr_tec_correspondance, ['enr', 'tec'], 'ENR_TEC_CORRESPONDANCE')
+        enr_emiss_int = gmspy.df2param(self.db, fleet.parameters.enr_emiss_int, ['enr', 'reg', 'year'], 'ENR_EMISS_INT')
 
-        veh_pay = gmspy.df2param(self.db, fleet.parameters.veh_pay, ['prodyear', 'age', 'year'], 'VEH_PAY')
+        cohort_age_correspondance = gmspy.df2param(self.db, fleet.parameters.cohort_age_correspondance, ['prodyear', 'age', 'year'], 'COHORT_AGE_CORRESPONDANCE')
 
         year_par = gmspy.df2param(self.db, fleet.parameters.year_par, ['year'], 'YEAR_PAR')
         veh_partab = gmspy.df2param(self.db, fleet.parameters.veh_partab, ['veheq', 'tec', 'seg', 'sigvar'], 'VEH_PARTAB')
 
         try:
-            veh_add_grd = self.db.get_parameter('VEH_ADD_GRD')
+            max_uptake_rate = self.db.get_parameter('MAX_UPTAKE_RATE')
         except:
-            veh_add_grd = self.db.add_parameter_dc('VEH_ADD_GRD', ['grdeq', 'newtec'])
+            max_uptake_rate = self.db.add_parameter_dc('MAX_UPTAKE_RATE', ['grdeq', 'newtec'])
 
         # Prep work making add gradient df from given rate constraint
         # adding growth constraint for each (new/emerging) tec
-        for keys, value in iter(fleet.parameters.veh_add_grd.items()):
-            veh_add_grd.add_record(keys).value = value
+        for keys, value in iter(fleet.parameters.max_uptake_rate.items()):
+            max_uptake_rate.add_record(keys).value = value
 
         # gro_cnstrnt = gmspy.df2param(self.db, fleet.gro_cnstrnt, ['year'], 'GRO_CNSTRNT')
 

@@ -1425,11 +1425,11 @@ fp = os.path.join(data_fp, 'GAMS_input.xlsx')
 with pd.ExcelWriter(fp, mode='a') as writer:
     workBook = writer.book
     try:
-        workBook.remove(workBook['enr_cint_IAM'])
+        workBook.remove(workBook['enr_emiss_int_IAM'])
     except:
             print("Worksheet does not exist")
     finally:
-        cluster_footprints.to_excel(writer, 'enr_cint_IAM', startrow=1)
+        cluster_footprints.to_excel(writer, 'enr_emiss_int_IAM', startrow=1)
         writer.save()
 
 #%%

@@ -216,8 +216,8 @@ class ParametersClass:
     """Contains all parameter values for GAMS model (in ready-to-insert form)."""
 
     veh_stck_tot: Union[pd.Series, pd.DataFrame] = None
-    enr_veh: Union[pd.Series, pd.DataFrame] = None
-    veh_pay: Union[pd.Series, pd.DataFrame] = None
+    enr_tec_correspondance: Union[pd.Series, pd.DataFrame] = None
+    cohort_age_correspondance: Union[pd.Series, pd.DataFrame] = None
     year_par: Union[pd.Series, pd.DataFrame] = None
     veh_partab: Union[pd.Series, pd.DataFrame] = None
 
@@ -227,22 +227,22 @@ class ParametersClass:
     mat_content: Union[List, pd.Series, pd.DataFrame] = None
     virg_mat_supply: Union[pd.Series, pd.DataFrame] = None
     mat_cint: Union[List, pd.Series, pd.DataFrame] = None
-    veh_add_grd: Union[float, pd.Series, pd.DataFrame] = None
+    max_uptake_rate: Union[float, pd.Series, pd.DataFrame] = None
 
-    enr_cint: Union[pd.Series, pd.DataFrame] = None
-    enr_cint_iam: Union[pd.Series, pd.DataFrame] = None # move to rawdataclass?
+    enr_emiss_int: Union[pd.Series, pd.DataFrame] = None
+    enr_emiss_int_IAM: Union[pd.Series, pd.DataFrame] = None # move to rawdataclass?
 
     raw_data: RawDataClass = None
 
     veh_oper_dist: Union[float, int, List, Dict, pd.Series, pd.DataFrame] = None
-    veh_stck_int_seg: Union[Dict, List] = field(default_factory=lambda:[0.08, 0.21, 0.27, 0.08, 0.03, 0.34])  # Shares from 2017, ICCT report
-    veh_stck_int_tec: Union[Dict, pd.Series, pd.DataFrame] = None
+    initial_seg_shares: Union[Dict, List] = field(default_factory=lambda:[0.08, 0.21, 0.27, 0.08, 0.03, 0.34])  # Shares from 2017, ICCT report
+    initial_tec_shares: Union[Dict, pd.Series, pd.DataFrame] = None
 
     bev_capac: Union[Dict, List] = field(default_factory=lambda:{'A': 26.6, 'B': 42.2, 'C': 59.9, 'D': 75., 'E':95., 'F':100.})
-    veh_lift_cdf: Union[pd.Series, pd.DataFrame] = None
-    veh_lift_pdf: Union[pd.Series, pd.DataFrame] = None
+    # veh_lift_cdf: Union[pd.Series, pd.DataFrame] = None
+    # veh_lift_pdf: Union[pd.Series, pd.DataFrame] = None
     veh_lift_mor: Union[pd.Series, pd.DataFrame] = None
-    veh_lift_age: Union[pd.Series, pd.DataFrame] = None
+    lifetime_age_distribution: Union[pd.Series, pd.DataFrame] = None
 
     recovery_pct: Union[float, pd.Series, pd.DataFrame] = None
 
@@ -262,9 +262,9 @@ class ParametersClass:
             self.bev_capac = [float(value) for value in self.bev_capac]
 
         # convert DataFrame to correct format (used in initializing FleetModel from .gdx file)
-        if isinstance(self.veh_add_grd, pd.DataFrame) and not isinstance(self.veh_add_grd.index, pd.MultiIndex):
-            tmp = self.veh_add_grd.stack()
-            self.veh_add_grd = tmp.to_dict()
+        if isinstance(self.max_uptake_rate, pd.DataFrame) and not isinstance(self.max_uptake_rate.index, pd.MultiIndex):
+            tmp = self.max_uptake_rate.stack()
+            self.max_uptake_rate = tmp.to_dict()
 
         if self.veh_stck_tot.index.name == 'fleetreg':
             self.veh_stck_tot = self.veh_stck_tot.T
@@ -388,10 +388,11 @@ class ParametersClass:
                    'mat_cint': ['mat_cat', 'mat_prod'],
                    'batt_portfolio':['seg', 'battery size'],
                    'veh_factors': ['veheq', 'tec', 'seg'],
-                   'enr_veh': ['enr', 'tec'],
-                   'veh_pay': ['cohort', 'age', 'year'],
-                   'enr_cint_iam': ['reg', 'enr'],
-                   'enr_cint': ['reg', 'enr'],
+                   # 'veh_partab': ['veheq', 'tec', 'seg'],
+                   'enr_tec_correspondance': ['enr', 'tec'],
+                   'cohort_age_correspondance': ['cohort', 'age', 'year'],
+                   'enr_emiss_int_IAM': ['reg', 'enr'],
+                   'enr_emiss_int': ['reg', 'enr'],
                    }
         # read parameter values in from Excel
         params_dict = {}
@@ -464,8 +465,8 @@ class ParametersClass:
         if (self.veh_oper_dist is not None) and ((self.raw_data.veh_pkm is not None) or (self.raw_data.pkm_scenario is not None)):
             log.warning('----- Vehicle operating distance overspecified. Both an annual vehicle mileage and an IAM scenario are specified.')
 
-        if self.veh_pay is None:
-            self.veh_pay = self.build_veh_pay(sets)  # establish self.veh_pay
+        if self.cohort_age_correspondance is None:
+            self.cohort_age_correspondance = self.build_cohort_age_correspondance(sets)  # establish self.cohort_age_correspondance
 
         has_required_data = all(attr is not None for attr in (self.raw_data.B_term_prod,
                                                               self.raw_data.B_term_oper_EOL,
@@ -473,7 +474,7 @@ class ParametersClass:
                                                               self.raw_data.u_term_factors
                                                              ))
         if self.veh_partab is not None and has_required_data:
-            log.warning('----- veh_partab is overdefined')
+            log.warning('----- tec_parameters is overdefined')
         elif has_required_data:
             self.veh_partab = self.build_veh_partab()
 
@@ -518,29 +519,29 @@ class ParametersClass:
                                              index=sets.modelyear,
                                              columns=sets.mat_cat)
 
-        if (self.raw_data.enr_glf_terms is not None) and (self.enr_cint is not None or self.enr_cint_IAM is not None):
-            log.warning('----- Source for energy pathways may be overspecified; both enr_glf_terms and enr_cint are specified. Using enr_cint.')
+        if (self.raw_data.enr_glf_terms is not None) and (self.enr_emiss_int is not None or self.enr_emiss_int_IAM is not None):
+            log.warning('----- Source for energy pathways may be overspecified; both enr_glf_terms and enr_emiss_int are specified. Using enr_emiss_int.')
 
-        if self.enr_cint is not None or self.enr_cint_IAM is not None:
-            if self.enr_cint_iam is not None:
-                self.check_region_sets(self.enr_cint_iam.index.get_level_values('reg'), 'enr_cint_iam', sets.reg)
-                # for building enr_cint from IAM pathways (see electricity_clustering.py)
-                self.enr_cint_iam = self.interpolate_years(self.enr_cint_iam, sets)
-                self.enr_cint_iam.index = self.enr_cint_iam.index.reorder_levels(['enr', 'reg', 'year'])  # match correct set order for enr_cint
+        if self.enr_emiss_int is not None or self.enr_emiss_int_IAM is not None:
+            if self.enr_emiss_int_IAM is not None:
+                self.check_region_sets(self.enr_emiss_int_IAM.index.get_level_values('reg'), 'enr_emiss_int_IAM', sets.reg)
+                # for building enr_emiss_int directly from IAM pathways (see electricity_clustering.py)
+                self.enr_emiss_int_IAM = self.interpolate_years(self.enr_emiss_int_IAM, sets)
+                self.enr_emiss_int_IAM.index = self.enr_emiss_int_IAM.index.reorder_levels(['enr', 'reg', 'year'])  # match correct set order for enr_emiss_int
 
-            if self.enr_cint is not None:
-                    self.check_region_sets(self.enr_cint.index.get_level_values('reg'), 'enr_cint', sets.reg)
-                    self.enr_cint = self.interpolate_years(self.enr_cint, sets)
-                    self.enr_cint.index = self.enr_cint.index.reorder_levels(['enr', 'reg', 'year'])
-                    self.enr_cint = pd.concat([self.enr_cint_iam, self.enr_cint])
+            if self.enr_emiss_int is not None:
+                    self.check_region_sets(self.enr_emiss_int.index.get_level_values('reg'), 'enr_emiss_int', sets.reg)
+                    self.enr_emiss_int = self.interpolate_years(self.enr_emiss_int, sets)
+                    self.enr_emiss_int.index = self.enr_emiss_int.index.reorder_levels(['enr', 'reg', 'year'])
+                    self.enr_emiss_int = pd.concat([self.enr_emiss_int_IAM, self.enr_emiss_int])
         elif self.raw_data.enr_glf_terms is not None:
             self.check_region_sets(self.raw_data.enr_glf_terms.index.get_level_values('reg'), 'enr_glf_terms', sets.reg)
-            # build enr_cint from generalized logistic function
+            # build enr_emiss_int from generalized logistic function
             mi = pd.MultiIndex.from_product([sets.reg, sets.enr, sets.modelyear], names=['reg', 'enr', 'modelyear'])
-            self.enr_cint = pd.Series(index=mi)
+            self.enr_emiss_int = pd.Series(index=mi)
 
 
-            # complete enr_cint parameter with fossil fuel chain and electricity in production regions
+            # complete enr_emiss_int parameter with fossil fuel chain and electricity in production regions
             # using terms for general logisitic function
             for label, row in self.raw_data.enr_glf_terms.iterrows():
                 A = row['A']
@@ -550,17 +551,17 @@ class ParametersClass:
                 reg = label[1]
                 enr = label[0]
                 for t in [((2000)+i) for i in range(81)]:
-                    self.enr_cint.loc[(reg, enr, str(t))] = A + (B - A) / (1 + np.exp(- r*(t - u)))
+                    self.enr_emiss_int.loc[(reg, enr, str(t))] = A + (B - A) / (1 + np.exp(- r*(t - u)))
 
-            self.enr_cint = self.enr_cint.swaplevel(0, 1) # enr, reg, year
-            self.enr_cint = self.enr_cint.to_frame()
-            self.enr_cint.dropna(how='all', axis=0, inplace=True)
+            self.enr_emiss_int = self.enr_emiss_int.swaplevel(0, 1) # enr, reg, year
+            self.enr_emiss_int = self.enr_emiss_int.to_frame()
+            self.enr_emiss_int.dropna(how='all', axis=0, inplace=True)
 
-        if (isinstance(self.raw_data.tec_add_gradient, float)) and (self.veh_add_grd is None):
-            self.veh_add_grd = {}
+        if (isinstance(self.raw_data.tec_add_gradient, float)) and (self.max_uptake_rate is None):
+            self.max_uptake_rate = {}
             for element in product(*[sets.grdeq, sets.tec]):
                 if element[1] in sets.newtec:
-                    self.veh_add_grd[element] = self.raw_data.tec_add_gradient
+                    self.max_uptake_rate[element] = self.raw_data.tec_add_gradient
 
         if len(self.virg_mat_supply.columns) in [len(sets.year), len(sets.optyear), len(sets.modelyear)]:
             # if years are in columns, transpose for transferring to GAMS
@@ -568,20 +569,20 @@ class ParametersClass:
 
         oldtec = list(set(sets.tec) - set(sets.newtec))  # get name of incumbent technology; works for single tec
         if len(sets.newtec) == 1:
-            self.veh_stck_int_tec = pd.Series([1-self.raw_data.bev_int_shr, self.raw_data.bev_int_shr], index=oldtec + sets.newtec)
+            self.initial_tec_shares = pd.Series([1-self.raw_data.bev_int_shr, self.raw_data.bev_int_shr], index=oldtec + sets.newtec)
         else:
             if isinstance(self.raw_data.bev_int_shr, dict):
                 all_new_tecs = sum(self.raw_data.bev_int_shr.values())
-                self.veh_stck_int_tec = pd.Series(self.raw_data.bev_int_shr)
-                self.veh_stck_int_tec.loc[oldtec] = 1- all_new_tecs
+                self.initial_tec_shares = pd.Series(self.raw_data.bev_int_shr)
+                self.initial_tec_shares.loc[oldtec] = 1- all_new_tecs
             elif isinstance(self.raw_data.bev_int_shr, pd.DataFrame) or isinstance(self.raw_data.bev_int_shr, pd.Series):
-                self.veh_stck_int_tec.loc[oldtec] - 1 - self.veh_stck_int_tec.sum()
+                self.initial_tec_shares.loc[oldtec] - 1 - self.initial_tec_shares.sum()
 
         self.year_par = pd.Series([float(i) for i in sets.year], index=sets.year)
         self.calc_veh_lifetime(sets)
 
 
-    def build_veh_pay(self, sets):
+    def build_cohort_age_correspondance(self, sets):
         """
         Build production year-cohort concordance matrix for use in GAMS (as parameter).
 
@@ -646,7 +647,7 @@ class ParametersClass:
 
     def build_veh_partab(self):
         """
-        Build VEH_PARTAB parameter containing sigmoid function terms.
+        Build TEC_PARAMETERS parameter containing sigmoid function terms.
 
         Fetch current (A-term) data from Excel spreadsheet and battery
         DataFrame. Upper asymptote (B term values) for production and EOL
@@ -711,12 +712,12 @@ class ParametersClass:
         temp_oper_df.drop(columns=['a', 'b'], inplace=True)
 
 
-        # Aggregate component A values for VEH_PARTAB parameter
+        # Aggregate component A values for TEC_PARAMETERS parameter
         A = self.raw_data.veh_factors.sum(axis=1)
         A = A.unstack(['comp']).sum(axis=1)
         A.columns = ['A']
 
-        # Begin building final VEH_PARTAB parameter table
+        # Begin building final TEC_PARAMETERS parameter table
         temp_df['A'] = A
         B = pd.concat([temp_prod_df, temp_oper_df], axis=0).dropna(how='any', axis=1)
         B = B.unstack(['comp']).sum(axis=1)
@@ -750,21 +751,20 @@ class ParametersClass:
         # Placeholder for Weibull calculations
         # Weibull: alpha = scale, beta = shape
         # self.veh_lift_cdf = pd.Series(weibull_min.cdf(x, c, loc=0, scale=1), index=sets.age)
-        # self.veh_lift_age = pd.Series()
+        # self.lifetime_age_distribution = pd.Series()
         # self.raw_data.veh_avg_age = alpha * gamma(1+beta^-1)
         # self.raw_data.veh_age_stdev^2 = alpha^2 * (gamma(1+2*beta^-1) - gamma(1+beta^-1)^2)
-
-        self.veh_lift_cdf = pd.Series(norm.cdf(sets.age_int, self.raw_data.veh_avg_age, self.raw_data.veh_age_stdev), index=sets.age)
-        self.veh_lift_cdf.index = self.veh_lift_cdf.index.astype('str')
+        # self.veh_lift_cdf = pd.Series(norm.cdf(sets.age_int, self.raw_data.veh_avg_age, self.raw_data.veh_age_stdev), index=sets.age)
+        # self.veh_lift_cdf.index = self.veh_lift_cdf.index.astype('str')
 
         # Calculate normalized survival function
-        self.veh_lift_age = pd.Series(self.calc_steadystate_vehicle_age_distributions(sets.age_int, self.raw_data.veh_avg_age, self.raw_data.veh_age_stdev), index=sets.age)
+        self.lifetime_age_distribution = pd.Series(self.calc_steadystate_vehicle_age_distributions(sets.age_int, self.raw_data.veh_avg_age, self.raw_data.veh_age_stdev), index=sets.age)
         self.veh_lift_sc = pd.Series(norm.sf(sets.age_int, self.raw_data.veh_avg_age, self.raw_data.veh_age_stdev), index=sets.age)
-        self.veh_lift_pdf = pd.Series(norm.pdf(sets.age_int, self.raw_data.veh_avg_age, self.raw_data.veh_age_stdev), index=sets.age)
+        # self.veh_lift_pdf = pd.Series(norm.pdf(sets.age_int, self.raw_data.veh_avg_age, self.raw_data.veh_age_stdev), index=sets.age)
 
-        self.veh_lift_pdf.index = self.veh_lift_pdf.index.astype('str')
+        # self.veh_lift_pdf.index = self.veh_lift_pdf.index.astype('str')
 
-        self.veh_lift_mor = pd.Series(self.calc_probability_of_vehicle_retirement(sets.age_int, self.veh_lift_age), index=sets.age)
+        self.veh_lift_mor = pd.Series(self.calc_probability_of_vehicle_retirement(sets.age_int, self.lifetime_age_distribution), index=sets.age)
         self.veh_lift_mor.index = self.veh_lift_mor.index.astype('str')
 
 
@@ -984,25 +984,25 @@ class ParametersClass:
 
         """
 
-        if isinstance(self.veh_stck_int_seg, list):
+        if isinstance(self.initial_seg_shares, list):
             # convert to dict with explicit connection to segments
-            self.veh_stck_int_seg = {seg: share for seg, share in zip(sets.seg, self.veh_stck_int_seg)}
-        if isinstance(self.veh_stck_int_seg, dict):
-            if sum(self.veh_stck_int_seg.values()) != 1:
+            self.initial_seg_shares = {seg: share for seg, share in zip(sets.seg, self.initial_seg_shares)}
+        if isinstance(self.initial_seg_shares, dict):
+            if sum(self.initial_seg_shares.values()) != 1:
                 print('\n *****************************************')
-                log.warning('----- Vehicle segment shares (VEH_STCK_INT_SEG) do not sum to 1!')
-        if isinstance(self.veh_stck_int_tec, (list, pd.Series)):
-            tec_sum = sum(self.veh_stck_int_tec)
-        elif isinstance(self.veh_stck_int_tec, dict):
-            tec_sum = sum(self.veh_stck_int_tec.values())
+                log.warning('----- Vehicle segment shares (INITIAL_SEG_SHARES) do not sum to 1!')
+        if isinstance(self.initial_tec_shares, (list, pd.Series)):
+            tec_sum = sum(self.initial_tec_shares)
+        elif isinstance(self.initial_tec_shares, dict):
+            tec_sum = sum(self.initial_tec_shares.values())
         else:
             print('\n *****************************************')
-            log.warning(f'----- veh_stck_int_tec is an invalid format. It is {type(self.veh_stck_int_tec)}; only dict or list allowed')
+            log.warning(f'----- initial_tec_shares is an invalid format. It is {type(self.initial_tec_shares)}; only dict or list allowed')
             tec_sum = np.nan
         if tec_sum != 1:
             print('\n *****************************************')
-            log.warning('----- Vehicle powertrain technology shares (VEH_STCK_INT_TEC) do not sum to 1!')
-            print(self.veh_stck_int_tec)
+            log.warning('----- Vehicle powertrain technology shares (initial_tec_shares) do not sum to 1!')
+            print(self.initial_tec_shares)
         if any(v is None for k, v in self.__dict__.items()):
             missing = [k for k, v in self.__dict__.items() if v is None]
             print('\n *****************************************')
