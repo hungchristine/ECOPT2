@@ -366,13 +366,13 @@ class FleetModel:
         self.veh_oper_eint.index.rename(['tec', 'seg', 'year'], inplace=True)
 
         try:
-            self.veh_oper_cint = self._p_dict['VEH_OPER_CINT']
-            self.veh_oper_cint = self.veh_oper_cint.stack().to_frame()
-            self.veh_oper_cint.index.names = ['tec', 'enr', 'seg', 'fleetreg', 'age', 'modelyear', 'prodyear']
+            self.tec_oper_impact_int = self._p_dict['TEC_OPER_IMPACT_INT']
+            self.tec_oper_impact_int = self.tec_oper_impact_int.stack().to_frame()
+            self.tec_oper_impact_int.index.names = ['tec', 'enr', 'seg', 'fleetreg', 'age', 'modelyear', 'prodyear']
         except:
-            log.warning('Invalid input for veh_oper_cint')
+            log.warning('Invalid input for tec_oper_impact_int')
 
-        # Import model results
+        # Import selected model results
         try:
             self.stock_change = self._v_dict['STOCK_CHANGE']
             # self.stock_added = self._v_dict['STOCK_ADDED']
@@ -381,7 +381,7 @@ class FleetModel:
             self.emissions = self._v_dict['TOT_IMPACTS']
             self.annual_totc = self.emissions.sum(axis=0)
 
-            self.totc_opt = self._v_dict['TOTC_OPT']
+            self.tot_impacts_opt = self._v_dict['TOT_IMPACTS_OPT']
 
             self.production_impacts = self._v_dict['PRODUCTION_IMPACTS']
             self.operation_impacts = self._v_dict['OPERATION_IMPACTS']
@@ -433,15 +433,15 @@ class FleetModel:
 
         # Import post-processing parameters
         try:
-            self.veh_oper_cohort = self._p_dict['VEH_OPER_COHORT']
-            self.veh_oper_cohort.index.rename(['tec', 'seg', 'fleetreg', 'prodyear', 'modelyear' 'age'], inplace=True)
-            self.stock_cohort = self._p_dict['VEH_STCK_COHORT']
+            self.oper_impact_cohort = self._p_dict['OPER_IMPACT_COHORT']
+            self.oper_impact_cohort.index.rename(['tec', 'seg', 'fleetreg', 'prodyear', 'modelyear' 'age'], inplace=True)
+            self.stock_cohort = self._p_dict['STOCK_BY_COHORT']
             self.stock_cohort.index.rename(['tec', 'seg', 'fleetreg', 'prodyear', 'age'], inplace=True)
             self.stock_cohort.columns.rename('modelyear', inplace=True)
             self.stock_cohort = self.stock_cohort.droplevel(level='age', axis=0)
             self.stock_cohort = self.stock_cohort.stack().unstack('prodyear').sum(axis=0, level=['tec', 'fleetreg', 'modelyear'])
-            self.bau_emissions = self._p_dict['BAU_EMISSIONS']
-            self.bau_emissions.index.rename(['modelyear'], inplace=True)
+            self.bau_impacts = self._p_dict['BAU_IMPACTS']
+            self.bau_impacts.index.rename(['modelyear'], inplace=True)
 
             self.mat_demand = self._p_dict['MAT_REQ_TOT']
             self.mat_demand = pd.concat([self.mat_demand], axis=1, keys=['total'])
@@ -459,25 +459,25 @@ class FleetModel:
         self.veh_oper_dist.index.rename(['modelyear','fleetreg'], inplace=True)
         # TODO: check 'ffill' with different distances
 
-        tmp_dist = self.veh_oper_dist.reindex_like(self.veh_oper_cint.reorder_levels(['modelyear', 'fleetreg', 'tec','seg','prodyear','enr','age']), method='ffill')
-        self.op_impacts = self.veh_oper_cint.mul(tmp_dist, axis=0)
+        tmp_dist = self.veh_oper_dist.reindex_like(self.tec_oper_impact_int.reorder_levels(['modelyear', 'fleetreg', 'tec','seg','prodyear','enr','age']), method='ffill')
+        self.op_impacts = self.tec_oper_impact_int.mul(tmp_dist, axis=0)
         self.full_oper_dist = tmp_dist
-        # self.full_oper_dist = self.veh_oper_dist.reindex(self.veh_oper_cint.index, level='modelyear')
-        # self.op_impacts = self.veh_oper_cint.multiply(self.full_oper_dist)
+        # self.full_oper_dist = self.veh_oper_dist.reindex(self.tec_oper_impact_int.index, level='modelyear')
+        # self.op_impacts = self.tec_oper_impact_int.multiply(self.full_oper_dist)
         # self.op_impacts.index = self.op_impacts.index.droplevel(level=['enr', 'age']) # these columns are unncessary/redundant
         # self.op_impacts = self.op_impacts.sum(level=['tec', 'seg', 'fleetreg', 'prodyear']) # sum the operating emissions over all model years for each cohort
         # self.op_impacts = self.op_impacts.reorder_levels(order=['tec', 'seg', 'fleetreg', 'prodyear']) # reorder MultiIndex to add production emissions
 
-        tmp_prod = self.tec_prod_impact_int.reindex_like(self.veh_oper_cint.reorder_levels(['tec','seg','prodyear','modelyear','enr','fleetreg','age']), method='ffill')
+        tmp_prod = self.tec_prod_impact_int.reindex_like(self.tec_oper_impact_int.reorder_levels(['tec','seg','prodyear','modelyear','enr','fleetreg','age']), method='ffill')
         tmp_prod.fillna(method='bfill', inplace=True)  # for filling 1999
         self.LC_emissions = self.op_impacts.add(self.tec_prod_impact_int.reindex_like(self.op_impacts.reorder_levels(['tec','seg','prodyear','enr','fleetreg','age','modelyear']), method='ffill'))
         self.LC_emissions.fillna(method='bfill', inplace=True) # for filling 1999
         self.LC_emissions = self.LC_emissions.squeeze()
         self.LC_emissions.index = self.LC_emissions.index.droplevel(['enr','prodyear'])
 
-        self.enr_emiss_int = self._p_dict['ENR_EMISS_INT']
-        self.enr_emiss_int = self.enr_emiss_int.stack()
-        self.enr_emiss_int.index.rename(['enr', 'reg', 'year'], inplace=True)
+        self.enr_impact_int = self._p_dict['ENR_IMPACT_INT']
+        self.enr_impact_int = self.enr_impact_int.stack()
+        self.enr_impact_int.index.rename(['enr', 'reg', 'year'], inplace=True)
 
         log.info('Finished importing results from GAMS run')
 
@@ -535,11 +535,11 @@ class FleetModel:
         """
 
         """Test calculation for average lifetime vehicle (~12 years)."""
-        self.veh_oper_cint_avg = self.veh_oper_cint.index.levels[4].astype(int)
-        ind = self.veh_oper_cint.index
-        self.veh_oper_cint.index = self.veh_oper_cint.index.set_levels(ind.levels[4].astype(int), level=4) # set ages as int
-        self.veh_oper_cint.sort_index(level='age', inplace=True)
-        self.veh_oper_cint_avg = self.veh_oper_cint.reset_index(level='age')
+        self.veh_oper_cint_avg = self.tec_oper_impact_int.index.levels[4].astype(int)
+        ind = self.tec_oper_impact_int.index
+        self.tec_oper_impact_int.index = self.tec_oper_impact_int.index.set_levels(ind.levels[4].astype(int), level=4) # set ages as int
+        self.tec_oper_impact_int.sort_index(level='age', inplace=True)
+        self.veh_oper_cint_avg = self.tec_oper_impact_int.reset_index(level='age')
         self.veh_oper_cint_avg = self.veh_oper_cint_avg[self.veh_oper_cint_avg.age <= age] # then, drop ages over selected lifetime
         self.veh_oper_cint_avg.set_index(self.veh_oper_cint_avg.age, drop=True, append=True, inplace=True)
         self.veh_oper_cint_avg.drop(columns='age', inplace=True)
@@ -575,7 +575,7 @@ class FleetModel:
      # Estimate operating emissions by cohort (i.e., prodyear)
         try:
             # sum total operating emissions for each cohort, by region, technology and segment
-            operation_em = self.veh_oper_cohort.sum(level=['prodyear', 'fleetreg', 'tec', 'seg']).sum(axis=1)
+            operation_em = self.oper_impact_cohort.sum(level=['prodyear', 'fleetreg', 'tec', 'seg']).sum(axis=1)
             operation_em.sort_index(axis=0, level=0, inplace=True)
             op = operation_em.loc['2000':'2050']
 

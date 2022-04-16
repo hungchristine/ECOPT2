@@ -213,12 +213,12 @@ def run_experiment():
             info[run_tag] = {
                 'input_params': experiment,
                 'output': {
-                     'totc_opt': fm.totc_opt,
+                     'tot_impacts_opt': fm.tot_impacts_opt,
                      'solver status': gams_run.ss,
                      'model status': gams_run.ms,
                      'first year of 100% BEV market share': fm.full_BEV_year.to_dict(),
                      'BEV shares in 2030': fm.shares_2030.to_dict(),
-                     'totc in optimization period':fm.totc_opt # collect these from all runs into a dataframe...ditto with shares of BEV/ICE
+                     'totc in optimization period':fm.tot_impacts_opt # collect these from all runs into a dataframe...ditto with shares of BEV/ICE
                 }
             }
 
@@ -226,10 +226,10 @@ def run_experiment():
             fm.shares_2030.name = run_id
             fm.shares_2050.name = run_id
             fm.add_share.name = run_id
-            fm.veh_stck.name = run_id
+            fm.tot_stock.name = run_id
 
-            totc_df.loc['totc_opt', run_id] = fm.totc_opt
-            stock_comp[run_id] = fm.veh_stck.stack() # fleet stock composition
+            totc_df.loc['tot_impacts_opt', run_id] = fm.tot_impacts_opt
+            stock_comp[run_id] = fm.tot_stock.stack() # fleet stock composition
             shares_2030[run_id] = fm.shares_2030.stack().stack() # market shares in 2030
             shares_2050[run_id] = fm.shares_2050.stack().stack()  # market shares in 2050
             add_share[run_id] = fm.add_share.stack().stack()  # market shares
@@ -277,11 +277,11 @@ if len(run_id_list) > 1:
 
     with gzip.open(baseline_file, 'rb') as f:
         d = pickle.load(f)  # load FleetModel instance
-        default_totc_opt = d.totc_opt
+        default_totc_opt = d.tot_impacts_opt
 
     try:
-        totc_df.loc['Abs. difference from totc_opt'] = default_totc_opt - totc_df.loc['totc_opt']
-        totc_df.loc['%_change_in_totc_opt'] = (default_totc_opt - totc_df.loc['totc_opt'])/default_totc_opt
+        totc_df.loc['Abs. difference from tot_impacts_opt'] = default_totc_opt - totc_df.loc['tot_impacts_opt']
+        totc_df.loc['%_change_in_totc_opt'] = (default_totc_opt - totc_df.loc['tot_impacts_opt'])/default_totc_opt
     except:
         print('\n *****************************************')
         log.info("No comparison to default performed")

@@ -128,12 +128,12 @@ class GAMSRunner:
         # veh_lift_cdf = gmspy.df2param(self.db, fleet.parameters.veh_lift_cdf, ['age'], 'VEH_LIFT_CDF')
         # veh_lift_pdf = gmspy.df2param(self.db, fleet.parameters.veh_lift_pdf, ['age'], 'VEH_LIFT_PDF')
         lifetime_age_distribution = gmspy.df2param(self.db, fleet.parameters.lifetime_age_distribution, ['age'], 'LIFETIME_AGE_DISTRIBUTION')
-        veh_lift_mor = gmspy.df2param(self.db, fleet.parameters.veh_lift_mor, ['age'], 'VEH_LIFT_MOR')
+        retirement_function = gmspy.df2param(self.db, fleet.parameters.retirement_function, ['age'], 'RETIREMENT_FUNCTION')
 
         initial_tec_shares = gmspy.df2param(self.db, fleet.parameters.initial_tec_shares,['tec'],'INITIAL_TEC_SHARES')
 
         enr_tec_correspondance = gmspy.df2param(self.db, fleet.parameters.enr_tec_correspondance, ['enr', 'tec'], 'ENR_TEC_CORRESPONDANCE')
-        enr_emiss_int = gmspy.df2param(self.db, fleet.parameters.enr_emiss_int, ['enr', 'reg', 'year'], 'ENR_EMISS_INT')
+        enr_impact_int = gmspy.df2param(self.db, fleet.parameters.enr_impact_int, ['enr', 'reg', 'year'], 'ENR_IMPACT_INT')
 
         cohort_age_correspondance = gmspy.df2param(self.db, fleet.parameters.cohort_age_correspondance, ['prodyear', 'age', 'year'], 'COHORT_AGE_CORRESPONDANCE')
 

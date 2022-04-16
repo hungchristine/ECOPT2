@@ -543,7 +543,7 @@ def vis_GAMS(fleet, fp, filename, param_values, export_png=False, export_pdf=Tru
         plot_ax2 = (fleet.stock_df_plot.sum(axis=1).unstack('seg').sum(axis=1).unstack('tec').sum(level='year')/1e6)
         plot_ax2.plot(ax=ax2, kind='area', cmap=tec_cm, lw=0)
         (fleet.all_impacts/1e6).plot(ax=ax1, kind='area', lw=0, cmap=cmap_em)
-        (fleet.bau_emissions/1e6).plot(ax=ax1, kind='line')
+        (fleet.bau_impacts/1e6).plot(ax=ax1, kind='line')
 
         ax1.set_ylabel('Lifecycle climate emissions \n Mt $CO_2$-eq', fontsize=13)
         ax2.set_ylabel('Vehicles, millions', fontsize=13, labelpad=25)

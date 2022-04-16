@@ -229,8 +229,8 @@ class ParametersClass:
     mat_cint: Union[List, pd.Series, pd.DataFrame] = None
     max_uptake_rate: Union[float, pd.Series, pd.DataFrame] = None
 
-    enr_emiss_int: Union[pd.Series, pd.DataFrame] = None
-    enr_emiss_int_IAM: Union[pd.Series, pd.DataFrame] = None # move to rawdataclass?
+    enr_impact_int: Union[pd.Series, pd.DataFrame] = None
+    enr_impact_int_IAM: Union[pd.Series, pd.DataFrame] = None # move to rawdataclass?
 
     raw_data: RawDataClass = None
 
@@ -241,7 +241,7 @@ class ParametersClass:
     bev_capac: Union[Dict, List] = field(default_factory=lambda:{'A': 26.6, 'B': 42.2, 'C': 59.9, 'D': 75., 'E':95., 'F':100.})
     # veh_lift_cdf: Union[pd.Series, pd.DataFrame] = None
     # veh_lift_pdf: Union[pd.Series, pd.DataFrame] = None
-    veh_lift_mor: Union[pd.Series, pd.DataFrame] = None
+    retirement_function: Union[pd.Series, pd.DataFrame] = None
     lifetime_age_distribution: Union[pd.Series, pd.DataFrame] = None
 
     recovery_pct: Union[float, pd.Series, pd.DataFrame] = None
@@ -391,8 +391,8 @@ class ParametersClass:
                    # 'veh_partab': ['veheq', 'tec', 'seg'],
                    'enr_tec_correspondance': ['enr', 'tec'],
                    'cohort_age_correspondance': ['cohort', 'age', 'year'],
-                   'enr_emiss_int_IAM': ['reg', 'enr'],
-                   'enr_emiss_int': ['reg', 'enr'],
+                   'enr_impact_int_IAM': ['reg', 'enr'],
+                   'enr_impact_int': ['reg', 'enr'],
                    }
         # read parameter values in from Excel
         params_dict = {}
@@ -519,29 +519,29 @@ class ParametersClass:
                                              index=sets.modelyear,
                                              columns=sets.mat_cat)
 
-        if (self.raw_data.enr_glf_terms is not None) and (self.enr_emiss_int is not None or self.enr_emiss_int_IAM is not None):
-            log.warning('----- Source for energy pathways may be overspecified; both enr_glf_terms and enr_emiss_int are specified. Using enr_emiss_int.')
+        if (self.raw_data.enr_glf_terms is not None) and (self.enr_impact_int is not None or self.enr_impact_int_IAM is not None):
+            log.warning('----- Source for energy pathways may be overspecified; both enr_glf_terms and enr_impact_int are specified. Using enr_impact_int.')
 
-        if self.enr_emiss_int is not None or self.enr_emiss_int_IAM is not None:
-            if self.enr_emiss_int_IAM is not None:
-                self.check_region_sets(self.enr_emiss_int_IAM.index.get_level_values('reg'), 'enr_emiss_int_IAM', sets.reg)
-                # for building enr_emiss_int directly from IAM pathways (see electricity_clustering.py)
-                self.enr_emiss_int_IAM = self.interpolate_years(self.enr_emiss_int_IAM, sets)
-                self.enr_emiss_int_IAM.index = self.enr_emiss_int_IAM.index.reorder_levels(['enr', 'reg', 'year'])  # match correct set order for enr_emiss_int
+        if self.enr_impact_int is not None or self.enr_impact_int_IAM is not None:
+            if self.enr_impact_int_IAM is not None:
+                self.check_region_sets(self.enr_impact_int_IAM.index.get_level_values('reg'), 'enr_impact_int_IAM', sets.reg)
+                # for building enr_impact_int directly from IAM pathways (see electricity_clustering.py)
+                self.enr_impact_int_IAM = self.interpolate_years(self.enr_impact_int_IAM, sets)
+                self.enr_impact_int_IAM.index = self.enr_impact_int_IAM.index.reorder_levels(['enr', 'reg', 'year'])  # match correct set order for enr_impact_int
 
-            if self.enr_emiss_int is not None:
-                    self.check_region_sets(self.enr_emiss_int.index.get_level_values('reg'), 'enr_emiss_int', sets.reg)
-                    self.enr_emiss_int = self.interpolate_years(self.enr_emiss_int, sets)
-                    self.enr_emiss_int.index = self.enr_emiss_int.index.reorder_levels(['enr', 'reg', 'year'])
-                    self.enr_emiss_int = pd.concat([self.enr_emiss_int_IAM, self.enr_emiss_int])
+            if self.enr_impact_int is not None:
+                    self.check_region_sets(self.enr_impact_int.index.get_level_values('reg'), 'enr_impact_int', sets.reg)
+                    self.enr_impact_int = self.interpolate_years(self.enr_impact_int, sets)
+                    self.enr_impact_int.index = self.enr_impact_int.index.reorder_levels(['enr', 'reg', 'year'])
+                    self.enr_impact_int = pd.concat([self.enr_impact_int_IAM, self.enr_impact_int])
         elif self.raw_data.enr_glf_terms is not None:
             self.check_region_sets(self.raw_data.enr_glf_terms.index.get_level_values('reg'), 'enr_glf_terms', sets.reg)
-            # build enr_emiss_int from generalized logistic function
+            # build enr_impact_int from generalized logistic function
             mi = pd.MultiIndex.from_product([sets.reg, sets.enr, sets.modelyear], names=['reg', 'enr', 'modelyear'])
-            self.enr_emiss_int = pd.Series(index=mi)
+            self.enr_impact_int = pd.Series(index=mi)
 
 
-            # complete enr_emiss_int parameter with fossil fuel chain and electricity in production regions
+            # complete enr_impact_int parameter with fossil fuel chain and electricity in production regions
             # using terms for general logisitic function
             for label, row in self.raw_data.enr_glf_terms.iterrows():
                 A = row['A']
@@ -551,11 +551,11 @@ class ParametersClass:
                 reg = label[1]
                 enr = label[0]
                 for t in [((2000)+i) for i in range(81)]:
-                    self.enr_emiss_int.loc[(reg, enr, str(t))] = A + (B - A) / (1 + np.exp(- r*(t - u)))
+                    self.enr_impact_int.loc[(reg, enr, str(t))] = A + (B - A) / (1 + np.exp(- r*(t - u)))
 
-            self.enr_emiss_int = self.enr_emiss_int.swaplevel(0, 1) # enr, reg, year
-            self.enr_emiss_int = self.enr_emiss_int.to_frame()
-            self.enr_emiss_int.dropna(how='all', axis=0, inplace=True)
+            self.enr_impact_int = self.enr_impact_int.swaplevel(0, 1) # enr, reg, year
+            self.enr_impact_int = self.enr_impact_int.to_frame()
+            self.enr_impact_int.dropna(how='all', axis=0, inplace=True)
 
         if (isinstance(self.raw_data.tec_add_gradient, float)) and (self.max_uptake_rate is None):
             self.max_uptake_rate = {}
@@ -759,13 +759,13 @@ class ParametersClass:
 
         # Calculate normalized survival function
         self.lifetime_age_distribution = pd.Series(self.calc_steadystate_vehicle_age_distributions(sets.age_int, self.raw_data.veh_avg_age, self.raw_data.veh_age_stdev), index=sets.age)
-        self.veh_lift_sc = pd.Series(norm.sf(sets.age_int, self.raw_data.veh_avg_age, self.raw_data.veh_age_stdev), index=sets.age)
+        # self.veh_lift_sc = pd.Series(norm.sf(sets.age_int, self.raw_data.veh_avg_age, self.raw_data.veh_age_stdev), index=sets.age)
         # self.veh_lift_pdf = pd.Series(norm.pdf(sets.age_int, self.raw_data.veh_avg_age, self.raw_data.veh_age_stdev), index=sets.age)
 
         # self.veh_lift_pdf.index = self.veh_lift_pdf.index.astype('str')
 
-        self.veh_lift_mor = pd.Series(self.calc_probability_of_vehicle_retirement(sets.age_int, self.lifetime_age_distribution), index=sets.age)
-        self.veh_lift_mor.index = self.veh_lift_mor.index.astype('str')
+        self.retirement_function = pd.Series(self.calc_probability_of_vehicle_retirement(sets.age_int, self.lifetime_age_distribution), index=sets.age)
+        self.retirement_function.index = self.retirement_function.index.astype('str')
 
 
     def calc_steadystate_vehicle_age_distributions(self, ages, average_expectancy=10.0, standard_dev=3.0):
