@@ -1287,14 +1287,14 @@ def vis_input(fleet, fp, filename, param_values, export_png, export_pdf=True, ma
 
     try:
         fig, axes = plt.subplots(3, 2, figsize=(9,9), sharex=True, sharey=True)
-        title = 'VEH_PROD_CINT'
-        plot_subplots(fig, axes, fleet.veh_prod_cint.unstack('tec').groupby(['seg']), title=title, labels=labels)
+        title = 'TEC_PROD_IMPACT_INT'
+        plot_subplots(fig, axes, fleet.tec_prod_impact_int.unstack('tec').groupby(['seg']), title=title, labels=labels)
         fig.text(0.04, 0.5, 'Production emissions intensity \n(t CO2/vehicle)', ha='center', va='center', rotation='vertical')
-        export_fig(fp, ax, pp, export_pdf, export_png, png_name='VEH_PROD_CINT')
+        export_fig(fp, ax, pp, export_pdf, export_png, png_name='TEC_PROD_IMPACT_INT')
         pp.savefig(bbox_inches='tight')
     except Exception as e:
         print('\n *****************************************')
-        print('Error with input figure: VEH_PROD_CINT')
+        print('Error with input figure: TEC_PROD_IMPACT_INT')
         print(e)
 
     try:

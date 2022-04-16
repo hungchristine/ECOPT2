@@ -128,9 +128,9 @@ ENR_TEC_CORRESPONDANCE(enr,tec)                     feasible combinations of veh
 CONST(seg,fleetreg)               Used as "seed" for additions to stock based on initial fleet size
 
 **PRODUCTION
-VEH_PROD_EINT(tec,seg,prodyear)        Electricity intensity of vehicle prod                [kwh el required per vehicle produced]
-VEH_PROD_CINT_CSNT(tec,seg,prodyear)   Constant term for CO2 int. of vehicle production     [t CO2-eq per vehicle produced]
-VEH_PROD_CINT(tec,seg,prodyear)        CO2 intensity of vehicle production                  [t CO2-eq per vehicle produced]
+TEC_PROD_EL_INT(tec,seg,prodyear)        Electricity intensity of vehicle prod                [kwh el required per vehicle produced]
+TEC_PROD_IMPACT_INT_REST(tec,seg,prodyear)   Constant term for CO2 int. of vehicle production     [t CO2-eq per vehicle produced]
+TEC_PROD_IMPACT_INT(tec,seg,prodyear)        CO2 intensity of vehicle production                  [t CO2-eq per vehicle produced]
 
 **OPERATION
 VEH_OPER_EINT(tec,seg,prodyear)                               Energy intensity of vehicle operation     [kwh per km]
@@ -229,12 +229,12 @@ $GDXIN
 
 *----- Production-related emissions
 * Assume constant for all regions for now
-VEH_PROD_EINT(tec,seg,prodyear) = genlogfnc(VEH_PARTAB('PROD_EINT',tec,seg,'A'),VEH_PARTAB('PROD_EINT',tec,seg,'B'),VEH_PARTAB('PROD_EINT',tec,seg,'r'),YEAR_PAR(prodyear),VEH_PARTAB('PROD_EINT',tec,seg,'u'));
+TEC_PROD_EL_INT(tec,seg,prodyear) = genlogfnc(VEH_PARTAB('PROD_EINT',tec,seg,'A'),VEH_PARTAB('PROD_EINT',tec,seg,'B'),VEH_PARTAB('PROD_EINT',tec,seg,'r'),YEAR_PAR(prodyear),VEH_PARTAB('PROD_EINT',tec,seg,'u'));
 
-VEH_PROD_CINT_CSNT(tec,seg,prodyear) = genlogfnc(VEH_PARTAB('PROD_CINT_CSNT',tec,seg,'A'),VEH_PARTAB('PROD_CINT_CSNT',tec,seg,'B'),VEH_PARTAB('PROD_CINT_CSNT',tec,seg,'r'),YEAR_PAR(prodyear),VEH_PARTAB('PROD_CINT_CSNT',tec,seg,'u'));
+TEC_PROD_IMPACT_INT_REST(tec,seg,prodyear) = genlogfnc(VEH_PARTAB('PROD_CINT_CSNT',tec,seg,'A'),VEH_PARTAB('PROD_CINT_CSNT',tec,seg,'B'),VEH_PARTAB('PROD_CINT_CSNT',tec,seg,'r'),YEAR_PAR(prodyear),VEH_PARTAB('PROD_CINT_CSNT',tec,seg,'u'));
 
 * only production emissions from 2000 onwards are relevant despite cohorts going back to 1972
-VEH_PROD_CINT(tec,seg,prodyear)$(ord(prodyear)>28) = VEH_PROD_CINT_CSNT(tec,seg,prodyear) + VEH_PROD_EINT(tec,seg,prodyear)*ENR_EMISS_INT('elc','prod',prodyear)/1000;
+TEC_PROD_IMPACT_INT(tec,seg,prodyear)$(ord(prodyear)>28) = TEC_PROD_IMPACT_INT_REST(tec,seg,prodyear) + TEC_PROD_EL_INT(tec,seg,prodyear)*ENR_EMISS_INT('elc','prod',prodyear)/1000;
 
 *----- Operation phase emissions
 * Assume constant for all regions for now
@@ -455,8 +455,8 @@ EQ_MAT_TOTC(modelyear, mat_prod)..                         MAT_CO2(modelyear, ma
                                                             ;
 * Calculate emissions from vehicle production
 EQ_VEH_PROD_TOTC(tec,seg,fleetreg,modelyear)..             PRODUCTION_IMPACTS
-(tec,seg,fleetreg,modelyear) =e= STOCK_ADDED(tec,seg,fleetreg,modelyear,new)*VEH_PROD_CINT(tec,seg,modelyear) + sum(mat_prod, MAT_CO2(modelyear, mat_prod))
-%SLACK_ADD% + SLACK_TEC_ADD(newtec,seg,fleetreg,modelyear,new)*VEH_PROD_CINT(tec,seg,modelyear)*1e6
+(tec,seg,fleetreg,modelyear) =e= STOCK_ADDED(tec,seg,fleetreg,modelyear,new)*TEC_PROD_IMPACT_INT(tec,seg,modelyear) + sum(mat_prod, MAT_CO2(modelyear, mat_prod))
+%SLACK_ADD% + SLACK_TEC_ADD(newtec,seg,fleetreg,modelyear,new)*TEC_PROD_IMPACT_INT(tec,seg,modelyear)*1e6
 ;
 
 * Calculate emissions from vehicle operation
