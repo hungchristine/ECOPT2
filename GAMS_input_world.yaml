@@ -1,0 +1,147 @@
+# probably not necessary; covered by the gradient constraint
+initial_seg_shares:
+ def:
+  - 0.08
+  - 0.21
+  - 0.26
+  - 0.08
+  - 0.03
+  - 0.34 
+ # big:
+  # - 0.05
+  # - 0.15
+  # - 0.20
+  # - 0.10
+  # - 0.10
+  # - 0.40  
+  
+tec_add_gradient:
+ def: 0.25
+ # agg: 0.35
+ # slow: 0.05
+ 
+bev_capac:
+ baseline:
+  A: 17.6
+  B: 42.2
+  C: 42.2
+  D: 59.9
+  E: 75
+  F: 95
+ # infra:
+  # A: 17.6
+  # B: 26.6
+  # C: 42.2
+  # D: 59.9
+  # E: 75
+  # F: 95
+ # longrange:
+  # A: 26.6
+  # B: 42.2
+  # C: 59.9
+  # D: 75
+  # E: 95
+  # F: 100
+  
+
+B_term_prod:
+ def:
+  PROD_EINT:
+   ICE: 
+    full_veh: 1
+   BEV: 
+    batt: 0.7
+    ROV: 1
+  PROD_CINT_CSNT: 
+   ICE: 
+    full_veh: 1
+   BEV:
+    batt: 0.8
+    ROV: 1
+ # BEV-optimistic:
+  # PROD_EINT:
+   # ICE: 
+    # full_veh: 0.8
+   # BEV: 
+    # batt: 0.5
+    # ROV: 0.75
+  # PROD_CINT_CSNT: 
+   # ICE: 
+    # full_veh: 0.9
+   # BEV:
+    # batt: 0.3
+    # ROV: 0.75
+ # ICEV-optimistic:
+  # PROD_EINT:
+   # ICE: 
+    # full_veh: 0.6
+   # BEV: 
+    # batt: 0.8
+    # ROV: 0.6
+  # PROD_CINT_CSNT: 
+   # ICE: 
+    # full_veh: 0.7
+   # BEV:
+    # batt: 0.7
+    # ROV: 0.8 
+    
+B_term_oper_EOL: 
+ def: 
+  OPER_EINT:
+   ICE: 1
+   BEV: 1
+  EOLT_CINT:
+   ICE: 1
+   BEV: 1
+   
+r_term_factors:
+   def: 
+    BEV: 0.2
+    ICE: 0.2
+   # aggr: 
+    # BEV: 0.5
+    # ICE: 0.5
+   # slow:
+    # BEV: 0.15
+    # ICE: 0.15
+    
+u_term_factors:
+ def:
+  ICE: 2025
+  BEV: 2025
+ # delay-ICEV:
+  # ICE: 2035
+  # BEV: 2035
+ # delay-BEV:
+  # ICE: 2020
+  # BEV: 2040
+  
+#eur_batt_share:
+ #def: 0.3
+ # cons: 0.3
+ # aggr: 0.75
+ 
+  
+veh_oper_dist:
+ def: 30000
+ 
+#pkm_scenario:
+ #def: iTEM2-Base
+ # alt: iTEM2-2C
+
+#el_scenario:
+# def: SSP2 
+# SSP1: SSP1
+# SSP3: SSP3 
+
+# occupancy_rate:
+#   def: 1.643
+#   sharing: 2.5
+#   low: 1.2
+
+# add_gradient (for technology additions)
+# veh_oper_dist [adjust lifetime to be in terms of km]
+# find lifetime km driven by age? --> tec specific lifetimes as well
+
+
+### try run with BEV_int_shr ==0 
