@@ -360,7 +360,7 @@ class FleetModel:
         self.tec_prod_impact_int = self.tec_prod_impact_int.stack().to_frame()
         self.tec_prod_impact_int.index.rename(['tec', 'seg', 'prodyear'], inplace=True)
 
-        self.veh_oper_eint = self._p_dict['VEH_OPER_EINT']
+        self.veh_oper_eint = self._p_dict['TEC_OPER_EINT']
         self.veh_oper_eint = self.veh_oper_eint.stack().to_frame()
         self.veh_oper_eint.index.rename(['tec', 'seg', 'year'], inplace=True)
 
