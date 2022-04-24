@@ -141,10 +141,7 @@ class FleetModel:
         self.gro_cnstrnt = pd.Series(self.gro_cnstrnt, index=self.sets.modelyear)
         self.gro_cnstrnt.index = self.gro_cnstrnt.index.astype('str')
 
-        self.manuf_cnstrnt = self._process_df_to_series(self.parameters.manuf_cnstrnt)
-        self.mat_content = [[0.11, 0.05] for year in range(len(self.sets.modelyear))]
-        self.mat_content = pd.DataFrame(self.parameters.mat_content, index=self.sets.modelyear, columns=self.sets.mat_cat)
-        self.mat_content.index = self.mat_content.index.astype('str')
+        self.parameters.mat_content.columns = self.parameters.mat_content.columns.astype(str)
 
         self.parameters.mat_cint.columns = self.parameters.mat_cint.columns.astype(str)
         self.parameters.mat_cint = self.parameters.mat_cint.T
@@ -508,16 +505,16 @@ class FleetModel:
             self.shares_2030 = self.add_share.loc(axis=0)[:,'2030']
             self.shares_2050 = self.add_share.loc(axis=0)[:,'2050']
 
-            """ Export first year of 100% BEV market share """
+            """ Export first year of 100% new tec market share """
             tec_shares = self.add_share.stack().stack().sum(level=['prodyear', 'tec','fleetreg'])
-            bev_shares = tec_shares.loc[:, 'BEV',:]
-            bev_shares = bev_shares.unstack('fleetreg')
-            bev_shares = bev_shares.loc['2020':'2050']
+            newtec_shares = tec_shares.loc[:, self.sets.newtec,:]
+            newtec_shares = newtec_shares.unstack('fleetreg')
+            newtec_shares = newtec_shares.loc['2020':'2050']
 
-            self.highest_BEV_marketshare = bev_shares.idxmax()
+            self.highest_newtec_marketshare = newtec_shares.idxmax()
 
-            self.full_BEV_year = bev_shares[bev_shares>=0.99]
-            self.full_BEV_year = self.full_BEV_year.apply(pd.Series.first_valid_index)
+            self.full_newtec_year = newtec_shares[newtec_shares>=0.99]
+            self.full_newtec_year = self.full_newtec_year.apply(pd.Series.first_valid_index)
 
         except Exception as e:
             print('\n ******************************')

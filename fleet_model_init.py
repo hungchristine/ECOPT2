@@ -200,7 +200,7 @@ class RawDataClass:
     veh_avg_age: Union[float, dict] = 11.1 # From ACEA 2019-2020 report
     veh_age_stdev: Union[float, dict] = 2.21
 
-    bev_int_shr: float = 0.0018  # from Eurostat; assume remaining is ICE
+    newtec_int_shr: float = 0.0018  # from Eurostat; assume remaining is ICE
 
     recycle_rate: Union[float, pd.Series] = 0.75
 
@@ -386,6 +386,7 @@ class ParametersClass:
                    'enr_glf_terms':['enr', 'reg', 'enreq'],
                    'virg_mat_supply': ['mat_cat', 'mat_prod'],
                    'mat_cint': ['mat_cat', 'mat_prod'],
+                   'mat_content': ['newtec','mat_cat'],
                    'batt_portfolio':['seg', 'battery size'],
                    'tec_parameters_raw': ['veheq', 'tec', 'seg'],
                    # 'tec_parameters': ['veheq', 'tec', 'seg'],
@@ -569,13 +570,13 @@ class ParametersClass:
 
         oldtec = list(set(sets.tec) - set(sets.newtec))  # get name of incumbent technology; works for single tec
         if len(sets.newtec) == 1:
-            self.initial_tec_shares = pd.Series([1-self.raw_data.bev_int_shr, self.raw_data.bev_int_shr], index=oldtec + sets.newtec)
+            self.initial_tec_shares = pd.Series([1-self.raw_data.newtec_int_shr, self.raw_data.newtec_int_shr], index=oldtec + sets.newtec)
         else:
-            if isinstance(self.raw_data.bev_int_shr, dict):
-                all_new_tecs = sum(self.raw_data.bev_int_shr.values())
-                self.initial_tec_shares = pd.Series(self.raw_data.bev_int_shr)
+            if isinstance(self.raw_data.newtec_int_shr, dict):
+                all_new_tecs = sum(self.raw_data.newtec_int_shr.values())
+                self.initial_tec_shares = pd.Series(self.raw_data.newtec_int_shr)
                 self.initial_tec_shares.loc[oldtec] = 1- all_new_tecs
-            elif isinstance(self.raw_data.bev_int_shr, pd.DataFrame) or isinstance(self.raw_data.bev_int_shr, pd.Series):
+            elif isinstance(self.raw_data.newtec_int_shr, pd.DataFrame) or isinstance(self.raw_data.newtec_int_shr, pd.Series):
                 self.initial_tec_shares.loc[oldtec] - 1 - self.initial_tec_shares.sum()
 
         self.year_par = pd.Series([float(i) for i in sets.year], index=sets.year)

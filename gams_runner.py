@@ -152,9 +152,9 @@ class GAMSRunner:
 
         # gro_cnstrnt = gmspy.df2param(self.db, fleet.gro_cnstrnt, ['year'], 'GRO_CNSTRNT')
 
-        manuf_cnstrnt = gmspy.df2param(self.db, fleet.parameters.manuf_cnstrnt, ['year'], 'MANUF_CNSTRNT')
+        manuf_cnstrnt = gmspy.df2param(self.db, fleet.parameters.manuf_cnstrnt, ['newtec','year'], 'MANUF_CNSTRNT')
 
-        mat_content = gmspy.df2param(self.db, fleet.parameters.mat_content, ['year','mat_cat'], 'MAT_CONTENT')
+        mat_content = gmspy.df2param(self.db, fleet.parameters.mat_content, ['newtec','mat_cat','year'], 'MAT_CONTENT')
         mat_cint = gmspy.df2param(self.db, fleet.parameters.mat_cint, ['year', 'mat_prod'], 'MAT_CINT')
         virg_mat = gmspy.df2param(self.db, fleet.parameters.virg_mat_supply, ['year','mat_prod'], 'VIRG_MAT_SUPPLY')
         recovery_pct = gmspy.df2param(self.db, fleet.parameters.recovery_pct, ['year','mat_cat'], 'RECOVERY_PCT')

@@ -161,8 +161,8 @@ INITIAL_SEG_SHARES(seg)            Initial stock distribution by segment
 
 ** CONSTRAINTS -------
 MAX_UPTAKE_RATE(grdeq,newtec)        Parameter for gradient of change constraint (fleet additions) - individual (IND) for each tech or related to all tech (ALL)
-MANUF_CNSTRNT(year)              Annual manufacturing capacity (for batteries destined for Europe)          [GWh]
-MAT_CONTENT(year,mat_cat)        Critical material content per kWh by production year                       [kg kWh-1]
+MANUF_CNSTRNT(newtec,year)              Annual manufacturing capacity (for batteries destined for Europe)          [GWh]
+MAT_CONTENT(newtec,mat_cat,year)        Critical material content per kWh by production year                       [kg kWh-1]
 RECOVERY_PCT(year,mat_cat)       Recovery of critical materials from battery recycling processes in wt%
 VIRG_MAT_SUPPLY(year,mat_prod)   Primary critical material resources available in a given year              [t]
 MAT_CINT(year,mat_prod)          Carbon intensity of each material by source                                [kg CO2e kg^-1 mat]
@@ -284,12 +284,12 @@ PRODUCTION_IMPACTS(tec,seg,fleetreg,year)   Total CO2 emissions from production 
 OPERATION_IMPACTS(tec,seg,fleetreg,year)    Total CO2 emissions from operations of vehicles per year            [t CO2-eq]
 EOL_IMPACTS(tec,seg,fleetreg,year)          Total CO2 emissions from vehicle end of life treatment per year     [t CO2-eq]
 
-RECYCLED_BATT(year,fleetreg, age)          Total battery capacity sent to recycling per year                   [kWh]
-RECYCLED_MAT(year, mat_cat)                Materials recovered from recycled batteries                         [kg]
-MAT_REQ(year,mat_cat)                      Total amount of critical materials needed for new vehicles          [kg]
+RECYCLED_BATT(newtec,year,fleetreg, age)           Total battery capacity sent to recycling per year                   [kWh]
+RECYCLED_MAT(year, mat_cat)                 Materials recovered from recycled batteries                         [kg]
+MAT_REQ(year,mat_cat)                       Total amount of critical materials needed for new vehicles          [kg]
 
-MAT_MIX(year, mat_prod)                    Production mixes for virgin materials                               [t]
-MAT_CO2(year, mat_prod)                    Total CO2 emissions from virgin material production per year        [t CO2e kg^-1]
+MAT_MIX(year, mat_prod)                     Production mixes for virgin materials                               [t]
+MAT_CO2(year, mat_prod)                     Total CO2 emissions from virgin material production per year        [t CO2e kg^-1]
 ;
 
 
@@ -375,11 +375,11 @@ EQ_STCK_BAL(tec,seg,fleetreg,modelyear,age)$(ord(modelyear) > card(inityear)).. 
 *EQ_FLEET_BAL(modelyear, fleetreg)..                               sum((tec,seg,age), TOT_STOCK(tec,seg,fleetreg,modelyear,age)) =e= EXOG_TOT_STOCK(modelyear,fleetreg);
 
 *--------------------------------------
-* B - Battery manufacturing constraint;
+* B - Manufacturing constraint;
 
 * total capacity added per year must be less than the battery manufacturing capacity
 * MANUF_CNSTRNT input is in GWh; BEV_CAPAC is in kWh
-EQ_NEW_BATT_CAP(optyear)..                            MANUF_CNSTRNT(optyear)*1e6 =g= sum((seg, fleetreg), STOCK_ADDED('BEV',seg,fleetreg,optyear,new) * BEV_CAPAC(seg))
+EQ_NEW_MANUF_CAP(newtec,optyear)..                   MANUF_CNSTRNT(newtec,optyear)*1e6 =g= sum((seg, fleetreg), STOCK_ADDED(newtec,seg,fleetreg,optyear,new) * BEV_CAPAC(seg))
 %SLACK_NEW_BATT_CAP% - SLACK_NEW_BATT_CAP(optyear)
 ;
 
@@ -420,17 +420,18 @@ EQ_SEG_SHARE_CONSTRAINT(seg,fleetreg,modelyear)$(ord(modelyear)>card(inityear)).
 
 *------ Lithium/elemental resource availability calculations for constraints C and D
 * Calculate amount of batteries retired each year in kWh
-EQ_RECYCLED_BATT(optyear,fleetreg, age)..             RECYCLED_BATT(optyear,fleetreg, age) =e= sum((seg), STOCK_REMOVED('BEV',seg,fleetreg,optyear, age)* BEV_CAPAC(seg))
+EQ_RECYCLED_BATT(newtec, optyear,fleetreg, age)..             RECYCLED_BATT(newtec,optyear,fleetreg,age) =e= sum((seg), STOCK_REMOVED(newtec,seg,fleetreg,optyear,age)* BEV_CAPAC(seg))
 ;
 
 * Calculate amount of materials recovered from end-of-life batteries for recycling (i.e., to new batteries), in kg
-EQ_RECYCLED_MAT(optyear,mat_cat)..                   RECYCLED_MAT(optyear, mat_cat) =e= sum((prodyear,age), sum((fleetreg), RECYCLED_BATT(optyear, fleetreg, age)) * COHORT_AGE_CORRESPONDANCE(prodyear, age, optyear) * MAT_CONTENT(optyear, mat_cat)) * RECOVERY_PCT(optyear, mat_cat)
+EQ_RECYCLED_MAT(optyear,mat_cat)..                   RECYCLED_MAT(optyear, mat_cat) =e= sum((newtec,prodyear,age), sum((fleetreg), RECYCLED_BATT(newtec, optyear, fleetreg, age)) * COHORT_AGE_CORRESPONDANCE(prodyear, age, optyear) * MAT_CONTENT(newtec, mat_cat, optyear)) * RECOVERY_PCT(optyear, mat_cat)
 ;
 
 * Material supply balance
 * Total amount of material required calculated from new vehicles entering the market, in kg
-EQ_MAT_REQ(optyear, mat_cat)..                       MAT_REQ(optyear, mat_cat) =e= sum((seg, fleetreg), STOCK_ADDED('BEV',seg,fleetreg,optyear,new)*BEV_CAPAC(seg)) * MAT_CONTENT(optyear, mat_cat)
-%SLACK_NEW_BATT_CAP% + SLACK_NEW_BATT_CAP(optyear) * MAT_CONTENT(optyear, mat_cat)
+EQ_MAT_REQ(optyear, mat_cat)..                       MAT_REQ(optyear, mat_cat) =e= sum(newtec, sum((seg, fleetreg), STOCK_ADDED(newtec,seg,fleetreg,optyear,new) * BEV_CAPAC(seg)) * MAT_CONTENT(newtec, mat_cat, optyear)
+%SLACK_NEW_BATT_CAP% + SLACK_NEW_BATT_CAP(optyear) * MAT_CONTENT(newtec, mat_cat, optyear)
+)
 ;
 
 
@@ -483,12 +484,12 @@ MODEL
  
       no_mat            "model with no critical material constraints"       /EVD4EUR_Basic - EQ_RECYCLED_MAT - EQ_RECYCLED_BATT - EQ_MAT_REQ - EQ_MAT_TOT_PRIMARY - EQ_MAT_SUPPLY - EQ_PRIM_MAT_SUPPLY_CONSTRAINT/
 
-      manuf_test        "model without manufacturing capacity constraint"       /EVD4EUR_Basic - EQ_NEW_BATT_CAP/
-      fleet_test        "model without growth or manufacturing constraint"      /tec_test - EQ_NEW_BATT_CAP/
+      manuf_test        "model without manufacturing capacity constraint"       /EVD4EUR_Basic - EQ_NEW_MANUF_CAP/
+      fleet_test        "model without growth or manufacturing constraint"      /tec_test - EQ_NEW_MANUF_CAP/
       mat_test          "model without material constraint"                     /EVD4EUR_Basic - EQ_MAT_SUPPLY/
       primary_mat_test  "model without primary material supply constraint"      /EVD4EUR_Basic - EQ_PRIM_MAT_SUPPLY_CONSTRAINT/
       test_model        "model with only manufacturing and growth constraints"  /no_mat - EQ_SEG_SHARE_CONSTRAINT/
-      no_constraints    "model without constraints"                             /no_mat - EQ_SEG_SHARE_CONSTRAINT - EQ_TEC_UPTAKE_CONSTRAINT - EQ_NEW_BATT_CAP/
+      no_constraints    "model without constraints"                             /no_mat - EQ_SEG_SHARE_CONSTRAINT - EQ_TEC_UPTAKE_CONSTRAINT - EQ_NEW_MANUF_CAP/
 ;
 
 
@@ -554,7 +555,7 @@ TOT_NEW_TECS(modelyear) = sum((newtec,seg, fleetreg, age), TOT_STOCK.l(newtec, s
 * total capacity of batteries added by year in MWh
 TOT_CAPACITY_ADDED(modelyear) = sum((newtec,seg, fleetreg)$STOCK_ADDED.l(newtec, seg, fleetreg, modelyear, new), STOCK_ADDED.l(newtec,seg,fleetreg,modelyear,new)*BEV_CAPAC(seg))/1e6;
 TOT_CAPACITY_RECYCLED(modelyear) = sum((seg), sum((newtec,fleetreg, age), STOCK_REMOVED.l(newtec,seg,fleetreg,modelyear, age))* BEV_CAPAC(seg));
-MAT_REQ_TOT(modelyear, mat_cat) = sum((newtec,seg, fleetreg), STOCK_ADDED.l(newtec,seg,fleetreg,modelyear,new)*BEV_CAPAC(seg)*MAT_CONTENT(modelyear,mat_cat));
+MAT_REQ_TOT(modelyear, mat_cat) = sum((newtec,seg, fleetreg), STOCK_ADDED.l(newtec,seg,fleetreg,modelyear,new)*BEV_CAPAC(seg)*MAT_CONTENT(newtec,mat_cat,modelyear));
 
 TOT_STOCK_ADDED(fleetreg,modelyear) = sum((tec,seg), STOCK_ADDED.l(tec, seg, fleetreg, modelyear, new));
 TOT_STOCK_REMOVED(fleetreg, modelyear) = sum((tec,seg,age), STOCK_REMOVED.l(tec, seg, fleetreg, modelyear, age));

@@ -126,7 +126,7 @@ def run_experiment():
     shares_2050 = pd.DataFrame()
     add_share = pd.DataFrame()
     stock_comp = pd.DataFrame()
-    full_BEV_yr_df = pd.DataFrame()
+    full_newtec_yr_df = pd.DataFrame()
     totc_df = pd.DataFrame()
 
     # unpack/create all experiments as Cartesian product of all parameter options
@@ -216,8 +216,8 @@ def run_experiment():
                      'tot_impacts_opt': fm.tot_impacts_opt,
                      'solver status': gams_run.ss,
                      'model status': gams_run.ms,
-                     'first year of 100% BEV market share': fm.full_BEV_year.to_dict(),
-                     'BEV shares in 2030': fm.shares_2030.to_dict(),
+                     'first year of 100% newtec market share': fm.full_newtec_year.to_dict(),
+                     'newtec shares in 2030': fm.shares_2030.to_dict(),
                      'totc in optimization period':fm.tot_impacts_opt # collect these from all runs into a dataframe...ditto with shares of BEV/ICE
                 }
             }
@@ -233,7 +233,7 @@ def run_experiment():
             shares_2030[run_id] = fm.shares_2030.stack().stack() # market shares in 2030
             shares_2050[run_id] = fm.shares_2050.stack().stack()  # market shares in 2050
             add_share[run_id] = fm.add_share.stack().stack()  # market shares
-            full_BEV_yr_df[run_id] = fm.full_BEV_year  # first year of full newtec penetration
+            full_newtec_yr_df[run_id] = fm.full_newtec_year  # first year of full newtec penetration
 
             # Display the info for this run
             log.info('\n'+repr(info[run_tag])+'\n')
@@ -248,11 +248,11 @@ def run_experiment():
         yaml.safe_dump(info, f)
 
     # Return last fleet object for troubleshooting
-    return fm, run_id_list, shares_2030, shares_2050, add_share, stock_comp, full_BEV_yr_df, totc_df
+    return fm, run_id_list, shares_2030, shares_2050, add_share, stock_comp, full_newtec_yr_df, totc_df
 
 
 """ Run the full experiment portfolio; also returns last instance of FleetModel object for troubleshooting"""
-fm, run_id_list, shares_2030, shares_2050, add_share, stock_comp, full_BEV_yr_df, totc_df = run_experiment()
+fm, run_id_list, shares_2030, shares_2050, add_share, stock_comp, full_newtec_yr_df, totc_df = run_experiment()
 
 
 """ Perform calculations across the experiments"""
@@ -287,8 +287,8 @@ if len(run_id_list) > 1:
         log.info("No comparison to default performed")
 
     # Plotting
-    if not full_BEV_yr_df.isnull().all().all():
-        full_BEV_yr_df.plot()
+    if not full_newtec_yr_df.isnull().all().all():
+        full_newtec_yr_df.plot()
     else:
         log.info('100% market share of BEVs is not achieved in any scenario')
 
@@ -297,7 +297,7 @@ if export:
     print('\n ********** Exporting cross-experiment results to pickle and Excel ************** \n')
     pickle_name = 'overview_run_' + now + '.pkl'
     with open(pickle_name, 'wb') as f:
-        pickle.dump([shares_2030, shares_2050, add_share, stock_comp, full_BEV_yr_df, totc_df], f)
+        pickle.dump([shares_2030, shares_2050, add_share, stock_comp, full_newtec_yr_df, totc_df], f)
 
     excel_name = 'cumulative_scenario_output'+now+'.xlsx'
     with pd.ExcelWriter(excel_name) as writer:
@@ -305,7 +305,7 @@ if export:
         shares_2050.to_excel(writer,sheet_name='tec_shares_in_2050')
         add_share.to_excel(writer,sheet_name='add_shares')
         stock_comp.to_excel(writer,sheet_name='total_stock')
-        full_BEV_yr_df.to_excel(writer,sheet_name='1st_year_full_BEV')
+        full_newtec_yr_df.to_excel(writer,sheet_name='1st_year_full_newtec')
         totc_df.to_excel(writer,sheet_name='totc')
 
     log.info(f'Exported cross-experiment results to {pickle_name} and {excel_name}')
