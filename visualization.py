@@ -324,10 +324,14 @@ def vis_GAMS(fleet, fp, filename, param_values, export_png=False, export_pdf=Tru
         fig, axes = plt.subplots(plt_array[0], plt_array[1],
                                  sharex=True, sharey='row', dpi=300)
 
-        tmp = fleet.stock_add.sum(axis=1).unstack('seg').unstack('tec').loc['2020':]
+        tmp = fleet.stock_add.sum(axis=1).unstack('seg').unstack('tec')
+        tmp.reset_index(level='prodyear', inplace=True)
+        tmp['prodyear'] = tmp['prodyear'].astype(int)
+        tmp.set_index('prodyear', drop=True, append=True, inplace=True)
+        tmp = tmp.loc(axis=0)[:, 2020:]
 
         # Check if scaling of stock additions required
-        level_2050 = tmp.groupby(['fleetreg', 'prodyear']).sum().sum(axis=1).unstack('prodyear')['2050'].mean()
+        level_2050 = tmp.groupby(['fleetreg', 'prodyear']).sum().sum(axis=1).unstack('prodyear')[2050].mean()
         if level_2050 > 1e6:
             tmp /= 1e6
             units = 'millions'
@@ -373,12 +377,15 @@ def vis_GAMS(fleet, fp, filename, param_values, export_png=False, export_pdf=Tru
                                  sharex=True, sharey=True, dpi=300)
         tmp = fleet.add_share
         tmp = sort_ind(tmp, cat_type, fleet)
+        tmp.reset_index(level='prodyear', inplace=True)
+        tmp['prodyear'] = tmp['prodyear'].astype(int)
+        tmp.set_index('prodyear', drop=True, append=True, inplace=True)
         tmp = tmp.groupby(['fleetreg'], sort=False, observed=True)
         tmp = {key: group for key, group in tmp if len(group) > 0}
 
         for (key, ax) in zip(tmp.keys(), axes.flatten()):
             tmp[key].plot(ax=ax, kind='area', cmap=paired, lw=0, legend=False, title=f'{key}')
-            ax.set_xbound(0, 80)
+            ax.set_xbound(0,50)
             ax.xaxis.set_major_locator(IndexLocator(10, 0))
             ax.xaxis.set_minor_locator(IndexLocator(2, 0))
             ax.xaxis.set_tick_params(rotation=45)
@@ -404,6 +411,9 @@ def vis_GAMS(fleet, fp, filename, param_values, export_png=False, export_pdf=Tru
     try:
         tmp = fleet.add_share.div(fleet.add_share.sum(axis=1, level='seg'), axis=1, level='seg')
         tmp = sort_ind(tmp, cat_type, fleet)
+        tmp.reset_index(level='prodyear', inplace=True)
+        tmp['prodyear'] = tmp['prodyear'].astype(int)
+        tmp.set_index('prodyear', drop=True, append=True, inplace=True)
         tmp = tmp.groupby(['fleetreg'], sort=False, observed=True)
         tmp = {key: group for key, group in tmp if len(group) > 0}
 
@@ -413,7 +423,7 @@ def vis_GAMS(fleet, fp, filename, param_values, export_png=False, export_pdf=Tru
         for col, reg in enumerate(tmp.keys()):
             for row, seg in enumerate(fleet.sets.seg):
                 tmp[reg][seg].plot(ax=axes[row,col], kind='area', cmap=paired_dict[seg], lw=0, legend=False)
-                axes[row,col].set_xbound(0, 80)
+                axes[row,col].set_xbound(0, 50)
                 axes[row,col].xaxis.set_major_locator(IndexLocator(10, 0))
                 axes[row,col].xaxis.set_minor_locator(IndexLocator(2, 0))
                 axes[row,col].xaxis.set_tick_params(rotation=45)
@@ -436,6 +446,7 @@ def vis_GAMS(fleet, fp, filename, param_values, export_png=False, export_pdf=Tru
         print('Error with figure: Technology market share, by seg')
         print(e)
 
+
     #%% Segment shares of BEVs by region
     """--- Plot market share of BEVs by segment and region ---"""
     try:
@@ -444,13 +455,17 @@ def vis_GAMS(fleet, fp, filename, param_values, export_png=False, export_pdf=Tru
 
         tmp = fleet.add_share.div(fleet.add_share.sum(axis=1, level='seg'), axis=1, level='seg')
         tmp = tmp.drop('ICE', axis=1, level='tec')
+        tmp.reset_index(level='prodyear', inplace=True)
+        tmp['prodyear'] = tmp['prodyear'].astype(int)
+        tmp.set_index('prodyear', drop=True, append=True, inplace=True)
         tmp = sort_ind(tmp, cat_type, fleet)
         tmp = tmp.groupby(['fleetreg'], observed=True)
         tmp = {key: group for key, group in tmp if len(group) > 0}
 
+
         for (key, ax) in zip(tmp.keys(), axes.flatten()):
             tmp[key].plot(ax=ax, cmap=dark, legend=False, title=f'{key}')
-            ax.set_xbound(0, 80)
+            ax.set_xbound(0, 50)
             ax.set_ybound(0, 1)
             ax.xaxis.set_major_locator(IndexLocator(10, 0))
             ax.xaxis.set_minor_locator(IndexLocator(2, 0))
@@ -483,6 +498,9 @@ def vis_GAMS(fleet, fp, filename, param_values, export_png=False, export_pdf=Tru
         tmp.dropna(axis=1, how='all', inplace=True)
         tmp = tmp.drop('ICE', axis=0, level='tec')
         tmp = sort_ind(tmp, cat_type, fleet)
+        tmp.reset_index(level='prodyear', inplace=True)
+        tmp['prodyear'] = tmp['prodyear'].astype(int)
+        tmp.set_index('prodyear', drop=True, append=True, inplace=True)
         tmp = tmp.unstack('fleetreg').droplevel('age', axis=1).droplevel('tec', axis=0).dropna(how='all', axis=1).groupby(['seg'])
 
         alpha = np.linspace(1,0.1, len(fleet.sets.fleetreg))
@@ -582,6 +600,7 @@ def vis_GAMS(fleet, fp, filename, param_values, export_png=False, export_pdf=Tru
         plot_impacts = fleet.impacts.sum(level=['fleetreg', 'tec'])
         plot_impacts.index = plot_impacts.index.swaplevel('fleetreg', 'tec')
         plot_impacts = sort_ind(plot_impacts, cat_type, fleet) #.sortlevel(0, sort_remaining=True)[0]
+        plot_impacts.columns = plot_impacts.columns.astype(int)
 
         ax.set_prop_cycle(paired_cycler)
 
@@ -591,7 +610,7 @@ def vis_GAMS(fleet, fp, filename, param_values, export_png=False, export_pdf=Tru
         if cropx:
             ax.set_xlim(right=max_year)
 
-        ax.set_xbound(0, 50)
+        ax.set_xbound(2000, 2050)
         ax.set_ybound(0)
 
         fix_tuple_axis_labels(fig, ax, 'year', 0, isAxesSubplot=True)
@@ -619,11 +638,11 @@ def vis_GAMS(fleet, fp, filename, param_values, export_png=False, export_pdf=Tru
         plot_data = fleet.operation_impacts.sum(level=['tec','fleetreg'], axis=0).loc(axis=0)[:,'EUR'] / 1e6
         plot_data.index = plot_data.index.droplevel('fleetreg')
         plot_data = plot_data.T
+        plot_data.index = plot_data.index.astype(int)
         cmap = LinearSegmentedColormap.from_list('temp', colors=['silver', 'grey'])
         cmap_cols = {'BEV':'silver', 'ICE': 'grey'}
-        for tec, c in cmap_cols.items():
-            plt.plot(plot_data[tec], kind='area',stacked=True, color=c, lw=0)
-            # plot_data.plot(kind='area', ax=ax, cmap=cmap, lw=0)
+
+        plot_data.plot.area(stacked=True, ax=ax, color=cmap_cols, lw=0)
 
         # plot regulation levels
         plt.hlines(442, xmin=0.16, xmax=0.6, linestyle='dotted', color='darkslategrey', label='EU 2030 target, \n 20% reduction from 2008 emissions', transform=ax.get_yaxis_transform())
@@ -633,7 +652,7 @@ def vis_GAMS(fleet, fp, filename, param_values, export_png=False, export_pdf=Tru
         if cropx:
             plt.xlim(right=max_year)
 
-        ax.set_xbound(0, 50)
+        ax.set_xbound(2000, 2050)
         ax.set_ybound(0)
 
         handles, labels = ax.get_legend_handles_labels()
@@ -655,8 +674,9 @@ def vis_GAMS(fleet, fp, filename, param_values, export_png=False, export_pdf=Tru
     try:
         fig, ax = plt.subplots(1,1, dpi=300)
         plot_data = fleet.tot_stock_plot.sum(axis=1).unstack('seg').sum(axis=0, level=['year'])
+        plot_data.index = plot_data.index.astype(int)
         plot_data.plot(kind='area', ax=ax, cmap='jet', lw=0, title='Total stocks by segment')
-        ax.set_xbound(0, 80)
+        ax.set_xbound(2000, 2050)
         ax.set_ybound(lower=0)
         # fix_age_legend(ax, pp, cropx, max_year, 'Vehicle segments')
         ax.legend(loc=2, bbox_to_anchor=(1.01,1), title='Vehicle segment')
@@ -675,8 +695,9 @@ def vis_GAMS(fleet, fp, filename, param_values, export_png=False, export_pdf=Tru
         tmp = fleet.tot_stock_plot.sum(axis=1).unstack('fleetreg').sum(axis=0, level=['year']).T
         tmp = sort_ind(tmp, cat_type, fleet).sort_index()
         tmp = tmp.T
+        tmp.index = tmp.index.astype(int)
         tmp.plot(kind='area', ax=ax, cmap='jet', lw=0, title='Total stocks by region')
-        ax.set_xbound(0, 80)
+        ax.set_xbound(2000, 2050)
         ax.set_ybound(lower=0)
         # fix_age_legend(ax, pp, cropx, max_year, 'Region')
         ax.legend(loc=2, bbox_to_anchor=(1.01,1), title='Region')
@@ -692,9 +713,10 @@ def vis_GAMS(fleet, fp, filename, param_values, export_png=False, export_pdf=Tru
     try:
         fig, ax = plt.subplots(1,1, dpi=300)
         plot_data = fleet.tot_stock_plot.sum(axis=1).unstack('seg').unstack('tec').sum(axis=0, level='year')
+        plot_data.index = plot_data.index.astype(int)
         plot_data.plot(kind='area', ax=ax, cmap=paired, lw=0,
                             title='Total stocks by segment and technology')
-        ax.set_xbound(0, 80)
+        ax.set_xbound(2000, 2050)
         ax.set_ybound(lower=0)
         fix_age_legend(ax, pp, cropx, max_year, 'Vehicle segment and technology')
         export_fig(fp, ax, pp, export_pdf, export_png, png_name=ax.get_title())
@@ -715,10 +737,11 @@ def vis_GAMS(fleet, fp, filename, param_values, export_png=False, export_pdf=Tru
         stock_tec_seg_reg = sort_ind(stock_tec_seg_reg, cat_type, fleet)#.sortlevel(0, sort_remaining=True)[0]  # sortlevel returns one-element tuple
         stock_tec_seg_reg = stock_tec_seg_reg.T
         stock_tec_seg_reg.columns = stock_tec_seg_reg.columns.swaplevel('fleetreg', 'tec')
+        stock_tec_seg_reg.index = stock_tec_seg_reg.index.astype(int)
 
         stock_tec_seg_reg.plot(kind='area', ax=ax, cmap='jet', lw=0,
                                title='Total stocks by segment, technology and region')
-        ax.set_xbound(0, 80)
+        ax.set_xbound(2000, 2050)
         ax.set_ybound(lower=0)
 
         fix_age_legend(ax, pp, cropx, max_year, 'Vehicle segment, technology and region')
@@ -739,9 +762,10 @@ def vis_GAMS(fleet, fp, filename, param_values, export_png=False, export_pdf=Tru
         plot_stock_add = plot_stock_add.unstack(['tec', 'fleetreg']).droplevel(axis=1, level=0).T
         plot_stock_add = sort_ind(plot_stock_add, cat_type, fleet)#.sortlevel(0, sort_remaining= True)[0]
         plot_stock_add = plot_stock_add.T
+        plot_stock_add.index = plot_stock_add.index.astype(int)
 
         plot_stock_add.plot(ax=ax, kind='area', cmap=tec_cm4, lw=0, legend=True, title='Stock additions by technology and region')
-        ax.set_xbound(0, 50)
+        ax.set_xbound(2000, 2050)
         ax.set_ybound(lower=0)
 
         fix_age_legend(ax, pp, cropx, max_year, 'Vehicle technology and region')
@@ -766,8 +790,9 @@ def vis_GAMS(fleet, fp, filename, param_values, export_png=False, export_pdf=Tru
         plot_stock = sort_ind(plot_stock, cat_type, fleet)
         plot_stock = plot_stock.T
         plot_stock = plot_stock.unstack('tec').swaplevel('tec', 'fleetreg', axis=1).sort_index(axis=1, level='tec')
+        plot_stock.index = plot_stock.index.astype(int)
         plot_stock.plot(ax=ax, kind='area', cmap=tec_cm4, lw=0, legend=True, title='Total stock by technology and region')
-        ax.set_xbound(0, 80)
+        ax.set_xbound(2000, 2050)
         ax.set_ybound(lower=0)
 
         fix_age_legend(ax, pp, cropx, max_year, 'Vehicle technology and region')
@@ -793,7 +818,9 @@ def vis_GAMS(fleet, fp, filename, param_values, export_png=False, export_pdf=Tru
             ax1 = fig.add_subplot(gs[1], sharex=ax2)
 
             plot_resources = fleet.resources.loc[:, (slice(None), resource)].copy()
+            plot_resources.index = plot_resources.index.astype(int)
             plot_virg_mat = fleet.parameters.virg_mat_supply.copy().filter(like=resource, axis=1)*1000  # primary material supply is in tons; convert to kg
+            plot_virg_mat.index = plot_virg_mat.index.astype(int)
 
             if plot_resources.max().mean() >= 1e6:
                 plot_resources /= 1e6
@@ -814,15 +841,16 @@ def vis_GAMS(fleet, fp, filename, param_values, export_png=False, export_pdf=Tru
                 plot_resources[plot_resources < 0] = 0  # set value to 0 for plotting
 
             # plot use of materials
-            plot_resources.loc['2020'] = np.nan # add 2020 to properly align plots
+            plot_resources.loc[2020] = np.nan # add 2020 to properly align plots
             plot_resources.sort_index(ascending=True, inplace=True)
             plot_resources.plot(ax=ax1, kind='area', lw=0, cmap='jet')
 
-            plot_virg_mat = plot_virg_mat.loc['2020':].sum(axis=1)
+            plot_virg_mat = plot_virg_mat.loc[2020:].sum(axis=1)
             plot_virg_mat.plot(ax=ax1, lw=4, kind='line', alpha=0.7)
 
             # plot fleet evolution
             fleet_evol = (fleet.tot_stock_plot.sum(axis=1).unstack('seg').sum(axis=1).unstack('tec').sum(level='year')/1e6).loc['2020':]
+            fleet_evol.index = fleet_evol.index.astype(int)
             fleet_evol.plot(ax=ax2, kind='area', cmap=tec_cm, lw=0)
 
             ax1.set_ylabel(f'{resource} used in new batteries \n {units} {resource}', fontsize=14)
@@ -841,8 +869,8 @@ def vis_GAMS(fleet, fp, filename, param_values, export_png=False, export_pdf=Tru
             handles, labels = ax2.get_legend_handles_labels()
             ax2.legend(handles, ['BEV', 'ICEV'], loc=4, fontsize=14, framealpha=1)
 
-            ax1.set_xbound(0, 30)
-            ax2.set_xbound(0, 30)
+            ax1.set_xbound(2020, 2050)
+            ax2.set_xbound(2020, 2050)
             ax1.set_ybound(lower=0, upper=plot_resources.sum(axis=1).max()*1.1)
             ax2.set_ybound(lower=0)
 
@@ -867,12 +895,14 @@ def vis_GAMS(fleet, fp, filename, param_values, export_png=False, export_pdf=Tru
         gpby_class = {supp: mat for mat, li in fleet.sets.mat_prod.items() for supp in li}
 
         resource_use = fleet.resources.copy()
-        resource_use.loc['2020'] = np.nan
+        resource_use.index = resource_use.index.astype(int)
+        resource_use.loc[2020] = np.nan
         resource_use.sort_index(ascending=True, inplace=True)
 
         # get total available primary supplies of each material category
         prim_supply = (fleet.parameters.virg_mat_supply.groupby(gpby_class, axis=1).sum() * fleet.parameters.raw_data.eur_batt_share)*1000 # primary supply is in t, convert to kg
-        prim_supply = prim_supply.loc['2020':]
+        prim_supply.index = prim_supply.index.astype(int)
+        prim_supply = prim_supply.loc[2020:]
 
         for i, mat in enumerate(fleet.sets.mat_prod.keys()):
             plot_resources = resource_use.loc[:, (slice(None), mat)]
@@ -940,9 +970,11 @@ def vis_GAMS(fleet, fp, filename, param_values, export_png=False, export_pdf=Tru
         fig, axes = plt.subplots(len(fleet.sets.mat_cat), 1, sharex=True, dpi=300)#, figsize=(8,8))
         plt.subplots_adjust(top=0.85, hspace=0.4)
         plot_data = fleet.mat_mix.copy()
-        level_2020 = plot_data.loc['2020'].mean() # use as baseline value to scale y-axis
-        plot_data = plot_data.loc['2020':'2050']  # restrict to optimization period
-        supply_constr = fleet.parameters.virg_mat_supply.loc['2020':'2050'] * 1000 # virg_mat_supply is in t, not kg
+        plot_data.index = plot_data.index.astype(int)
+        level_2020 = plot_data.loc[2020].mean() # use as baseline value to scale y-axis
+        plot_data = plot_data.loc[2020:2050]  # restrict to optimization period
+        fleet.parameters.virg_mat_supply.index = fleet.parameters.virg_mat_supply.index.astype(int)
+        supply_constr = fleet.parameters.virg_mat_supply.loc[2020:2050] * 1000 # virg_mat_supply is in t, not kg
         plot_data.sort_index(axis=1, inplace=True)  # make sure material mixes and supply constraints are in the same order
         supply_constr.sort_index(axis=1, inplace=True)
 
@@ -995,7 +1027,7 @@ def vis_GAMS(fleet, fp, filename, param_values, export_png=False, export_pdf=Tru
 
             axes[i].set_ylabel(y_label)
             axes[i].set_ylim(0, y_lims[1])
-            axes[i].set_xlim(0, 30)
+            axes[i].set_xlim(2020, 2050)
             axes[i].xaxis.set_major_locator(MultipleLocator(10))
 
         # construct legend for each subplot
@@ -1068,6 +1100,8 @@ def vis_GAMS(fleet, fp, filename, param_values, export_png=False, export_pdf=Tru
             units = 'GWh'
             ylabel = 'GWh new batteries per year'
 
+        fleet.new_capac_demand.index = fleet.new_capac_demand.index.astype(int)
+        fleet.parameters.manuf_cnstrnt.columns = fleet.parameters.manuf_cnstrnt.columns.astype(int)
         dem = ax.stackplot(fleet.new_capac_demand.index, fleet.new_capac_demand[0],
                            lw=0, labels=['New battery demand'])
         constr = ax.plot(fleet.parameters.manuf_cnstrnt.index,
@@ -1077,11 +1111,14 @@ def vis_GAMS(fleet, fp, filename, param_values, export_png=False, export_pdf=Tru
 
         ax.set_ylabel(ylabel)
         ax.set_ybound(lower=0, upper=fleet.parameters.manuf_cnstrnt.max()[0]*1.1)
-        ax.set_xlim(0, 50)
         ax.xaxis.set_major_locator(MultipleLocator(10))
         # if cropx:
         #     axes[i].set_xlim(right=max_year)
 
+        if cropx:
+            ax.set_xlim(right=max_year)
+        else:
+            ax.set_xlim(2000, 2050)
         ax.legend(loc=2, bbox_to_anchor=(0, -0.4, 1, 0.2),
                   ncol=2, mode='expand', borderaxespad=0, handlelength=3)
 
