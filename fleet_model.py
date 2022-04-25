@@ -144,13 +144,13 @@ class FleetModel:
         self.parameters.mat_content.columns = self.parameters.mat_content.columns.astype(str)
 
         self.parameters.mat_cint.columns = self.parameters.mat_cint.columns.astype(str)
-        self.parameters.mat_cint = self.parameters.mat_cint.T
-        self.parameters.mat_cint.columns = self.parameters.mat_cint.columns.droplevel(['mat_cat'])
+        self.parameters.mat_cint.index = self.parameters.mat_cint.index.droplevel(['mat_cat'])
 
         self.parameters.recovery_pct.index = self.parameters.recovery_pct.index.astype('str')
 
         self.parameters.virg_mat_supply.index = self.parameters.virg_mat_supply.index.astype('str')
         self.parameters.virg_mat_supply.columns = self.parameters.virg_mat_supply.columns.droplevel(['mat_cat'])
+        self.parameters.virg_mat_supply = self.parameters.virg_mat_supply.T
 
         # --------------- Expected GAMS Outputs ------------------------------
         self.totc = None
@@ -367,7 +367,7 @@ class FleetModel:
         try:
             self.tec_oper_impact_int = self._p_dict['TEC_OPER_IMPACT_INT']
             self.tec_oper_impact_int = self.tec_oper_impact_int.stack().to_frame()
-            self.tec_oper_impact_int.index.names = ['tec', 'enr', 'seg', 'fleetreg', 'age', 'modelyear', 'prodyear']
+            self.tec_oper_impact_int.index.names = ['tec', 'enr', 'seg', 'fleetreg', 'modelyear', 'prodyear', 'age']
         except:
             log.warning('Invalid input for tec_oper_impact_int')
 
@@ -395,8 +395,10 @@ class FleetModel:
                 self.recycled_batt = self._v_dict['RECYCLED_BATT']
                 self.recycled_mat = self._v_dict['RECYCLED_MAT']
                 self.primary_mat = self._v_dict['TOT_PRIMARY_MAT']
-                self.resources = pd.concat([self.primary_mat, self.recycled_mat], axis=1, keys=['primary', 'recycled'])
+                self.resources = pd.concat([self.primary_mat, self.recycled_mat], axis=0, keys=['primary', 'recycled'])
+                self.resources = self.resources.T
                 self.mat_mix = self._v_dict['MAT_MIX']
+                self.mat_mix = self.mat_mix.T
                 self.mat_co2 = self._v_dict['MAT_CO2']
             except Exception as e:
                 log.warning(f'Could not load material related variables. Check model. {e}')
@@ -432,8 +434,8 @@ class FleetModel:
 
         # Import post-processing parameters
         try:
-            self.oper_impact_cohort = self._p_dict['OPER_IMPACT_COHORT']
-            self.oper_impact_cohort.index.rename(['tec', 'seg', 'fleetreg', 'prodyear', 'modelyear' 'age'], inplace=True)
+            self.oper_impact_cohort = self._p_dict['OPER_IMPACT_COHORT'].stack()
+            self.oper_impact_cohort.index.rename(['tec', 'seg', 'fleetreg', 'modelyear', 'prodyear', 'age'], inplace=True)
             self.stock_cohort = self._p_dict['STOCK_BY_COHORT']
             self.stock_cohort.index.rename(['tec', 'seg', 'fleetreg', 'prodyear', 'age'], inplace=True)
             self.stock_cohort.columns.rename('modelyear', inplace=True)
@@ -445,8 +447,10 @@ class FleetModel:
             self.mat_demand = self._p_dict['MAT_REQ_TOT']
             self.mat_demand = pd.concat([self.mat_demand], axis=1, keys=['total'])
 
-            self.new_capac_demand = self._p_dict['TOT_CAPACITY_ADDED']
-            self.new_capac_demand.index.rename(['modelyear'], inplace=True)
+            self.new_capac_demand = self._p_dict['TOT_CAPACITY_ADDED'].T
+            self.new_capac_demand.index.rename('modelyear', inplace=True)
+            self.new_capac_demand.columns = ['New ' +tec+' demand' for tec in self.new_capac_demand.columns]
+
             # reset index (which is currently a single-level MultiIndex)
             self.new_capac_demand.index = self.new_capac_demand.index.get_level_values(0)
         except TypeError as e:
@@ -455,7 +459,7 @@ class FleetModel:
 
         self.veh_oper_dist = self._p_dict['VEH_OPER_DIST']
         self.veh_oper_dist = self.veh_oper_dist.stack()
-        self.veh_oper_dist.index.rename(['modelyear','fleetreg'], inplace=True)
+        self.veh_oper_dist.index.rename(['fleetreg','modelyear'], inplace=True)
         # TODO: check 'ffill' with different distances
 
         tmp_dist = self.veh_oper_dist.reindex_like(self.tec_oper_impact_int.reorder_levels(['modelyear', 'fleetreg', 'tec','seg','prodyear','enr','age']), method='ffill')
@@ -534,9 +538,9 @@ class FleetModel:
         """
 
         """Test calculation for average lifetime vehicle (~12 years)."""
-        self.veh_oper_cint_avg = self.tec_oper_impact_int.index.levels[4].astype(int)
+        self.veh_oper_cint_avg = self.tec_oper_impact_int.index.levels[6].astype(int)
         ind = self.tec_oper_impact_int.index
-        self.tec_oper_impact_int.index = self.tec_oper_impact_int.index.set_levels(ind.levels[4].astype(int), level=4) # set ages as int
+        self.tec_oper_impact_int.index = self.tec_oper_impact_int.index.set_levels(ind.levels[6].astype(int), level=6) # set ages as int
         self.tec_oper_impact_int.sort_index(level='age', inplace=True)
         self.veh_oper_cint_avg = self.tec_oper_impact_int.reset_index(level='age')
         self.veh_oper_cint_avg = self.veh_oper_cint_avg[self.veh_oper_cint_avg.age <= age] # then, drop ages over selected lifetime

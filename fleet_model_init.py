@@ -391,10 +391,11 @@ class ParametersClass:
                    'tec_parameters_raw': ['veheq', 'tec', 'seg'],
                    # 'tec_parameters': ['veheq', 'tec', 'seg'],
                    'enr_tec_correspondance': ['enr', 'tec'],
-                   'cohort_age_correspondance': ['cohort', 'age', 'year'],
+                   'cohort_age_correspondance': ['year', 'cohort', 'age'],
                    'enr_impact_int_IAM': ['reg', 'enr'],
                    'enr_impact_int': ['reg', 'enr'],
                    }
+
         # read parameter values in from Excel
         params_dict = {}
         raw_data_dict = {}
@@ -410,7 +411,7 @@ class ParametersClass:
                     # special case: MultiIndex index
                     # fill in nan values for columns that will be the index
                     value.loc(axis=1)[mi_dict[param.lower()]] = value.loc(axis=1)[mi_dict[param.lower()]].fillna(method='ffill')
-                    value = value.astype({cat: str for cat in mi_dict[param.lower()]})
+                    value = value.astype({cat: str for cat in mi_dict[param.lower()]})  # convert all labels to strings (requirement from GAMS)
                     value.set_index(mi_dict[param.lower()], inplace=True, drop=True)
                 elif value.shape[0] == 0:
                     log.info(f"Empty values for {param} in Excel file.")
@@ -418,11 +419,14 @@ class ParametersClass:
                     value = value.iloc[0,1]
                 else:
                     # single-level Index
-                    value.set_index(value.iloc(axis=1)[0].name, inplace=True, drop=True)
+                    value.set_index(value.iloc(axis=1)[0].name, inplace=True, drop=True) # set first column as index
                     value.index = value.index.astype(str)  # ensure all indices are strings (required to work for GAMS)
                     value.columns = value.columns.astype(str)
 
                 if param.lower() in param_attrs:
+                    if isinstance(value, pd.DataFrame) or isinstance(value, pd.Series):
+                        if not value.empty:
+                            value = cls.order_sets(value)
                     params_dict[param.lower()] = value
                 else:
                     # any sheets in Excel that are not ParameterClass fields are sent to RawDataClass
@@ -508,18 +512,18 @@ class ParametersClass:
         if isinstance(self.veh_oper_dist, (float, int)):
             # calculate veh_oper_dist
             # given a single value for veh_oper_dist, assumes that value applies for every region, year and technology
-            ind = pd.MultiIndex.from_product([sets.modelyear, sets.fleetreg])
+            ind = pd.MultiIndex.from_product([sets.fleetreg, sets.modelyear])
             self.veh_oper_dist = pd.Series([self.veh_oper_dist for i in range(len(ind))], index=ind)
         elif isinstance(self.veh_oper_dist, dict):
             self.veh_oper_dist = pd.Series(self.veh_oper_dist)
-        self.veh_oper_dist.index.names = ['year', 'fleetreg']
+        self.veh_oper_dist.index.names = ['fleetreg','year']
 
         if self.raw_data.recycle_rate is not None and isinstance(self.raw_data.recycle_rate, float):
             self.recovery_pct = [[self.raw_data.recycle_rate]*len(sets.mat_cat) for year in range(len(sets.modelyear))]
             self.recovery_pct = pd.DataFrame(self.recovery_pct,
                                              index=sets.modelyear,
                                              columns=sets.mat_cat)
-
+            self.recovery_pct = self.recovery_pct.T
         if (self.raw_data.enr_glf_terms is not None) and (self.enr_impact_int is not None or self.enr_impact_int_IAM is not None):
             log.warning('----- Source for energy pathways may be overspecified; both enr_glf_terms and enr_impact_int are specified. Using enr_impact_int.')
 
@@ -585,7 +589,7 @@ class ParametersClass:
 
     def build_cohort_age_correspondance(self, sets):
         """
-        Build production year-cohort concordance matrix for use in GAMS (as parameter).
+        Build production year-cohort-age concordance matrix for use in GAMS (as parameter).
 
         Returns
         -------
@@ -594,33 +598,33 @@ class ParametersClass:
 
         """
 
-        top_year = int(sets.optyear[-1])
+        top_year = int(sets.optyear[-1])  # the last year we are interested in
         # start_year = int(sets.inityear[0])
-        start_year = int(sets.cohort[0])
+        start_year = int(sets.modelyear[0])  # start with the oldest cohort
         prod_year = start_year - int(sets.age[-1])
         ind = []
         for year in range(start_year, top_year + 1):
             for a in sets.age_int:
                 prod_year = year - a - 1
-                ind.append([prod_year, a, year, 1])
+                ind.append([year, prod_year, a, 1])
 
         index = pd.DataFrame(ind)
         #index = index[index[0]<=2050]
-        index = index[index[2] <= (top_year + 1)]
+        # index = index[index[2] <= (top_year + 1)] # we don't need tecnologies manufactured past our time period
         for ind, col in index.iloc[:,:-1].iteritems():
-            index.loc(axis=1)[ind] = index.loc(axis=1)[ind].astype(str)
-        index.columns = ['prodyear', 'age', 'year', 'level']
+            index.loc(axis=1)[ind] = index.loc(axis=1)[ind].astype(str) # convert to strings as required by GAMS
+        index.columns = ['year','prodyear','age', 'level']
 
         return index
 
 
     def build_BEV(self):
         """
-        Fetch BEV production emissions based on battery size.
+        Fetch BEV production impacts based on battery size.
 
         Select battery size by segment from size-segment combinations,
-        fetch and sum production emissions for battery and rest-of-vehicle.
-        Update DataFrame with total production emissions and energy use for
+        fetch and sum production impacts for battery and rest-of-vehicle.
+        Update DataFrame with total production impacts and energy use for
         BEVs by segment.
 
         Returns
@@ -1036,4 +1040,52 @@ class ParametersClass:
         if len(missing_regs):
             log.error(f'Missing region {missing_regs} in parameter {par_name}')
         elif len(set(par_ind) - set(reg_set)):
-            log.warning(f'Region {extra_regs} are in parameter {par_name}, but not declared as a set')
+            log.warning(f'Region {extra_regs} are in parameter {par_name}, but not declared as a set')    @staticmethod
+    @staticmethod
+    def order_sets(df):
+        """
+        Reorder parameter sets to match LP for feeding to GAMS.
+
+        Parameters
+        ----------
+        df : pandas DataFrame
+            Parameter read in from Excel.
+
+        Returns
+        -------
+        df : pandas DataFrame
+            Parameter with column order consistent with LP.
+
+        """
+        ordered_list = ['veheq',
+                        'grdeq',
+                        'tec',
+                        'newtec',
+                        'mat_cat',
+                        'mat_prod',
+                        'enr',
+                        'seg',
+                        'reg',
+                        'prodreg',
+                        'fleetreg',
+                        'year',
+                        'modelyear',
+                        'optyear',
+                        'prodyear',
+                        'age',
+                        'age_int',
+                        'sigvar',
+                        'A',
+                        'B',
+                        'r',
+                        'u']
+
+        # check if years are in index
+        if df.index.dtype == int:
+            df = df.T
+        df.reset_index(inplace=True)
+        df_collist = df.columns
+        new_collist = [col for col in ordered_list if col in df.columns]
+        if len(new_collist)>0:
+            df.set_index(new_collist, inplace=True)
+        return df

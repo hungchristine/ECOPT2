@@ -120,7 +120,7 @@ TEC_PARAMETERS(veheq,tec,seg,sigvar)     variables for each tech and veh equatio
 ENR_IMPACT_INT(enr,reg,year)               CO2 intensity of the regional energy mixes            [kg CO2-eq pr kwh]
 
 ***ENERGY and VEHICLE TECHONLOGY COMBINATIONS ----------------------------------------
-ENR_TEC_CORRESPONDANCE(enr,tec)                     feasible combinations of vehicle technology and energy (fuel)
+ENR_TEC_CORRESPONDANCE(tec, enr)                     feasible combinations of vehicle technology and energy (fuel)
 
 
 ***All VEHICLES ----------------------------------------------------------------------
@@ -134,7 +134,7 @@ TEC_PROD_IMPACT_INT(tec,seg,prodyear)        CO2 intensity of vehicle production
 
 **OPERATION
 TEC_OPER_EINT(tec,seg,prodyear)                               Energy intensity of vehicle operation     [kwh per km]
-TEC_OPER_IMPACT_INT(tec,enr,seg,fleetreg,age,modelyear,prodyear)    CO2 intensity of vehicle operation        [t CO2 per km]
+TEC_OPER_IMPACT_INT(tec,enr,seg,fleetreg,modelyear,prodyear,age)    CO2 intensity of vehicle operation        [t CO2 per km]
 
 **EOL
 TEC_EOLT_IMPACT_INT(tec,seg,year)            CO2 intensity of ICE vehicle EOL                     [t CO2-eq per vehicle in EOL treatment]
@@ -144,8 +144,8 @@ TEC_EOLT_IMPACT_INT(tec,seg,year)            CO2 intensity of ICE vehicle EOL   
 BEV_CAPAC(seg)                   Correspondence of battery capacities used in each segment  [kWh]
 
 **DEMAND --------------------
-EXOG_TOT_STOCK(year,reg)           Number of vehicles                            [#]
-VEH_OPER_DIST(year,reg)          Annual driving distance per vehicles          [km]
+EXOG_TOT_STOCK(reg,year)           Number of vehicles                            [#]
+VEH_OPER_DIST(reg,year)          Annual driving distance per vehicles          [km]
 
 ** LIFETIME -----------------
 *VEH_LIFT_PDF(age)                Age PDF
@@ -154,7 +154,7 @@ LIFETIME_AGE_DISTRIBUTION(age)                Age distribution = 1 - CDF
 RETIREMENT_FUNCTION(age)                Age distribution = 1 - CDF
 
 ** COMPOSITION --------------
-COHORT_AGE_CORRESPONDANCE(prodyear,age,year)       Correspondence between a vehicle production year and its age (up to 20) in a given year
+COHORT_AGE_CORRESPONDANCE(year,prodyear,age)       Correspondence between a vehicle production year and its age (up to 20) in a given year
 INITIAL_TEC_SHARES(tec)            Initial share of vehicles in stock tech
 INITIAL_SEG_SHARES(seg)            Initial stock distribution by segment
 *VEH_STCK_INT(tec,seg,reg,age)    Initial size of stock of vehicles by age cohort and segment
@@ -163,22 +163,22 @@ INITIAL_SEG_SHARES(seg)            Initial stock distribution by segment
 MAX_UPTAKE_RATE(grdeq,newtec)        Parameter for gradient of change constraint (fleet additions) - individual (IND) for each tech or related to all tech (ALL)
 MANUF_CNSTRNT(newtec,year)              Annual manufacturing capacity (for batteries destined for Europe)          [GWh]
 MAT_CONTENT(newtec,mat_cat,year)        Critical material content per kWh by production year                       [kg kWh-1]
-RECOVERY_PCT(year,mat_cat)       Recovery of critical materials from battery recycling processes in wt%
-VIRG_MAT_SUPPLY(year,mat_prod)   Primary critical material resources available in a given year              [t]
-MAT_CINT(year,mat_prod)          Carbon intensity of each material by source                                [kg CO2e kg^-1 mat]
+RECOVERY_PCT(mat_cat,year)       Recovery of critical materials from battery recycling processes in wt%
+VIRG_MAT_SUPPLY(mat_prod,year)   Primary critical material resources available in a given year              [t]
+MAT_CINT(mat_prod,year)          Carbon intensity of each material by source                                [kg CO2e kg^-1 mat]
 
 ** POST-PROCESSING --------
 TOT_NEW_TECS(year)                   Total number of BEVs in Europe
-TOT_CAPACITY_ADDED(year)             Total battery capacity required by year         [MWh]
+TOT_CAPACITY_ADDED(newtec,year)             Total battery capacity required by year         [MWh]
 TOT_CAPACITY_RECYCLED(year)          Total battery capacity retired each year        [kWh]
-MAT_REQ_TOT(year, mat_cat)       Total resources required by year                [kg]
+MAT_REQ_TOT(mat_cat,year)       Total resources required by year                [kg]
 EXOG_TOT_STOCK_CHECK(modelyear)
-STOCK_BY_COHORT(tec,seg,fleetreg,prodyear,age,modelyear)       Total stock by technology segment region and cohort
-OPER_IMPACT_COHORT(tec,seg,fleetreg,prodyear,modelyear,age)       Total fleet operating emissions by technology segment region and cohort
-EOL_IMPACT_COHORT(tec,seg,fleetreg,prodyear,modelyear,age)       Total end-of-life emissions by technology segment region and cohort
+STOCK_BY_COHORT(tec,seg,fleetreg,modelyear,prodyear,age)       Total stock by technology segment region and cohort
+OPER_IMPACT_COHORT(tec,seg,fleetreg,modelyear,prodyear,age)       Total fleet operating emissions by technology segment region and cohort
+EOL_IMPACT_COHORT(tec,seg,fleetreg,modelyear,prodyear,age)       Total end-of-life emissions by technology segment region and cohort
 TOTAL_OPERATION_ENERGY(tec,seg,fleetreg,modelyear)                      Total fleet operatin energy by technology segment and region
-TOT_STOCK_ADDED(fleetreg, year)      Total vehicles added by region
-TOT_STOCK_REMOVED(fleetreg, year)      Total vehicles retired by region
+TOT_STOCK_ADDED(fleetreg,year)      Total vehicles added by region
+TOT_STOCK_REMOVED(fleetreg,year)      Total vehicles retired by region
 TOT_STOCK_CHECK(fleetreg,year)
 BAU_PROD(modelyear)
 BAU_OPER(modelyear)
@@ -239,13 +239,13 @@ TEC_PROD_IMPACT_INT(tec,seg,prodyear)$(ord(prodyear)>28) = TEC_PROD_IMPACT_INT_R
 * Assume constant for all regions for now
 TEC_OPER_EINT(tec,seg,prodyear) = genlogfnc(TEC_PARAMETERS('OPER_EINT',tec,seg,'A'),TEC_PARAMETERS('OPER_EINT',tec,seg,'B'),TEC_PARAMETERS('OPER_EINT',tec,seg,'r'),YEAR_PAR(prodyear),TEC_PARAMETERS('OPER_EINT',tec,seg,'u'));
 
-TEC_OPER_IMPACT_INT(tec,enr,seg,fleetreg,age,modelyear,prodyear)$(ENR_TEC_CORRESPONDANCE(enr,tec)) = TEC_OPER_EINT(tec,seg,prodyear)*COHORT_AGE_CORRESPONDANCE(prodyear,age,modelyear)*(ENR_IMPACT_INT(enr,fleetreg,modelyear)/1000);
+TEC_OPER_IMPACT_INT(tec,enr,seg,fleetreg,modelyear,prodyear,age)$(ENR_TEC_CORRESPONDANCE(tec,enr)) = TEC_OPER_EINT(tec,seg,prodyear)*COHORT_AGE_CORRESPONDANCE(modelyear,prodyear,age)*(ENR_IMPACT_INT(enr,fleetreg,modelyear)/1000);
 
 *----- End-of-life phase emissions
 TEC_EOLT_IMPACT_INT(tec,seg,modelyear) = genlogfnc(TEC_PARAMETERS('EOLT_CINT',tec,seg,'A'),TEC_PARAMETERS('EOLT_CINT',tec,seg,'B'),TEC_PARAMETERS('EOLT_CINT',tec,seg,'r'),YEAR_PAR(modelyear),TEC_PARAMETERS('EOLT_CINT',tec,seg,'u'));
 
 
-*VEH_STCK_INT(tec,seg,fleetreg,age) = (INITIAL_TEC_SHARES(tec)*VEH_LIFT_PDF(age)*INITIAL_SEG_SHARES(seg))*EXOG_TOT_STOCK('2000',fleetreg);
+*VEH_STCK_INT(tec,seg,fleetreg,age) = (INITIAL_TEC_SHARES(tec)*VEH_LIFT_PDF(age)*INITIAL_SEG_SHARES(seg))*EXOG_TOT_STOCK(fleetreg,'2000');
 
 
 *-----------------------------------------------------------------------------------
@@ -262,15 +262,15 @@ TEC_EOLT_IMPACT_INT(tec,seg,modelyear) = genlogfnc(TEC_PARAMETERS('EOLT_CINT',te
 FREE VARIABLES
 TOTC                                        Total CO2 emissions for the whole system over the whole period
 TOT_IMPACTS_OPT                             Total CO2 emissions for the whole system over optimization period
-STOCK_CHANGE(year,fleetreg)                 Net change in stock from one year to the next
-TOT_PRIMARY_MAT(year, mat_cat)              Total primary resources required by year [kg]
+STOCK_CHANGE(fleetreg,year)                 Net change in stock from one year to the next
+TOT_PRIMARY_MAT(mat_cat,year)              Total primary resources required by year [kg]
 
 * Slack variables for debugging
 SLACK_ADD(tec,seg,fleetreg,year,age)        
-SLACK_TEC_ADD(newtec, seg,fleetreg,year,age)
+SLACK_TEC_ADD(newtec,seg,fleetreg,year,age)
 SLACK_SEG_ADD(seg,fleetreg,year)
-SLACK_RECYCLED_BATT(year, fleetreg, age)
-SLACK_VIRG_MAT(year, mat_prod)
+SLACK_RECYCLED_BATT(fleetreg,year,age)
+SLACK_VIRG_MAT(mat_prod,year)
 SLACK_NEW_BATT_CAP(year)
 ;
 
@@ -284,12 +284,12 @@ PRODUCTION_IMPACTS(tec,seg,fleetreg,year)   Total CO2 emissions from production 
 OPERATION_IMPACTS(tec,seg,fleetreg,year)    Total CO2 emissions from operations of vehicles per year            [t CO2-eq]
 EOL_IMPACTS(tec,seg,fleetreg,year)          Total CO2 emissions from vehicle end of life treatment per year     [t CO2-eq]
 
-RECYCLED_BATT(newtec,year,fleetreg, age)           Total battery capacity sent to recycling per year                   [kWh]
-RECYCLED_MAT(year, mat_cat)                 Materials recovered from recycled batteries                         [kg]
-MAT_REQ(year,mat_cat)                       Total amount of critical materials needed for new vehicles          [kg]
+RECYCLED_BATT(newtec,fleetreg,year,age)           Total battery capacity sent to recycling per year                   [kWh]
+RECYCLED_MAT(mat_cat,year)                 Materials recovered from recycled batteries                         [kg]
+MAT_REQ(mat_cat,year)                       Total amount of critical materials needed for new vehicles          [kg]
 
-MAT_MIX(year, mat_prod)                     Production mixes for virgin materials                               [t]
-MAT_CO2(year, mat_prod)                     Total CO2 emissions from virgin material production per year        [t CO2e kg^-1]
+MAT_MIX(mat_prod,year)                     Production mixes for virgin materials                               [t]
+MAT_CO2(mat_prod,year)                     Total CO2 emissions from virgin material production per year        [t CO2e kg^-1]
 ;
 
 
@@ -341,7 +341,7 @@ EQ_EOL_IMPACTS              Total vehicle end of life emissions
 
 ***VEHICLE STOCK MODEL  ------------------------------------------------------------
 * First, initialize first year (boundary condition)
-TOT_STOCK.fx(tec,seg,fleetreg,modelyear,age)$(ord(modelyear)=1) = EXOG_TOT_STOCK(modelyear, fleetreg) * LIFETIME_AGE_DISTRIBUTION(age) * INITIAL_TEC_SHARES(tec)  * INITIAL_SEG_SHARES(seg);
+TOT_STOCK.fx(tec,seg,fleetreg,modelyear,age)$(ord(modelyear)=1) = EXOG_TOT_STOCK(fleetreg,modelyear) * LIFETIME_AGE_DISTRIBUTION(age) * INITIAL_TEC_SHARES(tec)  * INITIAL_SEG_SHARES(seg);
 * try below with age+1 on LHS to avoid weird offset thing?
 STOCK_REMOVED.fx(tec,seg,fleetreg,modelyear,age)$(ord(modelyear)=1) = TOT_STOCK.l(tec,seg,fleetreg,modelyear,age-1) * RETIREMENT_FUNCTION(age-1);
 STOCK_ADDED.fx(tec,seg,fleetreg,modelyear,new)$(ord(modelyear)=1) = sum(age, STOCK_REMOVED.l(tec,seg,fleetreg,modelyear,age));
@@ -350,21 +350,21 @@ STOCK_ADDED.fx(tec,seg,fleetreg,modelyear,age)$(ord(age)>1) = 0;
 
 * Initiate stock in remaining initialization period
 loop(modelyear $ (ord(modelyear)>1 and ord(modelyear) <= card(inityear)),
-STOCK_CHANGE.fx(modelyear, fleetreg) = EXOG_TOT_STOCK(modelyear, fleetreg) - EXOG_TOT_STOCK(modelyear-1, fleetreg);
+STOCK_CHANGE.fx(fleetreg,modelyear) = EXOG_TOT_STOCK(fleetreg,modelyear) - EXOG_TOT_STOCK(fleetreg,modelyear-1);
 * calculate stock removals as per survival curves
 STOCK_REMOVED.fx(tec,seg,fleetreg,modelyear,age) = TOT_STOCK.l(tec,seg,fleetreg,modelyear-1,age-1) * RETIREMENT_FUNCTION(age-1);
 * in initialization period, assume that new vehicles maintain the status quo of tec and segment shares
-STOCK_ADDED.fx(tec,seg,fleetreg,modelyear,new) = sum(age, STOCK_REMOVED.l(tec,seg,fleetreg,modelyear,age)) + (STOCK_CHANGE.l(modelyear,fleetreg) * INITIAL_TEC_SHARES(tec) * INITIAL_SEG_SHARES(seg));
+STOCK_ADDED.fx(tec,seg,fleetreg,modelyear,new) = sum(age, STOCK_REMOVED.l(tec,seg,fleetreg,modelyear,age)) + (STOCK_CHANGE.l(fleetreg,modelyear) * INITIAL_TEC_SHARES(tec) * INITIAL_SEG_SHARES(seg));
 TOT_STOCK.fx(tec,seg,fleetreg,modelyear,age) = TOT_STOCK.l(tec,seg,fleetreg,modelyear-1,age-1) - STOCK_REMOVED.l(tec,seg,fleetreg,modelyear,age) + STOCK_ADDED.l(tec,seg,fleetreg,modelyear,age);
 );
 
 
 ***  Fleet balance model -----------------------------------------------
-EQ_STCK_CHANGE(modelyear,fleetreg)$(ord(modelyear)>card(inityear))..             STOCK_CHANGE(modelyear,fleetreg)  =e=  EXOG_TOT_STOCK(modelyear,fleetreg) - EXOG_TOT_STOCK(modelyear-1,fleetreg);
+EQ_STCK_CHANGE(modelyear,fleetreg)$(ord(modelyear)>card(inityear))..             STOCK_CHANGE(fleetreg,modelyear)  =e=  EXOG_TOT_STOCK(fleetreg,modelyear) - EXOG_TOT_STOCK(fleetreg,modelyear-1);
 
 EQ_STCK_REM(tec,seg,fleetreg,modelyear,age)$(ord(modelyear)>card(inityear))..    STOCK_REMOVED(tec,seg,fleetreg,modelyear,age) =e= TOT_STOCK(tec,seg,fleetreg,modelyear-1,age-1)*RETIREMENT_FUNCTION(age-1);
 
-EQ_STCK_ADD(modelyear,fleetreg)$(ord(modelyear)>card(inityear))..               sum((tec,seg), STOCK_ADDED(tec,seg,fleetreg,modelyear,new)) =e= sum((tec,seg,age), STOCK_REMOVED(tec,seg,fleetreg,modelyear, age)) + STOCK_CHANGE(modelyear, fleetreg);
+EQ_STCK_ADD(modelyear,fleetreg)$(ord(modelyear)>card(inityear))..               sum((tec,seg), STOCK_ADDED(tec,seg,fleetreg,modelyear,new)) =e= sum((tec,seg,age), STOCK_REMOVED(tec,seg,fleetreg,modelyear, age)) + STOCK_CHANGE(fleetreg,modelyear);
 
 
 EQ_STCK_BAL(tec,seg,fleetreg,modelyear,age)$(ord(modelyear) > card(inityear))..      TOT_STOCK(tec,seg,fleetreg,modelyear,age)  =e= TOT_STOCK(tec,seg,fleetreg,modelyear-1,age-1) + STOCK_ADDED(tec,seg,fleetreg,modelyear,age) - STOCK_REMOVED(tec,seg,fleetreg,modelyear,age);
@@ -386,16 +386,16 @@ EQ_NEW_MANUF_CAP(newtec,optyear)..                   MANUF_CNSTRNT(newtec,optyea
 *-----------------------------------------------
 * C - Material balance constraint - total supply
 * Amount of virgin + recycled material to produce new batteries, in kg; see intermediate calculations below
-EQ_MAT_SUPPLY(optyear, mat_cat)..                    TOT_PRIMARY_MAT(optyear, mat_cat) + RECYCLED_MAT(optyear, mat_cat) =e= MAT_REQ(optyear, mat_cat);
+EQ_MAT_SUPPLY(mat_cat,optyear)..                    TOT_PRIMARY_MAT(mat_cat,optyear) + RECYCLED_MAT(mat_cat,optyear) =e= MAT_REQ(mat_cat,optyear);
 
-EQ_MAT_TOT_PRIMARY(mat_cat, optyear)..               TOT_PRIMARY_MAT(optyear, mat_cat) =e= sum(mat_prod$mat(mat_cat, mat_prod), MAT_MIX(optyear, mat_prod));
+EQ_MAT_TOT_PRIMARY(mat_cat, optyear)..               TOT_PRIMARY_MAT(mat_cat,optyear) =e= sum(mat_prod$mat(mat_cat, mat_prod), MAT_MIX(mat_prod,optyear));
 
 *------------------------------------------------
 * D - Critical material primary supply constraint
 * demand of virgin resources from each source must be less than or equal to available supply; see intermediate calculations below
 * primary resources constraint provided in t, mat_mix in kg
-EQ_PRIM_MAT_SUPPLY_CONSTRAINT(optyear,mat_prod)..                MAT_MIX(optyear, mat_prod) =l= VIRG_MAT_SUPPLY(optyear, mat_prod)*1000
-%SLACK_VIRG_MAT% + SLACK_VIRG_MAT(optyear, mat_prod)
+EQ_PRIM_MAT_SUPPLY_CONSTRAINT(mat_prod,optyear)..                MAT_MIX(mat_prod,optyear) =l= VIRG_MAT_SUPPLY(mat_prod,optyear)*1000
+%SLACK_VIRG_MAT% + SLACK_VIRG_MAT(mat_prod,optyear)
 ;
 
 *---------------------------------
@@ -420,16 +420,16 @@ EQ_SEG_SHARE_CONSTRAINT(seg,fleetreg,modelyear)$(ord(modelyear)>card(inityear)).
 
 *------ Lithium/elemental resource availability calculations for constraints C and D
 * Calculate amount of batteries retired each year in kWh
-EQ_RECYCLED_BATT(newtec, optyear,fleetreg, age)..             RECYCLED_BATT(newtec,optyear,fleetreg,age) =e= sum((seg), STOCK_REMOVED(newtec,seg,fleetreg,optyear,age)* BEV_CAPAC(seg))
+EQ_RECYCLED_BATT(newtec,fleetreg,optyear,age)..             RECYCLED_BATT(newtec,fleetreg,optyear,age) =e= sum((seg), STOCK_REMOVED(newtec,seg,fleetreg,optyear,age)* BEV_CAPAC(seg))
 ;
 
 * Calculate amount of materials recovered from end-of-life batteries for recycling (i.e., to new batteries), in kg
-EQ_RECYCLED_MAT(optyear,mat_cat)..                   RECYCLED_MAT(optyear, mat_cat) =e= sum((newtec,prodyear,age), sum((fleetreg), RECYCLED_BATT(newtec, optyear, fleetreg, age)) * COHORT_AGE_CORRESPONDANCE(prodyear, age, optyear) * MAT_CONTENT(newtec, mat_cat, optyear)) * RECOVERY_PCT(optyear, mat_cat)
+EQ_RECYCLED_MAT(mat_cat,optyear)..                   RECYCLED_MAT(mat_cat,optyear) =e= sum((newtec,prodyear,age), sum((fleetreg), RECYCLED_BATT(newtec,fleetreg,optyear,age)) * COHORT_AGE_CORRESPONDANCE(optyear,prodyear,age) * MAT_CONTENT(newtec, mat_cat, optyear)) * RECOVERY_PCT(mat_cat,optyear)
 ;
 
 * Material supply balance
 * Total amount of material required calculated from new vehicles entering the market, in kg
-EQ_MAT_REQ(optyear, mat_cat)..                       MAT_REQ(optyear, mat_cat) =e= sum(newtec, sum((seg, fleetreg), STOCK_ADDED(newtec,seg,fleetreg,optyear,new) * BEV_CAPAC(seg)) * MAT_CONTENT(newtec, mat_cat, optyear)
+EQ_MAT_REQ(mat_cat,optyear)..                       MAT_REQ(mat_cat,optyear) =e= sum(newtec, sum((seg, fleetreg), STOCK_ADDED(newtec,seg,fleetreg,optyear,new) * BEV_CAPAC(seg)) * MAT_CONTENT(newtec, mat_cat, optyear)
 %SLACK_NEW_BATT_CAP% + SLACK_NEW_BATT_CAP(optyear) * MAT_CONTENT(newtec, mat_cat, optyear)
 )
 ;
@@ -447,18 +447,17 @@ EQ_TOTAL_IMPACTS(tec,seg,fleetreg,modelyear)..                  TOT_IMPACTS(tec,
 (tec,seg,fleetreg,modelyear);
 
 * Calculate emissions from virgin materials. Currently assumes zero emissions for recycled materials.
-EQ_PRIMARY_MAT_IMPACTS(modelyear, mat_prod)..                         MAT_CO2(modelyear, mat_prod) =e= (MAT_MIX(modelyear, mat_prod) * MAT_CINT(modelyear, mat_prod))/1000
-%SLACK_VIRG_MAT% + SLACK_VIRG_MAT(modelyear, mat_prod)*1e6
+EQ_PRIMARY_MAT_IMPACTS(mat_prod,modelyear)..                         MAT_CO2(mat_prod,modelyear) =e= (MAT_MIX(mat_prod,modelyear) * MAT_CINT(mat_prod,modelyear))/1000
                                                             ;
 * Calculate emissions from vehicle production
 EQ_PRODUCTION_IMPACTS(tec,seg,fleetreg,modelyear)..             PRODUCTION_IMPACTS
-(tec,seg,fleetreg,modelyear) =e= STOCK_ADDED(tec,seg,fleetreg,modelyear,new)*TEC_PROD_IMPACT_INT(tec,seg,modelyear) + sum(mat_prod, MAT_CO2(modelyear, mat_prod))
+(tec,seg,fleetreg,modelyear) =e= STOCK_ADDED(tec,seg,fleetreg,modelyear,new)*TEC_PROD_IMPACT_INT(tec,seg,modelyear) + sum(mat_prod, MAT_CO2(mat_prod,modelyear))
 %SLACK_ADD% + SLACK_TEC_ADD(newtec,seg,fleetreg,modelyear,new)*TEC_PROD_IMPACT_INT(tec,seg,modelyear)*1e6
 ;
 
 * Calculate emissions from vehicle operation
 EQ_OPERATION_IMPACTS(tec,seg,fleetreg,modelyear)..             OPERATION_IMPACTS
-(tec,seg,fleetreg,modelyear) =e= sum( (agej,enr,prodyear), TOT_STOCK(tec,seg,fleetreg,modelyear,agej) * COHORT_AGE_CORRESPONDANCE(prodyear,agej,modelyear)* TEC_OPER_IMPACT_INT(tec,enr,seg,fleetreg,agej,modelyear,prodyear) *  VEH_OPER_DIST(modelyear, fleetreg));
+(tec,seg,fleetreg,modelyear) =e= sum( (agej,enr,prodyear), TOT_STOCK(tec,seg,fleetreg,modelyear,agej) * COHORT_AGE_CORRESPONDANCE(modelyear,prodyear,agej)* TEC_OPER_IMPACT_INT(tec,enr,seg,fleetreg,modelyear,prodyear,agej) *  VEH_OPER_DIST(fleetreg,modelyear));
 
 * Calculate emissions from vehicle disposal and recycling
 EQ_EOL_IMPACTS(tec,seg,fleetreg,modelyear)..             EOL_IMPACTS
@@ -553,9 +552,9 @@ ss = EVD4EUR_Basic.solvestat;
 
 TOT_NEW_TECS(modelyear) = sum((newtec,seg, fleetreg, age), TOT_STOCK.l(newtec, seg, fleetreg, modelyear,age)); 
 * total capacity of batteries added by year in MWh
-TOT_CAPACITY_ADDED(modelyear) = sum((newtec,seg, fleetreg)$STOCK_ADDED.l(newtec, seg, fleetreg, modelyear, new), STOCK_ADDED.l(newtec,seg,fleetreg,modelyear,new)*BEV_CAPAC(seg))/1e6;
-TOT_CAPACITY_RECYCLED(modelyear) = sum((seg), sum((newtec,fleetreg, age), STOCK_REMOVED.l(newtec,seg,fleetreg,modelyear, age))* BEV_CAPAC(seg));
-MAT_REQ_TOT(modelyear, mat_cat) = sum((newtec,seg, fleetreg), STOCK_ADDED.l(newtec,seg,fleetreg,modelyear,new)*BEV_CAPAC(seg)*MAT_CONTENT(newtec,mat_cat,modelyear));
+TOT_CAPACITY_ADDED(newtec, modelyear) = sum((seg,fleetreg)$STOCK_ADDED.l(newtec, seg, fleetreg, modelyear, new), STOCK_ADDED.l(newtec,seg,fleetreg,modelyear,new)*BEV_CAPAC(seg))/1e6;
+TOT_CAPACITY_RECYCLED(modelyear) = sum((seg), sum((newtec,fleetreg, age), STOCK_REMOVED.l(newtec,seg,fleetreg,modelyear,age))* BEV_CAPAC(seg));
+MAT_REQ_TOT(mat_cat,modelyear) = sum((newtec,seg, fleetreg), STOCK_ADDED.l(newtec,seg,fleetreg,modelyear,new)*BEV_CAPAC(seg)*MAT_CONTENT(newtec,mat_cat,modelyear));
 
 TOT_STOCK_ADDED(fleetreg,modelyear) = sum((tec,seg), STOCK_ADDED.l(tec, seg, fleetreg, modelyear, new));
 TOT_STOCK_REMOVED(fleetreg, modelyear) = sum((tec,seg,age), STOCK_REMOVED.l(tec, seg, fleetreg, modelyear, age));
@@ -563,16 +562,16 @@ TOT_STOCK_CHECK(fleetreg, modelyear) = sum((tec,seg,age), TOT_STOCK.l(tec,seg,fl
 
 * summing the number of vehicles in fleet as check.
 EXOG_TOT_STOCK_CHECK(modelyear) = sum((tec,seg,fleetreg,age), TOT_STOCK.l(tec,seg,fleetreg,modelyear,age));
-STOCK_BY_COHORT(tec,seg,fleetreg,prodyear,agej,modelyear) $ COHORT_AGE_CORRESPONDANCE(prodyear,agej,modelyear) = (TOT_STOCK.l(tec,seg,fleetreg,modelyear,agej)*COHORT_AGE_CORRESPONDANCE(prodyear,agej,modelyear));
+STOCK_BY_COHORT(tec,seg,fleetreg,modelyear,prodyear,agej) $ COHORT_AGE_CORRESPONDANCE(modelyear,prodyear,agej) = (TOT_STOCK.l(tec,seg,fleetreg,modelyear,agej)*COHORT_AGE_CORRESPONDANCE(modelyear,prodyear,agej));
 
 * total operation emissions by cohort and model year
-OPER_IMPACT_COHORT(tec, seg, fleetreg, prodyear, modelyear ,age) = sum((enr), TOT_STOCK.l(tec,seg,fleetreg,modelyear,age) * COHORT_AGE_CORRESPONDANCE(prodyear,age,modelyear)* TEC_OPER_IMPACT_INT(tec,enr,seg,fleetreg,age,modelyear,prodyear) * VEH_OPER_DIST(modelyear, fleetreg));
-EOL_IMPACT_COHORT(tec,seg,fleetreg,prodyear,modelyear,age) = (STOCK_REMOVED.l(tec,seg,fleetreg,modelyear,age)* COHORT_AGE_CORRESPONDANCE(prodyear,age,modelyear)) * TEC_EOLT_IMPACT_INT(tec,seg,modelyear);
-TOTAL_OPERATION_ENERGY(tec,seg,fleetreg,modelyear) = sum((prodyear, age), TOT_STOCK.l(tec,seg,fleetreg,modelyear,age) * COHORT_AGE_CORRESPONDANCE(prodyear,age,modelyear) * TEC_OPER_EINT(tec,seg,prodyear) * VEH_OPER_DIST(modelyear, fleetreg));
+OPER_IMPACT_COHORT(tec, seg, fleetreg,modelyear,prodyear,age) = sum((enr), TOT_STOCK.l(tec,seg,fleetreg,modelyear,age) * COHORT_AGE_CORRESPONDANCE(modelyear,prodyear,age)* TEC_OPER_IMPACT_INT(tec,enr,seg,fleetreg,modelyear,prodyear,age) * VEH_OPER_DIST(fleetreg,modelyear));
+EOL_IMPACT_COHORT(tec,seg,fleetreg,modelyear,prodyear,age) = (STOCK_REMOVED.l(tec,seg,fleetreg,modelyear,age)* COHORT_AGE_CORRESPONDANCE(modelyear,prodyear,age)) * TEC_EOLT_IMPACT_INT(tec,seg,modelyear);
+TOTAL_OPERATION_ENERGY(tec,seg,fleetreg,modelyear) = sum((prodyear, age), TOT_STOCK.l(tec,seg,fleetreg,modelyear,age) * COHORT_AGE_CORRESPONDANCE(modelyear,prodyear,age) * TEC_OPER_EINT(tec,seg,prodyear) * VEH_OPER_DIST(fleetreg,modelyear));
 
 * calculate emissions for 0 electrification (business as usual)
 BAU_PROD(modelyear) = sum(seg, sum((tec,fleetreg), STOCK_ADDED.l(tec, seg, fleetreg, modelyear, new)) * TEC_PROD_IMPACT_INT('ICE',seg,modelyear));
-BAU_OPER(modelyear) = sum((fleetreg,age,prodyear,seg), sum((tec), TOT_STOCK.l(tec,seg,fleetreg,modelyear,age)) * TEC_OPER_IMPACT_INT('ICE', 'FOS', seg, fleetreg, age, modelyear, prodyear) * COHORT_AGE_CORRESPONDANCE(prodyear,age ,modelyear) * VEH_OPER_DIST(modelyear, fleetreg));
+BAU_OPER(modelyear) = sum((fleetreg,age,prodyear,seg), sum((tec), TOT_STOCK.l(tec,seg,fleetreg,modelyear,age)) * TEC_OPER_IMPACT_INT('ICE', 'FOS', seg, fleetreg, modelyear, prodyear, age) * COHORT_AGE_CORRESPONDANCE(modelyear,prodyear,age) * VEH_OPER_DIST(fleetreg,modelyear));
 BAU_EOL(modelyear)  = sum(seg, sum((tec, fleetreg,age), STOCK_REMOVED.l(tec,seg,fleetreg,modelyear,age))  * TEC_EOLT_IMPACT_INT('ICE',seg,modelyear));
 BAU_IMPACTS(modelyear) = BAU_PROD(modelyear) + BAU_OPER(modelyear) + BAU_EOL(modelyear);
 

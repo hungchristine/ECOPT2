@@ -819,7 +819,7 @@ def vis_GAMS(fleet, fp, filename, param_values, export_png=False, export_pdf=Tru
 
             plot_resources = fleet.resources.loc[:, (slice(None), resource)].copy()
             plot_resources.index = plot_resources.index.astype(int)
-            plot_virg_mat = fleet.parameters.virg_mat_supply.copy().filter(like=resource, axis=1)*1000  # primary material supply is in tons; convert to kg
+            plot_virg_mat = fleet.parameters.virg_mat_supply.copy().T.filter(like=resource, axis=0)*1000  # primary material supply is in tons; convert to kg
             plot_virg_mat.index = plot_virg_mat.index.astype(int)
 
             if plot_resources.max().mean() >= 1e6:
@@ -900,7 +900,7 @@ def vis_GAMS(fleet, fp, filename, param_values, export_png=False, export_pdf=Tru
         resource_use.sort_index(ascending=True, inplace=True)
 
         # get total available primary supplies of each material category
-        prim_supply = (fleet.parameters.virg_mat_supply.groupby(gpby_class, axis=1).sum() * fleet.parameters.raw_data.eur_batt_share)*1000 # primary supply is in t, convert to kg
+        prim_supply = (fleet.parameters.virg_mat_supply.T.groupby(gpby_class, axis=1).sum() * fleet.parameters.raw_data.eur_batt_share)*1000 # primary supply is in t, convert to kg
         prim_supply.index = prim_supply.index.astype(int)
         prim_supply = prim_supply.loc[2020:]
 
@@ -973,8 +973,9 @@ def vis_GAMS(fleet, fp, filename, param_values, export_png=False, export_pdf=Tru
         plot_data.index = plot_data.index.astype(int)
         level_2020 = plot_data.loc[2020].mean() # use as baseline value to scale y-axis
         plot_data = plot_data.loc[2020:2050]  # restrict to optimization period
-        fleet.parameters.virg_mat_supply.index = fleet.parameters.virg_mat_supply.index.astype(int)
-        supply_constr = fleet.parameters.virg_mat_supply.loc[2020:2050] * 1000 # virg_mat_supply is in t, not kg
+        fleet.parameters.virg_mat_supply.columns = fleet.parameters.virg_mat_supply.columns.astype(int)
+        supply_constr = fleet.parameters.virg_mat_supply.loc(axis=1)[2020:2050] * 1000 # virg_mat_supply is in t, not kg
+        supply_constr = supply_constr.T
         plot_data.sort_index(axis=1, inplace=True)  # make sure material mixes and supply constraints are in the same order
         supply_constr.sort_index(axis=1, inplace=True)
 

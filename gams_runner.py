@@ -120,8 +120,8 @@ class GAMSRunner:
             for producer in item:
                 mat.add_record((key, producer))
 
-        veh_oper_dist = gmspy.df2param(self.db, fleet.parameters.veh_oper_dist, ['year', 'reg'], 'VEH_OPER_DIST')
-        exog_tot_stock = gmspy.df2param(self.db, fleet.parameters.exog_tot_stock, ['year', 'fleetreg'], 'EXOG_TOT_STOCK')
+        veh_oper_dist = gmspy.df2param(self.db, fleet.parameters.veh_oper_dist, ['reg','year'], 'VEH_OPER_DIST')
+        exog_tot_stock = gmspy.df2param(self.db, fleet.parameters.exog_tot_stock, ['fleetreg','year'], 'EXOG_TOT_STOCK')
         initial_seg_shares = gmspy.df2param(self.db, fleet.parameters.initial_seg_shares, ['seg'], 'INITIAL_SEG_SHARES')
         bev_capac = gmspy.df2param(self.db, fleet.parameters.bev_capac, ['seg'], 'BEV_CAPAC')
 
@@ -135,7 +135,7 @@ class GAMSRunner:
         enr_tec_correspondance = gmspy.df2param(self.db, fleet.parameters.enr_tec_correspondance, ['enr', 'tec'], 'ENR_TEC_CORRESPONDANCE')
         enr_impact_int = gmspy.df2param(self.db, fleet.parameters.enr_impact_int, ['enr', 'reg', 'year'], 'ENR_IMPACT_INT')
 
-        cohort_age_correspondance = gmspy.df2param(self.db, fleet.parameters.cohort_age_correspondance, ['prodyear', 'age', 'year'], 'COHORT_AGE_CORRESPONDANCE')
+        cohort_age_correspondance = gmspy.df2param(self.db, fleet.parameters.cohort_age_correspondance, ['year','prodyear','age'], 'COHORT_AGE_CORRESPONDANCE')
 
         year_par = gmspy.df2param(self.db, fleet.parameters.year_par, ['year'], 'YEAR_PAR')
         tec_parameters = gmspy.df2param(self.db, fleet.parameters.tec_parameters, ['veheq', 'tec', 'seg', 'sigvar'], 'TEC_PARAMETERS')
@@ -155,9 +155,9 @@ class GAMSRunner:
         manuf_cnstrnt = gmspy.df2param(self.db, fleet.parameters.manuf_cnstrnt, ['newtec','year'], 'MANUF_CNSTRNT')
 
         mat_content = gmspy.df2param(self.db, fleet.parameters.mat_content, ['newtec','mat_cat','year'], 'MAT_CONTENT')
-        mat_cint = gmspy.df2param(self.db, fleet.parameters.mat_cint, ['year', 'mat_prod'], 'MAT_CINT')
-        virg_mat = gmspy.df2param(self.db, fleet.parameters.virg_mat_supply, ['year','mat_prod'], 'VIRG_MAT_SUPPLY')
-        recovery_pct = gmspy.df2param(self.db, fleet.parameters.recovery_pct, ['year','mat_cat'], 'RECOVERY_PCT')
+        mat_cint = gmspy.df2param(self.db, fleet.parameters.mat_cint, ['mat_prod','year'], 'MAT_CINT')
+        virg_mat = gmspy.df2param(self.db, fleet.parameters.virg_mat_supply, ['mat_prod','year'], 'VIRG_MAT_SUPPLY')
+        recovery_pct = gmspy.df2param(self.db, fleet.parameters.recovery_pct, ['mat_cat','year'], 'RECOVERY_PCT')
 
         try:
             self.db.export(os.path.join(self.export_fp, filename + '_'+timestamp))
