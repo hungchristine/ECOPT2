@@ -211,6 +211,8 @@ class FleetModel:
             Stacked (Series) form of df, with MultiIndex.
         """
         dims = df.shape[1] - 1 # assumes unstacked format
+
+
         if dims > 0:
             if isinstance(df.columns, pd.MultiIndex):
                 df = df.stack(level=[i for i in range(df.columns.nlevels)])
@@ -228,6 +230,7 @@ class FleetModel:
 
                 df.columns = ['']
                 df = pd.Series(df.iloc[:, 0])
+
             return df
         else:
             # case of df is DataFrame with 1 column in series form (nx1)
@@ -374,9 +377,6 @@ class FleetModel:
         # Import selected model results
         try:
             self.stock_change = self._v_dict['STOCK_CHANGE']
-            # self.stock_added = self._v_dict['STOCK_ADDED']
-            # self.stock_removed = self._v_dict['STOCK_REMOVED']
-            # self.tot_stock = self._v_dict['TOT_STOCK']
             self.impacts = self._v_dict['TOT_IMPACTS']
             self.annual_impacts = self.impacts.sum(axis=0)
 
@@ -500,7 +500,7 @@ class FleetModel:
         ####
 
         try:
-            self.LC_emissions_avg = [self.avg_LCemiss(i) for i in range(0, 28)]  # quality check - estimate lifecycle emissions of vehicles
+            self.LC_impacts_avg = [self.avg_LCimpacts(i) for i in range(0, 28)]  # quality check - estimate lifecycle impacts of vehicles
 
             add_gpby = self.stock_add.sum(axis=1).unstack('seg').unstack('tec')
             self.add_share = add_gpby.div(add_gpby.sum(axis=1), axis=0)
@@ -526,16 +526,16 @@ class FleetModel:
             log.error(f'----- Error in calculating scenario results. {e}')
 
 
-    def avg_LCemiss(self, age=12):
+    def avg_LCimpacts(self, age=12):
         """ Calculate lifecycle intensity by cohort for quality check.
 
-        Calculate average operating emissions intensity by using total
-        lifetime operating emissions by cohort, divided by original stock
+        Calculate average operating impacts intensity by using total
+        lifetime operating impacts by cohort, divided by original stock
         of the cohort
 
         Returns
         -------
-        Average lifecycle emissions.
+        Average lifecycle impacts.
         """
 
         """Test calculation for average lifetime vehicle (~12 years)."""
@@ -576,7 +576,7 @@ class FleetModel:
         tmp_prod = self.tec_prod_impact_int.reindex_like(self.op_impacts_avg, method='ffill')
         tmp_prod = tmp_prod.fillna(method='bfill')  # fill 1999 prodyear
 
-     # Estimate operating emissions by cohort (i.e., prodyear)
+     # Estimate operating impacts by cohort (i.e., prodyear)
         try:
             # sum total operating impacts for each cohort, by region, technology and segment
             operation_em = self.oper_impact_cohort.sum(level=['prodyear', 'fleetreg', 'tec', 'seg'])#.sum(axis=1)
@@ -594,6 +594,6 @@ class FleetModel:
             self.op_intensity.sort_index(inplace=True)
         except Exception as e:
             print('\n*****************************************')
-            log.error(f'----- Error in calculating operating emissions by cohort. Perhaps post-processing parameters not loaded? {e}')
+            log.error(f'----- Error in calculating operating impacts by cohort. Perhaps post-processing parameters not loaded? {e}')
 
         return self.op_impacts_avg.add(tmp_prod, axis=0).mean(level=['tec','seg','fleetreg'])

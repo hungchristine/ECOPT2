@@ -1,8 +1,8 @@
-*
-* EVD4EUR Model
+**
+* ECOPT2 LP Model
 * =============
 *
-* The EVD4EUR model minimizes total CO2 emissions while satisfying
+* The ECOPT2 LP model minimizes total CO2 emissions while satisfying
 * transport demand via light duty vehicles. Manufacturing and supply
 * chain constraints are considered.
 *
@@ -47,12 +47,10 @@ optimp(imp)     optimized impact category
 *---- ABBREIVATIONS USED *-----------------------------------------------------------------------------------
 * PROD = Production
 * OPER = Operation
-* ENIT = Enerqy intensity
-* CINT = CO2-eq intensity
 * CNST = b in y = ax + b
 
 ** Load sets defined in Python class
-* These lines must be uncommented if specific input .gdx is not specified, e.g., $gdxin <filepath>_input.gdx
+* These lines must be uncommented if specific input .gdx is not given, e.g., $gdxin <filepath>_input.gdx
 * By default uses pyGAMS_input.gdx if gdx filename not provided by Python
 $if not set gdxincname $GDXIN C:\Users\chrishun\Box Sync\YSSP_temp\pyGAMS_input.gdx 
 $if set gdxincname $GDXIN %gdxincname%
@@ -359,6 +357,7 @@ TOT_STOCK.fx(tec,seg,fleetreg,modelyear,age) = TOT_STOCK.l(tec,seg,fleetreg,mode
 
 
 ***  Fleet balance model -----------------------------------------------
+* Net change in stock from year to year - exogeneously defined (see Constraint A)
 EQ_STCK_CHANGE(modelyear,fleetreg)$(ord(modelyear)>card(inityear))..             STOCK_CHANGE(fleetreg,modelyear)  =e=  EXOG_TOT_STOCK(fleetreg,modelyear) - EXOG_TOT_STOCK(fleetreg,modelyear-1);
 
 EQ_STCK_REM(tec,seg,fleetreg,modelyear,age)$(ord(modelyear)>card(inityear))..    STOCK_REMOVED(tec,seg,fleetreg,modelyear,age) =e= TOT_STOCK(tec,seg,fleetreg,modelyear-1,age-1)*RETIREMENT_FUNCTION(age-1);
@@ -371,8 +370,6 @@ EQ_STCK_BAL(tec,seg,fleetreg,modelyear,age)$(ord(modelyear) > card(inityear)).. 
 
 *** Constraints -----------------------------------------------------------------------
 
-*EQ_FLEET_BAL(modelyear, fleetreg)..                               sum((tec,seg,age), TOT_STOCK(tec,seg,fleetreg,modelyear,age)) =e= EXOG_TOT_STOCK(modelyear,fleetreg);
-
 *--------------------------------------
 * B - Manufacturing constraint;
 
@@ -384,6 +381,7 @@ EQ_NEW_MANUF_CAP(newtec,optyear)..                   MANUF_CNSTRNT(newtec,optyea
 
 *-----------------------------------------------
 * C - Material balance constraint - total supply
+* Equation 10 (split into two equations here)
 * Amount of virgin + recycled material to produce new batteries, in kg; see intermediate calculations below
 EQ_MAT_SUPPLY(mat_cat,optyear)..                    TOT_PRIMARY_MAT(mat_cat,optyear) + RECYCLED_MAT(mat_cat,optyear) =e= MAT_REQ(mat_cat,optyear);
 
@@ -391,6 +389,7 @@ EQ_MAT_TOT_PRIMARY(mat_cat, optyear)..               TOT_PRIMARY_MAT(mat_cat,opt
 
 *------------------------------------------------
 * D - Critical material primary supply constraint
+* Equation 11
 * demand of virgin resources from each source must be less than or equal to available supply; see intermediate calculations below
 * primary resources constraint provided in t, mat_mix in kg
 EQ_PRIM_MAT_SUPPLY_CONSTRAINT(mat_prod,optyear)..                MAT_MIX(mat_prod,optyear) =l= VIRG_MAT_SUPPLY(mat_prod,optyear)*1000
@@ -399,6 +398,7 @@ EQ_PRIM_MAT_SUPPLY_CONSTRAINT(mat_prod,optyear)..                MAT_MIX(mat_pro
 
 *---------------------------------
 * E - Technology uptake constraint
+* Equation 12
 * incumbent technology excluded
 EQ_TEC_UPTAKE_CONSTRAINT(newtec,seg,fleetreg,modelyear)$(ord(modelyear)>card(inityear))..     STOCK_ADDED(newtec,seg,fleetreg,modelyear,new) =l= ((1 + MAX_UPTAKE_RATE('IND', newtec)) * STOCK_ADDED(newtec,seg,fleetreg,modelyear-1,new)) + 100
 %SLACK_ADD% + SLACK_TEC_ADD(newtec,seg,fleetreg,modelyear,new)
@@ -407,9 +407,8 @@ EQ_TEC_UPTAKE_CONSTRAINT(newtec,seg,fleetreg,modelyear)$(ord(modelyear)>card(ini
 
 *------------------------------------------------------
 * F - Segment share constraint (segments kept constant)
-* try to remove - allow for ICEV smart cars (e.g.,) to be replaced by a BEV Model X...
-*EQ_SEG_GRD(seg,fleetreg,optyear)$(ord(optyear)>card(inityear))..          sum(tec, STOCK_ADDED(tec,seg,fleetreg,optyear,new))
-*    =e= INITIAL_SEG_SHARES(seg) * sum((tec,segj), STOCK_ADDED(tec,segj,fleetreg,optyear,new));
+* Equation 13
+* Removing allows for ICEV smart cars (e.g.,) to be replaced by a BEV Model X...
 EQ_SEG_SHARE_CONSTRAINT(seg,fleetreg,modelyear)$(ord(modelyear)>card(inityear))..          sum(tec, STOCK_ADDED(tec,seg,fleetreg,modelyear,new))
     =e= INITIAL_SEG_SHARES(seg) * sum((tec,segj), STOCK_ADDED(tec,segj,fleetreg,modelyear,new));
 
@@ -503,8 +502,8 @@ Scalar ms 'model status', ss 'solve status';
 *-----------------------------------------------------------------------------------
 
 SOLVE EVD4EUR_Basic USING LP MINIMIZING TOT_IMPACTS_OPT;
-ms = EVD4EUR_Basic.modelstat;
 ss = EVD4EUR_Basic.solvestat;
+ms = EVD4EUR_Basic.modelstat;
 
 *SOLVE seg_test USING LP MINIMIZING TOT_IMPACTS_OPT;
 *ms = seg_test.modelstat;

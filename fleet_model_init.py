@@ -54,7 +54,6 @@ class SetsClass:
     veheq: List = field(default_factory=lambda: ['PROD_EINT', 'PROD_CINT_CSNT', 'OPER_EINT', 'EOLT_CINT'])
     sigvar: List = field(default_factory=lambda: ['A', 'B', 'r', 'u'])
     lcphase: List = field(default_factory=lambda: ['prod', 'oper', 'eol'])
-    # imp_int: List = field(default_factory=lambda: ['nrg', 'GHG', 'AP', 'MTP'])
 
 
     @classmethod
@@ -245,8 +244,6 @@ class ParametersClass:
     initial_tec_shares: Union[Dict, pd.Series, pd.DataFrame] = None
 
     bev_capac: Union[Dict, List] = field(default_factory=lambda:{'A': 26.6, 'B': 42.2, 'C': 59.9, 'D': 75., 'E':95., 'F':100.})
-    # veh_lift_cdf: Union[pd.Series, pd.DataFrame] = None
-    # veh_lift_pdf: Union[pd.Series, pd.DataFrame] = None
     retirement_function: Union[pd.Series, pd.DataFrame] = None
     lifetime_age_distribution: Union[pd.Series, pd.DataFrame] = None
 
@@ -389,7 +386,7 @@ class ParametersClass:
 
         """
         mi_dict = {
-                   'enr_glf_terms':['imp', 'enr', 'reg'],#, 'enreq'],
+                   'enr_glf_terms':['imp', 'enr', 'reg'],
                    'virg_mat_supply': ['mat_cat', 'mat_prod'],
                    'mat_impact_int': ['imp', 'mat_cat', 'mat_prod'],
                    'mat_content': ['tec','mat_cat'],
@@ -414,9 +411,9 @@ class ParametersClass:
             if (param != 'readme') and (not param.startswith('_')):
                 if param.lower() in mi_dict.keys():
                     # special case: MultiIndex index
-                    # fill in nan values for columns that will be the index
+                    # fill empty spots in columns that will be part of the index
                     value.loc(axis=1)[mi_dict[param.lower()]] = value.loc(axis=1)[mi_dict[param.lower()]].fillna(method='ffill')
-                    value = value.astype({cat: str for cat in mi_dict[param.lower()]})  # convert all labels to strings (requirement from GAMS)
+                    value = value.astype({cat: str for cat in mi_dict[param.lower()]})  # convert all labels in multiindex to strings (requirement from GAMS)
                     value.set_index(mi_dict[param.lower()], inplace=True, drop=True)
                 elif value.shape[0] == 0:
                     log.info(f"Empty values for {param} in Excel file.")
@@ -672,10 +669,10 @@ class ParametersClass:
         Parameters
         ----------
         B_term_prod : float
-            Upper asymptote for production emissions; expressed
+            Upper asymptote for production impacts; expressed
             as a multiple of A-term.
         B_term_oper_EOL : float
-            Upper asymptote for operaion and EOL emissions; expressed
+            Upper asymptote for operation and EOL impacts; expressed
             as a multiple of A-term..
         r_term_factors : dict of {str: float}
             Growth rate term.
@@ -690,11 +687,11 @@ class ParametersClass:
         # TODO: separate A-terms for battery and rest-of-vehicle and apply different b-factors
         # TODO: allow for series of B-term values
 
-        # Fetch sigmoid A terms from RawDataClass
+        # Fetch values for sigmoid A terms from RawDataClass and add label
         self.raw_data.tec_parameters_raw.columns.names = ['comp']
         self.raw_data.tec_parameters_raw = self.raw_data.tec_parameters_raw.stack().to_frame('a')
 
-        # Retrieve production emission factors for chosen battery capacities and place in raw A factors (with component resolution)
+        # Retrieve production impacts factors for chosen battery capacities and place in raw A factors (with component resolution)
         self.build_BEV()  # update self.prod_df with selected battery capacities
         self.raw_data.tec_parameters_raw.sort_index(inplace=True)
         for index, value in self.raw_data.prod_df.iteritems():
@@ -1054,7 +1051,8 @@ class ParametersClass:
         if len(missing_regs):
             log.error(f'Missing region {missing_regs} in parameter {par_name}')
         elif len(set(par_ind) - set(reg_set)):
-            log.warning(f'Region {extra_regs} are in parameter {par_name}, but not declared as a set')    @staticmethod
+            log.warning(f'Region {extra_regs} are in parameter {par_name}, but not declared as a set')
+
     @staticmethod
     def order_sets(df):
         """
@@ -1075,7 +1073,6 @@ class ParametersClass:
                         'grdeq',
                         'lcphase',
                         'imp',
-                        # 'imp_int',
                         'tec',
                         'newtec',
                         'mat_cat',
