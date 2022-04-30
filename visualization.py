@@ -269,7 +269,7 @@ def export_fig(fp, ax, pp, export_pdf=True, export_png=False, png_name=None):
 
 
 #%%
-def vis_GAMS(fleet, fp, filename, param_values, export_png=False, export_pdf=True, max_year=50, cropx=True, suppress_vis=False):
+def vis_GAMS(fleet, fp, filename, param_values, export_png=False, export_pdf=True, max_year=2050, cropx=True, suppress_vis=False):
     """
     Visualize model results and input.
 
@@ -1114,14 +1114,13 @@ def vis_GAMS(fleet, fp, filename, param_values, export_png=False, export_pdf=Tru
         fleet.new_capac_demand.index = fleet.new_capac_demand.index.astype(int)
         fleet.parameters.manuf_cnstrnt.columns = fleet.parameters.manuf_cnstrnt.columns.astype(int)
 
-        dem = fleet.new_capac_demand.plot(ax=ax,kind='area', #ax.stackplot(fleet.new_capac_demand.index, fleet.new_capac_demand[0],
-                           lw=0,) #labels=['New battery demand'])
+        dem = fleet.new_capac_demand.plot(ax=ax, kind='area', lw=0,)
         constr = fleet.parameters.manuf_cnstrnt.T.plot(ax=ax,
                          lw=2.5, ls='--', color='k', alpha=0.7,)
 
         handles, labels = constr.get_legend_handles_labels()
 
-        labels = [label+ ' manufacturing capacity' if label in fleet.sets.newtec else label for label in labels]
+        labels = [label + ' manufacturing capacity' if label in fleet.sets.newtec else label for label in labels]
 
         ax.set_ylabel(ylabel)
         ax.set_ybound(lower=0, upper=fleet.parameters.manuf_cnstrnt.max().max()*1.1)

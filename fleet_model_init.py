@@ -392,7 +392,7 @@ class ParametersClass:
                    'enr_glf_terms':['imp', 'enr', 'reg'],#, 'enreq'],
                    'virg_mat_supply': ['mat_cat', 'mat_prod'],
                    'mat_impact_int': ['imp', 'mat_cat', 'mat_prod'],
-                   'mat_content': ['newtec','mat_cat'],
+                   'mat_content': ['tec','mat_cat'],
                    'batt_portfolio':['seg', 'battery size'],
                    'tec_parameters_raw': ['lcphase','imp', 'tec', 'seg'],
                    'enr_tec_correspondance': ['enr', 'tec'],
@@ -547,7 +547,7 @@ class ParametersClass:
         elif self.raw_data.enr_glf_terms is not None:
             self.check_region_sets(self.raw_data.enr_glf_terms.index.get_level_values('reg'), 'enr_glf_terms', sets.reg)
             # build enr_impact_int from generalized logistic function
-            mi = pd.MultiIndex.from_product([sets.imp, sets.reg, sets.enr, sets.modelyear], names=['imp', 'reg', 'enr', 'modelyear'])
+            mi = pd.MultiIndex.from_product([sets.imp, sets.reg, sets.enr, sets.modelyear], names=['imp', 'enr', 'reg', 'modelyear'])
             self.enr_impact_int = pd.Series(index=mi)
 
 
@@ -562,9 +562,8 @@ class ParametersClass:
                 reg = label[2]
                 enr = label[1]
                 for t in [((2000)+i) for i in range(81)]:
-                    self.enr_impact_int.loc[(reg, enr, str(t))] = A + (B - A) / (1 + np.exp(- r*(t - u)))
+                    self.enr_impact_int.loc[(imp, enr, reg, str(t))] = A + (B - A) / (1 + np.exp(- r*(t - u)))
 
-            self.enr_impact_int = self.enr_impact_int.swaplevel(0, 1) # enr, reg, year
             self.enr_impact_int = self.enr_impact_int.to_frame()
             self.enr_impact_int.dropna(how='all', axis=0, inplace=True)
 

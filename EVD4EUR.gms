@@ -400,12 +400,9 @@ EQ_PRIM_MAT_SUPPLY_CONSTRAINT(mat_prod,optyear)..                MAT_MIX(mat_pro
 *---------------------------------
 * E - Technology uptake constraint
 * incumbent technology excluded
-EQ_TEC_UPTAKE_CONSTRAINT(newtec,seg,fleetreg,optyear)$(ord(optyear)>card(inityear))..     STOCK_ADDED(newtec,seg,fleetreg,optyear,new)
-    =l= ((1 + MAX_UPTAKE_RATE('IND', newtec)) * STOCK_ADDED(newtec,seg,fleetreg,optyear-1,new)) + 100
-%SLACK_ADD% + SLACK_TEC_ADD(newtec,seg,fleetreg,optyear,new)
-*EQ_STCK_GRD(newtec,seg,fleetreg,modelyear)$(ord(modelyear)>card(inityear))..     STOCK_ADDED(newtec,seg,fleetreg,modelyear,new)
-*    =l= ((1 + MAX_UPTAKE_RATE('IND', newtec)) * STOCK_ADDED(newtec,seg,fleetreg,modelyear-1,new)) + 100
-*%SLACK_ADD% + SLACK_TEC_ADD(newtec,seg,fleetreg,modelyear,new)
+EQ_TEC_UPTAKE_CONSTRAINT(newtec,seg,fleetreg,modelyear)$(ord(modelyear)>card(inityear))..     STOCK_ADDED(newtec,seg,fleetreg,modelyear,new) =l= ((1 + MAX_UPTAKE_RATE('IND', newtec)) * STOCK_ADDED(newtec,seg,fleetreg,modelyear-1,new)) + 100
+%SLACK_ADD% + SLACK_TEC_ADD(newtec,seg,fleetreg,modelyear,new)
+
 ;
 
 *------------------------------------------------------
