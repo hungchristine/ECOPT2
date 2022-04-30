@@ -772,7 +772,8 @@ def vis_GAMS(fleet, fp, filename, param_values, export_png=False, export_pdf=Tru
 
         plt.xlabel('year')
         plt.ylabel('Vehicles added to stock')
-        pp.savefig()
+        export_fig(fp, ax, pp, export_pdf, export_png, png_name=ax.get_title())
+
 
     except Exception as e:
         print('\n *****************************************')
@@ -889,9 +890,6 @@ def vis_GAMS(fleet, fp, filename, param_values, export_png=False, export_pdf=Tru
     #%% Total resource use
     """--- Plot total resource use ---"""
     try:
-        fig, axes = plt.subplots(len(fleet.sets.mat_cat), 1, sharex=True, dpi=300)
-        plt.subplots_adjust(top=0.85, hspace=0.4)
-
         gpby_class = {supp: mat for mat, li in fleet.sets.mat_prod.items() for supp in li}
 
         resource_use = fleet.resources.copy()
@@ -904,9 +902,13 @@ def vis_GAMS(fleet, fp, filename, param_values, export_png=False, export_pdf=Tru
         prim_supply.index = prim_supply.index.astype(int)
         prim_supply = prim_supply.loc[2020:]
 
+        fig, axes = plt.subplots(len(fleet.sets.mat_cat), 1, sharex=True, dpi=300)
+        plt.subplots_adjust(top=0.85, hspace=0.4)
+
         for i, mat in enumerate(fleet.sets.mat_prod.keys()):
             plot_resources = resource_use.loc[:, (slice(None), mat)]
             plot_prim_supply = prim_supply[mat]
+
             # scale y-axis if necessary
             if plot_resources.max().mean() >= 1e6:
                 plot_resources /= 1e6
@@ -931,9 +933,11 @@ def vis_GAMS(fleet, fp, filename, param_values, export_png=False, export_pdf=Tru
 
             axes[i].set_ylabel(ylabel)
             axes[i].set_ybound(lower=0, upper=plot_resources.sum(axis=1).max()*1.1)
-            axes[i].set_xlim(0, 30)
-            # if cropx:
-            #     axes[i].set_xlim(right=max_year)
+
+            if cropx:
+                axes[i].set_xlim(right=max_year)
+            else:
+                axes[i].set_xlim(2020, 2050)
 
         handles, labels = axes[0].get_legend_handles_labels()
         new_labels = []
@@ -1002,6 +1006,7 @@ def vis_GAMS(fleet, fp, filename, param_values, export_png=False, export_pdf=Tru
 
         n = len(fleet.sets.mat_prod.items())
         tmp = pd.DataFrame()
+
         for i, (mat, prods) in enumerate(fleet.sets.mat_prod.items()):
             # make supply constraint lines relative to actual materials used
             for j, prod in enumerate(prods):
@@ -1011,7 +1016,13 @@ def vis_GAMS(fleet, fp, filename, param_values, export_png=False, export_pdf=Tru
                     tmp[prod] = supply_constr[prod]
 
             cmap = plt.get_cmap(mat_cmaps[i])
-            axes[i].set_prop_cycle(cycler('linestyle', ['solid',':','-.','--']))
+
+            # FIXME: Using the linestyle cycler 'breaks' the PDF export.
+            # This is also the case if the cycler is used directly in the plot
+            # specification, or if the linestyle cycler is implemented via rcParams.
+            # Find workaround?
+
+            # axes[i].set_prop_cycle(cycler('linestyle', ['solid',':','-.','--']))
 
             # plot primary material mixes
             plot_data[prods].plot(ax=axes[i], kind='area', stacked=True, lw=0,
@@ -1052,8 +1063,7 @@ def vis_GAMS(fleet, fp, filename, param_values, export_png=False, export_pdf=Tru
             if len(axLabel) < (max_len*2):
                 start = max(ind) + 1
                 end = int(start + (max_len - len(axLabel)/2))
-                print(start)
-                print(end)
+
                 # add blank entries to match greatest number of material producers
                 axLine[start:start] = [plt.plot([], marker="", ls="")[0]]* (end-start)
                 axLabel[start:start] = [''] * (end-start)
@@ -1103,24 +1113,27 @@ def vis_GAMS(fleet, fp, filename, param_values, export_png=False, export_pdf=Tru
 
         fleet.new_capac_demand.index = fleet.new_capac_demand.index.astype(int)
         fleet.parameters.manuf_cnstrnt.columns = fleet.parameters.manuf_cnstrnt.columns.astype(int)
-        dem = ax.stackplot(fleet.new_capac_demand.index, fleet.new_capac_demand[0],
-                           lw=0, labels=['New battery demand'])
-        constr = ax.plot(fleet.parameters.manuf_cnstrnt.index,
-                         fleet.parameters.manuf_cnstrnt,
-                         lw=2.5, ls='--', color='k', alpha=0.7,
-                         label='Manufacturing Capacity')
+
+        dem = fleet.new_capac_demand.plot(ax=ax,kind='area', #ax.stackplot(fleet.new_capac_demand.index, fleet.new_capac_demand[0],
+                           lw=0,) #labels=['New battery demand'])
+        constr = fleet.parameters.manuf_cnstrnt.T.plot(ax=ax,
+                         lw=2.5, ls='--', color='k', alpha=0.7,)
+
+        handles, labels = constr.get_legend_handles_labels()
+
+        labels = [label+ ' manufacturing capacity' if label in fleet.sets.newtec else label for label in labels]
 
         ax.set_ylabel(ylabel)
-        ax.set_ybound(lower=0, upper=fleet.parameters.manuf_cnstrnt.max()[0]*1.1)
+        ax.set_ybound(lower=0, upper=fleet.parameters.manuf_cnstrnt.max().max()*1.1)
+
         ax.xaxis.set_major_locator(MultipleLocator(10))
-        # if cropx:
-        #     axes[i].set_xlim(right=max_year)
 
         if cropx:
             ax.set_xlim(right=max_year)
         else:
             ax.set_xlim(2000, 2050)
-        ax.legend(loc=2, bbox_to_anchor=(0, -0.4, 1, 0.2),
+
+        ax.legend(handles, labels, loc=2, bbox_to_anchor=(0, -0.4, 1, 0.2),
                   ncol=2, mode='expand', borderaxespad=0, handlelength=3)
 
         plt.xlabel('year', fontsize=10)
