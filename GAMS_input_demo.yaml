@@ -34,27 +34,30 @@ bev_capac:
 # of production; as % of A (initial) value
 B_term_prod:
  def:
-  PROD_EINT:
-   ICE: 
-    full_veh: 0.8
-   BEV: 
-    batt: 0.7
-    ROV: 0.8
-  PROD_CINT_CSNT: 
-   ICE: 
-    full_veh: 0.9
-   BEV:
-    batt: 0.8
-    ROV: 0.87
+  prod:
+   nrg:
+    ICE: 
+     full_veh: 0.8
+    BEV: 
+     batt: 0.7
+     ROV: 0.8
+   GHG: 
+    ICE: 
+     full_veh: 0.9
+    BEV:
+     batt: 0.8
+     ROV: 0.87
     
 B_term_oper_EOL: 
  def: 
-  OPER_EINT:
-   ICE: 0.82
-   BEV: 0.9
-  EOLT_CINT:
-   ICE: 0.9
-   BEV: 0.9
+  oper:
+   nrg:
+    ICE: 0.82
+    BEV: 0.9
+  eol:
+   GHG:
+    ICE: 0.9
+    BEV: 0.9
    
 r_term_factors:
    def: 

@@ -143,8 +143,8 @@ class FleetModel:
 
         self.parameters.mat_content.columns = self.parameters.mat_content.columns.astype(str)
 
-        self.parameters.mat_cint.columns = self.parameters.mat_cint.columns.astype(str)
-        self.parameters.mat_cint.index = self.parameters.mat_cint.index.droplevel(['mat_cat'])
+        self.parameters.mat_impact_int.columns = self.parameters.mat_impact_int.columns.astype(str)
+        self.parameters.mat_impact_int.index = self.parameters.mat_impact_int.index.droplevel(['mat_cat'])
 
         self.parameters.recovery_pct.index = self.parameters.recovery_pct.index.astype('str')
 
@@ -358,7 +358,7 @@ class FleetModel:
         # Import the parameters that are calculated within the GAMS model
         self.tec_prod_impact_int = self._p_dict['TEC_PROD_IMPACT_INT']
         self.tec_prod_impact_int = self.tec_prod_impact_int.stack().to_frame()
-        self.tec_prod_impact_int.index.rename(['tec', 'seg', 'prodyear'], inplace=True)
+        self.tec_prod_impact_int.index.rename(['imp','tec', 'seg', 'prodyear'], inplace=True)
 
         self.veh_oper_eint = self._p_dict['TEC_OPER_EINT']
         self.veh_oper_eint = self.veh_oper_eint.stack().to_frame()
@@ -367,7 +367,7 @@ class FleetModel:
         try:
             self.tec_oper_impact_int = self._p_dict['TEC_OPER_IMPACT_INT']
             self.tec_oper_impact_int = self.tec_oper_impact_int.stack().to_frame()
-            self.tec_oper_impact_int.index.names = ['tec', 'enr', 'seg', 'fleetreg', 'modelyear', 'prodyear', 'age']
+            self.tec_oper_impact_int.index.names = ['imp','tec', 'enr', 'seg', 'fleetreg', 'modelyear', 'prodyear', 'age']
         except:
             log.warning('Invalid input for tec_oper_impact_int')
 
@@ -399,7 +399,7 @@ class FleetModel:
                 self.resources = self.resources.T
                 self.mat_mix = self._v_dict['MAT_MIX']
                 self.mat_mix = self.mat_mix.T
-                self.mat_co2 = self._v_dict['MAT_CO2']
+                self.mat_impacts = self._v_dict['MAT_IMPACTS']
             except Exception as e:
                 log.warning(f'Could not load material related variables. Check model. {e}')
 
@@ -435,14 +435,15 @@ class FleetModel:
         # Import post-processing parameters
         try:
             self.oper_impact_cohort = self._p_dict['OPER_IMPACT_COHORT'].stack()
-            self.oper_impact_cohort.index.rename(['tec', 'seg', 'fleetreg', 'modelyear', 'prodyear', 'age'], inplace=True)
+            self.oper_impact_cohort.index.rename(['imp','tec', 'seg', 'fleetreg', 'modelyear', 'prodyear', 'age'], inplace=True)
             self.stock_cohort = self._p_dict['STOCK_BY_COHORT']
             self.stock_cohort.index.rename(['tec', 'seg', 'fleetreg', 'prodyear', 'age'], inplace=True)
             self.stock_cohort.columns.rename('modelyear', inplace=True)
             self.stock_cohort = self.stock_cohort.droplevel(level='age', axis=0)
             self.stock_cohort = self.stock_cohort.stack().unstack('prodyear').sum(axis=0, level=['tec', 'fleetreg', 'modelyear'])
             self.bau_impacts = self._p_dict['BAU_IMPACTS']
-            self.bau_impacts.index.rename(['modelyear'], inplace=True)
+            self.bau_impacts = self.bau_impacts.stack()
+            self.bau_impacts.index.rename(['imp','modelyear'], inplace=True)
 
             self.mat_demand = self._p_dict['MAT_REQ_TOT']
             self.mat_demand = pd.concat([self.mat_demand], axis=1, keys=['total'])
@@ -462,25 +463,25 @@ class FleetModel:
         self.veh_oper_dist.index.rename(['fleetreg','modelyear'], inplace=True)
         # TODO: check 'ffill' with different distances
 
-        tmp_dist = self.veh_oper_dist.reindex_like(self.tec_oper_impact_int.reorder_levels(['modelyear', 'fleetreg', 'tec','seg','prodyear','enr','age']), method='ffill')
+        tmp_dist = self.veh_oper_dist.reindex_like(self.tec_oper_impact_int.reorder_levels(['imp','modelyear', 'fleetreg', 'tec','seg','prodyear','enr','age']), method='ffill')
         self.op_impacts = self.tec_oper_impact_int.mul(tmp_dist, axis=0)
         self.full_oper_dist = tmp_dist
         # self.full_oper_dist = self.veh_oper_dist.reindex(self.tec_oper_impact_int.index, level='modelyear')
         # self.op_impacts = self.tec_oper_impact_int.multiply(self.full_oper_dist)
         # self.op_impacts.index = self.op_impacts.index.droplevel(level=['enr', 'age']) # these columns are unncessary/redundant
-        # self.op_impacts = self.op_impacts.sum(level=['tec', 'seg', 'fleetreg', 'prodyear']) # sum the operating emissions over all model years for each cohort
-        # self.op_impacts = self.op_impacts.reorder_levels(order=['tec', 'seg', 'fleetreg', 'prodyear']) # reorder MultiIndex to add production emissions
+        # self.op_impacts = self.op_impacts.sum(level=['tec', 'seg', 'fleetreg', 'prodyear']) # sum the operating impacts over all model years for each cohort
+        # self.op_impacts = self.op_impacts.reorder_levels(order=['tec', 'seg', 'fleetreg', 'prodyear']) # reorder MultiIndex to add production impacts
 
-        tmp_prod = self.tec_prod_impact_int.reindex_like(self.tec_oper_impact_int.reorder_levels(['tec','seg','prodyear','modelyear','enr','fleetreg','age']), method='ffill')
+        tmp_prod = self.tec_prod_impact_int.reindex_like(self.tec_oper_impact_int.reorder_levels(['imp','tec','seg','prodyear','modelyear','enr','fleetreg','age']), method='ffill')
         tmp_prod.fillna(method='bfill', inplace=True)  # for filling 1999
-        self.LC_emissions = self.op_impacts.add(self.tec_prod_impact_int.reindex_like(self.op_impacts.reorder_levels(['tec','seg','prodyear','enr','fleetreg','age','modelyear']), method='ffill'))
-        self.LC_emissions.fillna(method='bfill', inplace=True) # for filling 1999
-        self.LC_emissions = self.LC_emissions.squeeze()
-        self.LC_emissions.index = self.LC_emissions.index.droplevel(['enr','prodyear'])
+        self.LC_impacts = self.op_impacts.add(self.tec_prod_impact_int.reindex_like(self.op_impacts.reorder_levels(['imp','tec','seg','prodyear','enr','fleetreg','age','modelyear']), method='ffill'))
+        self.LC_impacts.fillna(method='bfill', inplace=True) # for filling 1999
+        self.LC_impacts = self.LC_impacts.squeeze()
+        self.LC_impacts.index = self.LC_impacts.index.droplevel(['enr','prodyear'])
 
         self.enr_impact_int = self._p_dict['ENR_IMPACT_INT']
         self.enr_impact_int = self.enr_impact_int.stack()
-        self.enr_impact_int.index.rename(['enr', 'reg', 'year'], inplace=True)
+        self.enr_impact_int.index.rename(['imp','enr', 'reg', 'year'], inplace=True)
 
         log.info('Finished importing results from GAMS run')
 
@@ -538,37 +539,37 @@ class FleetModel:
         """
 
         """Test calculation for average lifetime vehicle (~12 years)."""
-        self.veh_oper_cint_avg = self.tec_oper_impact_int.index.levels[6].astype(int)
+        self.veh_oper_imp_int_avg = self.tec_oper_impact_int.index.levels[7].astype(int)
         ind = self.tec_oper_impact_int.index
-        self.tec_oper_impact_int.index = self.tec_oper_impact_int.index.set_levels(ind.levels[6].astype(int), level=6) # set ages as int
+        self.tec_oper_impact_int.index = self.tec_oper_impact_int.index.set_levels(ind.levels[7].astype(int), level=7) # set ages as int
         self.tec_oper_impact_int.sort_index(level='age', inplace=True)
-        self.veh_oper_cint_avg = self.tec_oper_impact_int.reset_index(level='age')
-        self.veh_oper_cint_avg = self.veh_oper_cint_avg[self.veh_oper_cint_avg.age <= age] # then, drop ages over selected lifetime
-        self.veh_oper_cint_avg.set_index(self.veh_oper_cint_avg.age, drop=True, append=True, inplace=True)
-        self.veh_oper_cint_avg.drop(columns='age', inplace=True)
-        self.veh_oper_cint_avg = self.veh_oper_cint_avg.reorder_levels(['tec','enr','seg','fleetreg','age','modelyear','prodyear'])
+        self.veh_oper_imp_int_avg = self.tec_oper_impact_int.reset_index(level='age')
+        self.veh_oper_imp_int_avg = self.veh_oper_imp_int_avg[self.veh_oper_imp_int_avg.age <= age] # then, drop ages over selected lifetime
+        self.veh_oper_imp_int_avg.set_index(self.veh_oper_imp_int_avg.age, drop=True, append=True, inplace=True)
+        self.veh_oper_imp_int_avg.drop(columns='age', inplace=True)
+        self.veh_oper_imp_int_avg = self.veh_oper_imp_int_avg.reorder_levels(['imp','tec','enr','seg','fleetreg','age','modelyear','prodyear'])
 
         # self.avg_oper_dist = self.full_oper_dist.reset_index(level='age')
         # self.avg_oper_dist = self.avg_oper_dist.astype({'age': 'int32'})
         # self.avg_oper_dist = self.avg_oper_dist[self.avg_oper_dist.age <= age]  # again, drop ages over lifetime
-        # self.avg_oper_dist = self.avg_oper_dist.set_index([self.avg_oper_dist.index, self.avg_oper_dist.age]) # make same index for joining with self.veh_oper_cint_avg
+        # self.avg_oper_dist = self.avg_oper_dist.set_index([self.avg_oper_dist.index, self.avg_oper_dist.age]) # make same index for joining with self.veh_oper_imp_int_avg
         # self.avg_oper_dist.drop(columns='age', inplace=True)
-        self.full_oper_dist = self.full_oper_dist.reorder_levels(['tec','enr','seg','fleetreg','age','modelyear','prodyear'])
-        self.full_oper_dist.index = self.full_oper_dist.index.set_levels(ind.levels[4].astype(int), level=4) # set ages as int
-        self.d = self.full_oper_dist.to_frame().join(self.veh_oper_cint_avg, lsuffix='_dist')
+        self.full_oper_dist = self.full_oper_dist.reorder_levels(['imp','tec','enr','seg','fleetreg','age','modelyear','prodyear'])
+        self.full_oper_dist.index = self.full_oper_dist.index.set_levels(ind.levels[5].astype(int), level=5) # set ages as int
+        self.d = self.full_oper_dist.to_frame().join(self.veh_oper_imp_int_avg, lsuffix='_dist')
         self.d.columns=['dist','intensity']
         self.op_impacts_avg = self.d.dist * self.d.intensity
         self.op_impacts_avg = self.op_impacts_avg.to_frame().reset_index('age', drop=False)
         self.op_impacts_avg.index = self.op_impacts_avg.index.droplevel(level=['enr']) # these columns are unncessary/redundant
         self.op_impacts_avg['age'] = self.op_impacts_avg['age'].astype(int)
-        self.op_impacts_avg['lifetime op emissions'] = (self.op_impacts_avg['age']+1).mul(self.op_impacts_avg[0])
+        self.op_impacts_avg['lifetime op impacts'] = (self.op_impacts_avg['age']+1).mul(self.op_impacts_avg[0])
         self.op_impacts_avg.drop(columns=0, inplace=True)
-        # self.op_impacts_avg.to_csv('op_emiss_avg_with_duplicates.csv')
+        # self.op_impacts_avg.to_csv('op_impacts_avg_with_duplicates.csv')
         # self.op_impacts_avg = self.op_impacts_avg.reset_index().drop_duplicates().set_index(['tec','seg','fleetreg','age','modelyear','prodyear'])
-        # self.op_impacts_avg.to_csv('op_emiss_avg_without_duplicates.csv')
+        # self.op_impacts_avg.to_csv('op_impacts_avg_without_duplicates.csv')
         self.op_impacts_avg.set_index('age', append=True, drop=True, inplace=True)
-        self.op_impacts_avg = self.op_impacts_avg.sum(level=['tec','seg','fleetreg','prodyear','age']) # sum the operating emissions over all model years
-        self.op_impacts_avg = self.op_impacts_avg.reorder_levels(order=['tec','seg','prodyear','fleetreg','age']) # reorder MultiIndex to add production emissions
+        self.op_impacts_avg = self.op_impacts_avg.sum(level=['tec','seg','fleetreg','prodyear','age']) # sum the operating impacts over all model years
+        self.op_impacts_avg = self.op_impacts_avg.reorder_levels(order=['tec','seg','prodyear','fleetreg','age']) # reorder MultiIndex to add production impacts
         self.op_impacts_avg.columns = [0]
         self.op_impacts_avg.index = self.op_impacts_avg.index.set_levels(self.op_impacts_avg.index.levels[-1].astype(str), level='age')
 
@@ -577,8 +578,8 @@ class FleetModel:
 
      # Estimate operating emissions by cohort (i.e., prodyear)
         try:
-            # sum total operating emissions for each cohort, by region, technology and segment
-            operation_em = self.oper_impact_cohort.sum(level=['prodyear', 'fleetreg', 'tec', 'seg']).sum(axis=1)
+            # sum total operating impacts for each cohort, by region, technology and segment
+            operation_em = self.oper_impact_cohort.sum(level=['prodyear', 'fleetreg', 'tec', 'seg'])#.sum(axis=1)
             operation_em.sort_index(axis=0, level=0, inplace=True)
             op = operation_em.loc['2000':'2050']
 

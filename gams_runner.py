@@ -106,6 +106,11 @@ class GAMSRunner:
         grdeq = gmspy.list2set(self.db, fleet.sets.grdeq, 'grdeq')
         sigvar = gmspy.list2set(self.db, fleet.sets.sigvar, 'sigvar')
         veheq = gmspy.list2set(self.db, fleet.sets.veheq, 'veheq')
+        imp = gmspy.list2set(self.db, fleet.sets.imp, 'imp')
+        optimp = gmspy.list2set(self.db, fleet.sets.optimp, 'optimp')
+        imp_cat = gmspy.list2set(self.db, fleet.sets.imp_cat, 'imp_cat')
+        imp_int = gmspy.list2set(self.db, fleet.sets.imp_int, 'imp_int')
+        lcphase = gmspy.list2set(self.db, fleet.sets.lcphase, 'lcphase')
 
         mat_cat = gmspy.list2set(self.db, fleet.sets.mat_cat, 'mat_cat')
         mat_prod = gmspy.list2set(self.db, sum(fleet.sets.mat_prod.values(), []), 'mat_prod')  # concatenate all material producers from all material categories
@@ -133,12 +138,14 @@ class GAMSRunner:
         initial_tec_shares = gmspy.df2param(self.db, fleet.parameters.initial_tec_shares,['tec'],'INITIAL_TEC_SHARES')
 
         enr_tec_correspondance = gmspy.df2param(self.db, fleet.parameters.enr_tec_correspondance, ['enr', 'tec'], 'ENR_TEC_CORRESPONDANCE')
-        enr_impact_int = gmspy.df2param(self.db, fleet.parameters.enr_impact_int, ['enr', 'reg', 'year'], 'ENR_IMPACT_INT')
+        enr_impact_int = gmspy.df2param(self.db, fleet.parameters.enr_impact_int, ['imp', 'enr', 'reg', 'year'], 'ENR_IMPACT_INT')
 
         cohort_age_correspondance = gmspy.df2param(self.db, fleet.parameters.cohort_age_correspondance, ['year','prodyear','age'], 'COHORT_AGE_CORRESPONDANCE')
 
         year_par = gmspy.df2param(self.db, fleet.parameters.year_par, ['year'], 'YEAR_PAR')
-        tec_parameters = gmspy.df2param(self.db, fleet.parameters.tec_parameters, ['veheq', 'tec', 'seg', 'sigvar'], 'TEC_PARAMETERS')
+
+        ##### this one needs impacts
+        tec_parameters = gmspy.df2param(self.db, fleet.parameters.tec_parameters, ['lcphase', 'imp', 'tec', 'seg', 'sigvar'], 'TEC_PARAMETERS')
 
         try:
             max_uptake_rate = self.db.get_parameter('MAX_UPTAKE_RATE')
@@ -155,7 +162,7 @@ class GAMSRunner:
         manuf_cnstrnt = gmspy.df2param(self.db, fleet.parameters.manuf_cnstrnt, ['newtec','year'], 'MANUF_CNSTRNT')
 
         mat_content = gmspy.df2param(self.db, fleet.parameters.mat_content, ['newtec','mat_cat','year'], 'MAT_CONTENT')
-        mat_cint = gmspy.df2param(self.db, fleet.parameters.mat_cint, ['mat_prod','year'], 'MAT_CINT')
+        mat_impact_int = gmspy.df2param(self.db, fleet.parameters.mat_impact_int, ['imp','mat_prod','year'], 'MAT_IMPACT_INT')
         virg_mat = gmspy.df2param(self.db, fleet.parameters.virg_mat_supply, ['mat_prod','year'], 'VIRG_MAT_SUPPLY')
         recovery_pct = gmspy.df2param(self.db, fleet.parameters.recovery_pct, ['mat_cat','year'], 'RECOVERY_PCT')
 

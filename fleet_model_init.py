@@ -28,7 +28,11 @@ class SetsClass:
     """ Default values initialize with a two-region system with three
     size segments and two critical material classes each with two producers."""
 
-    tec: List = field(default_factory=lambda:['BEV', 'ICEV'])
+    imp: List = field(default_factory=lambda: ['nrg','GHG', 'AP', 'MTP'])
+    optimp:  List = field(default_factory=lambda: ['GHG'])
+    imp_cat: List = field(default_factory=lambda: ['GHG', 'AP', 'MTP'])
+    imp_int: List = field(default_factory=lambda: ['nrg','GHG', 'AP', 'MTP'])
+    tec: List = field(default_factory=lambda: ['BEV', 'ICEV'])
     enr: List = field(default_factory=lambda: ['FOS', 'ELC'])
     seg: List = field(default_factory=lambda: ['A', 'C', 'F'])
     mat_cat: List = field(default_factory=lambda: ['Li', 'Co'])
@@ -44,11 +48,13 @@ class SetsClass:
     age_int: List = field(default_factory=lambda: [i for i in range(29)])
 
     new: List = field(default_factory=lambda: ['0'])  # static set for new vehicles
-    newtec: List = field(default_factory=lambda:['BEV'])
+    newtec: List = field(default_factory=lambda: ['BEV'])
     demeq: List = field(default_factory=lambda: ['STCK_TOT', 'OPER_DIST', 'OCUP'])
     grdeq: List = field(default_factory=lambda: ['IND', 'ALL'])
     veheq: List = field(default_factory=lambda: ['PROD_EINT', 'PROD_CINT_CSNT', 'OPER_EINT', 'EOLT_CINT'])
     sigvar: List = field(default_factory=lambda: ['A', 'B', 'r', 'u'])
+    lcphase: List = field(default_factory=lambda: ['prod', 'oper', 'eol'])
+    # imp_int: List = field(default_factory=lambda: ['nrg', 'GHG', 'AP', 'MTP'])
 
 
     @classmethod
@@ -226,7 +232,7 @@ class ParametersClass:
 
     mat_content: Union[List, pd.Series, pd.DataFrame] = None
     virg_mat_supply: Union[pd.Series, pd.DataFrame] = None
-    mat_cint: Union[List, pd.Series, pd.DataFrame] = None
+    mat_impact_int: Union[List, pd.Series, pd.DataFrame] = None
     max_uptake_rate: Union[float, pd.Series, pd.DataFrame] = None
 
     enr_impact_int: Union[pd.Series, pd.DataFrame] = None
@@ -383,17 +389,16 @@ class ParametersClass:
 
         """
         mi_dict = {
-                   'enr_glf_terms':['enr', 'reg', 'enreq'],
+                   'enr_glf_terms':['imp', 'enr', 'reg'],#, 'enreq'],
                    'virg_mat_supply': ['mat_cat', 'mat_prod'],
-                   'mat_cint': ['mat_cat', 'mat_prod'],
+                   'mat_impact_int': ['imp', 'mat_cat', 'mat_prod'],
                    'mat_content': ['newtec','mat_cat'],
                    'batt_portfolio':['seg', 'battery size'],
-                   'tec_parameters_raw': ['veheq', 'tec', 'seg'],
-                   # 'tec_parameters': ['veheq', 'tec', 'seg'],
+                   'tec_parameters_raw': ['lcphase','imp', 'tec', 'seg'],
                    'enr_tec_correspondance': ['enr', 'tec'],
                    'cohort_age_correspondance': ['year', 'cohort', 'age'],
-                   'enr_impact_int_IAM': ['reg', 'enr'],
-                   'enr_impact_int': ['reg', 'enr'],
+                   'enr_impact_int_IAM': ['imp', 'reg', 'enr'],
+                   'enr_impact_int': ['imp', 'reg', 'enr'],
                    }
 
         # read parameter values in from Excel
@@ -532,17 +537,17 @@ class ParametersClass:
                 self.check_region_sets(self.enr_impact_int_IAM.index.get_level_values('reg'), 'enr_impact_int_IAM', sets.reg)
                 # for building enr_impact_int directly from IAM pathways (see electricity_clustering.py)
                 self.enr_impact_int_IAM = self.interpolate_years(self.enr_impact_int_IAM, sets)
-                self.enr_impact_int_IAM.index = self.enr_impact_int_IAM.index.reorder_levels(['enr', 'reg', 'year'])  # match correct set order for enr_impact_int
+                self.enr_impact_int_IAM.index = self.enr_impact_int_IAM.index.reorder_levels(['imp', 'enr', 'reg', 'year'])  # match correct set order for enr_impact_int
 
             if self.enr_impact_int is not None:
-                    self.check_region_sets(self.enr_impact_int.index.get_level_values('reg'), 'enr_impact_int', sets.reg)
-                    self.enr_impact_int = self.interpolate_years(self.enr_impact_int, sets)
-                    self.enr_impact_int.index = self.enr_impact_int.index.reorder_levels(['enr', 'reg', 'year'])
-                    self.enr_impact_int = pd.concat([self.enr_impact_int_IAM, self.enr_impact_int])
+                self.check_region_sets(self.enr_impact_int.index.get_level_values('reg'), 'enr_impact_int', sets.reg)
+                self.enr_impact_int = self.interpolate_years(self.enr_impact_int, sets)
+                self.enr_impact_int.index = self.enr_impact_int.index.reorder_levels(['imp', 'enr', 'reg', 'year'])
+                self.enr_impact_int = pd.concat([self.enr_impact_int_IAM, self.enr_impact_int])
         elif self.raw_data.enr_glf_terms is not None:
             self.check_region_sets(self.raw_data.enr_glf_terms.index.get_level_values('reg'), 'enr_glf_terms', sets.reg)
             # build enr_impact_int from generalized logistic function
-            mi = pd.MultiIndex.from_product([sets.reg, sets.enr, sets.modelyear], names=['reg', 'enr', 'modelyear'])
+            mi = pd.MultiIndex.from_product([sets.imp, sets.reg, sets.enr, sets.modelyear], names=['imp', 'reg', 'enr', 'modelyear'])
             self.enr_impact_int = pd.Series(index=mi)
 
 
@@ -553,8 +558,9 @@ class ParametersClass:
                 B = row['B']
                 r = row['r']
                 u = row['u']
-                reg = label[1]
-                enr = label[0]
+                imp = label[0]
+                reg = label[2]
+                enr = label[1]
                 for t in [((2000)+i) for i in range(81)]:
                     self.enr_impact_int.loc[(reg, enr, str(t))] = A + (B - A) / (1 + np.exp(- r*(t - u)))
 
@@ -617,7 +623,6 @@ class ParametersClass:
 
         return index
 
-
     def build_BEV(self):
         """
         Fetch BEV production impacts based on battery size.
@@ -633,22 +638,27 @@ class ParametersClass:
 
         """
         # build vehicle impacts table from batt_portfolio
-        self.raw_data.batt_portfolio = self.raw_data.batt_portfolio.T
+        self.raw_data.batt_portfolio.dropna(axis=1, how='all', inplace=True)
         self.raw_data.prod_df = pd.DataFrame()
 
-        # assemble production emissions for battery for defined battery capacities
+        # assemble production impacts for battery for defined battery capacities
         for key, value in self.bev_capac.items():
-            self.raw_data.prod_df[key] = self.raw_data.batt_portfolio[key, str(value)]
-        mi = pd.MultiIndex.from_product([self.raw_data.prod_df.index.to_list(), ['BEV'], ['batt']])
-        self.raw_data.prod_df.index = mi
+            self.raw_data.prod_df[key] = self.raw_data.batt_portfolio.loc[key, str(value)]
+        self.raw_data.prod_df = self.raw_data.prod_df.T.set_index('lcphase', append=True, drop=True)
+
+        self.raw_data.prod_df['tec'] = 'BEV'
+        self.raw_data.prod_df['comp'] = 'batt'
+        self.raw_data.prod_df.set_index(['tec', 'comp'], append=True, inplace=True)
+
         self.raw_data.prod_df = self.raw_data.prod_df.stack()
-        self.raw_data.prod_df.index.names = ['veheq', 'tec', 'comp', 'seg']
-        self.raw_data.prod_df.index = self.raw_data.prod_df.index.swaplevel(i=-2, j=-1)
+        self.raw_data.prod_df.index.rename(['seg', 'lcphase', 'tec','comp','imp'], inplace=True)
+        self.raw_data.prod_df.index =  self.raw_data.prod_df.index.reorder_levels(['lcphase', 'imp', 'tec', 'seg', 'comp'])
         self.raw_data.prod_df.sort_index(inplace=True)
         try:
-            self.raw_data.prod_df.drop('battery weight', axis=0, inplace=True)  # remove (currently not implemented)
+            self.raw_data.prod_df.drop('battery weight', axis=0, level='imp', inplace=True)  # remove battery weight (currently not implemented)
         except KeyError:
             log.info('Could not drop battery weight')
+
 
     def build_tec_parameters(self):
         """
@@ -699,19 +709,22 @@ class ParametersClass:
         temp_df = pd.DataFrame()
 
         b_prod = pd.DataFrame(reform.values(), index=mi)
-        b_prod.index.names = ['veheq', 'tec', 'comp']
+        b_prod = b_prod.stack()
+        b_prod.index.names = ['lcphase', 'imp', 'tec', 'comp']
+        b_prod.name = 'b'
 
         # Apply B-multiplication factors to production A-factors (with component resolution)
-        temp_a = self.raw_data.tec_parameters_raw.join(b_prod, on=['veheq', 'tec', 'comp'], how='left')
-        temp_prod_df['B'] = temp_a['a'] * temp_a[0]
+        temp_a = self.raw_data.tec_parameters_raw.join(b_prod, on=['lcphase', 'imp', 'tec', 'comp'], how='left')
+        temp_prod_df['B'] = temp_a['a'] * temp_a['b']
         temp_prod_df.dropna(how='any', axis=0, inplace=True)
 
-        reform = {(firstKey, secondKey): values for firstKey, secondDict in self.raw_data.B_term_oper_EOL.items() for secondKey, values in secondDict.items()}
+        reform = {(firstKey, secondKey, thirdKey): values for firstKey, secondDict in self.raw_data.B_term_oper_EOL.items() for secondKey, thirdDict in secondDict.items() for thirdKey, values in thirdDict.items()}
         mi = pd.MultiIndex.from_tuples(reform.keys())
         b_oper = pd.DataFrame(reform.values(), index=mi, columns=['b'])
+        b_oper.index.names = ['lcphase', 'imp_int', 'tec']
 
         # Apply B-multiplication factors for operation and EOL A-factors
-        temp_oper_df = self.raw_data.tec_parameters_raw.join(b_oper, on=['veheq', 'tec'], how='left')
+        temp_oper_df = self.raw_data.tec_parameters_raw.join(b_oper, on=['lcphase', 'imp', 'tec'], how='left')
         temp_oper_df['B'] = temp_oper_df['a'] * temp_oper_df['b']
         temp_oper_df.dropna(how='any', axis=0, inplace=True)
         temp_oper_df.drop(columns=['a', 'b'], inplace=True)
@@ -737,6 +750,7 @@ class ParametersClass:
         temp_df = temp_df.join(temp_u, on=['tec'], how='left')
 
         return temp_df
+
 
 
     def calc_veh_lifetime(self, sets):
@@ -969,7 +983,8 @@ class ParametersClass:
             df.index = df.index.astype('str')
         df = df.reindex(labels=ind, axis=axis)
         df = df.astype('float64').interpolate(axis=axis, limit_direction='both')
-        df = df.stack()
+        df = pd.DataFrame(df.stack())
+        df = self.order_sets(df)
         # df.index.rename('year', level=-1, inplace=True)
 
         return df
@@ -1013,7 +1028,7 @@ class ParametersClass:
             print('\n *****************************************')
             log.warning(f'----- The following parameters are missing values: {missing}')
 
-        self.check_region_sets(self.exog_tot_stock.index, 'exog_tot_stock', sets.fleetreg)
+        self.check_region_sets(self.exog_tot_stock.index.get_level_values('fleetreg'), 'exog_tot_stock', sets.fleetreg)
 
     @staticmethod
     def check_region_sets(par_ind, par_name, reg_set):
@@ -1059,6 +1074,9 @@ class ParametersClass:
         """
         ordered_list = ['veheq',
                         'grdeq',
+                        'lcphase',
+                        'imp',
+                        # 'imp_int',
                         'tec',
                         'newtec',
                         'mat_cat',
