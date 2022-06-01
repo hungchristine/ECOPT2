@@ -267,6 +267,24 @@ def export_fig(fp, ax, pp, export_pdf=True, export_png=False, png_name=None):
         plt.savefig(os.path.join(fp, png_name+'.png'), format='png', bbox_inches='tight')
 
 
+#%% for exporting values
+
+from pprint import pprint
+from inspect import getmembers
+from types import FunctionType
+
+def attributes(obj):
+    disallowed_names = {
+      name for name, value in getmembers(type(obj))
+        if isinstance(value, FunctionType)}
+    return {
+      name: getattr(obj, name) for name in dir(obj)
+        if name[0] != '_' and name not in disallowed_names and hasattr(obj, name)}
+
+def print_attributes(obj):
+    pprint(attributes(obj))
+
+
 #%%
 def vis_GAMS(fleet, fp, filename, param_values, export_png=False, export_pdf=True, max_year=2050, cropx=True, suppress_vis=False):
     """
@@ -560,7 +578,7 @@ def vis_GAMS(fleet, fp, filename, param_values, export_png=False, export_pdf=Tru
         plot_ax2 = (fleet.tot_stock_plot.sum(axis=1).unstack('seg').sum(axis=1).unstack('tec').sum(level='year')/1e6)
         plot_ax2.plot(ax=ax2, kind='area', cmap=tec_cm, lw=0)
         (fleet.all_impacts/1e6).plot(ax=ax1, kind='area', lw=0, cmap=cmap_em)
-        (fleet.bau_impacts/1e6).plot(ax=ax1, kind='line')
+        (fleet.bau_impacts/1e6).unstack(level='imp').plot(ax=ax1, kind='line')
 
         ax1.set_ylabel('Lifecycle climate impacts \n Mt $CO_2$-eq', fontsize=13)
         ax2.set_ylabel('Vehicles, millions', fontsize=13, labelpad=25)
@@ -591,6 +609,21 @@ def vis_GAMS(fleet, fp, filename, param_values, export_png=False, export_pdf=Tru
         print('\n *****************************************')
         print('Error with figure: Total vehicle stocks vs lifecycle impacts by tec')
         print(e)
+
+    #%% Comparison of emission impacts
+    # plot 2020, 2035, 2050?
+    # regions vs tec and lifecycle phase
+    # regions vs tec and seg?
+
+    # try:
+    #     fig, axes = plt.subplots(plt_array[0], plt_array[1],
+    #                              sharex=True, sharey=True, dpi=300)
+
+    #     plt_groups = fleet.impacts.groupby('fleetreg')
+         # for (reg, ax) in zip(plt_groups.keys(), axes.flatten()):
+         #     plt_groups(reg)
+
+         # make a line graph with all impact categories, normalized to base year and # of vehicles
 
     #%% Regionalized fleet impacts
     try:
@@ -711,6 +744,25 @@ def vis_GAMS(fleet, fp, filename, param_values, export_png=False, export_pdf=Tru
         print('Error with figure: Total stocks by reg')
         print(e)
 
+    #%% Total stock by technology and region
+    """--- Plot total stock share of new tec ---"""
+    try:
+        fig, ax = plt.subplots(1,1, dpi=300)
+        plot_data = fleet.tot_stock_plot.sum(axis=1).unstack('tec').unstack('fleetreg').sum(axis=0, level='year')
+        plot_data.index = plot_data.index.astype(int)
+        plot_data.plot(kind='area', ax=ax, lw=0, cmap=paired_tec,
+                            title='Total stocks by region and technology')
+        ax.set_xbound(2000, 2050)
+        ax.set_ybound(lower=0)
+        fix_age_legend(ax, pp, cropx, max_year, 'Vehicle region and technology')
+        export_fig(fp, ax, pp, export_pdf, export_png, png_name=ax.get_title())
+
+    except Exception as e:
+        print('\n *****************************************')
+        print('Error with figure: Total stocks by reg, tec')
+        print(e)
+
+
     #%% Total stocks by segment and technology
     """--- Plot total stocks by age, segment and technology ---"""
     try:
@@ -823,7 +875,7 @@ def vis_GAMS(fleet, fp, filename, param_values, export_png=False, export_pdf=Tru
 
             plot_resources = fleet.resources.loc[:, (slice(None), resource)].copy()
             plot_resources.index = plot_resources.index.astype(int)
-            plot_virg_mat = fleet.parameters.virg_mat_supply.copy().T.filter(like=resource, axis=0)*1000  # primary material supply is in tons; convert to kg
+            plot_virg_mat = (fleet.parameters.virg_mat_supply.copy().filter(like=resource, axis=0)*1000).T  # primary material supply is in tons; convert to kg
             plot_virg_mat.index = plot_virg_mat.index.astype(int)
 
             if plot_resources.max().mean() >= 1e6:
@@ -842,7 +894,8 @@ def vis_GAMS(fleet, fp, filename, param_values, export_png=False, export_pdf=Tru
                 log.warning('----- Some resource demand is negative! Setting to 0. \n')
                 print(plot_resources.loc[plot_resources.values < 0])  # print negative values for troubleshooting; may be very small or boundary condition
                 print('\n')
-                plot_resources[plot_resources < 0] = 0  # set value to 0 for plotting
+                plot_resources.where(plot_resources>=0, 0, inplace=True)   # set value to 0 for plotting
+                # plot_resources[plot_resources < 0] = 0  # set value to 0 for plotting
 
             # plot use of materials
             plot_resources.loc[2020] = np.nan # add 2020 to properly align plots
@@ -912,6 +965,12 @@ def vis_GAMS(fleet, fp, filename, param_values, export_png=False, export_pdf=Tru
             plot_resources = resource_use.loc[:, (slice(None), mat)]
             plot_prim_supply = prim_supply[mat]
 
+            if (plot_resources.values < 0).any():
+                log.warning('----- Some resource demand is negative! Setting to 0. \n')
+                print(plot_resources.loc[plot_resources.values < 0])  # print negative values for troubleshooting; may be very small or boundary condition
+                print('\n')
+                plot_resources.where(plot_resources>=0, 0, inplace=True)  # set value to 0 for plotting
+                # plot_resources[plot_resources < 0] = 0
             # scale y-axis if necessary
             if plot_resources.max().mean() >= 1e6:
                 plot_resources /= 1e6
@@ -938,7 +997,7 @@ def vis_GAMS(fleet, fp, filename, param_values, export_png=False, export_pdf=Tru
             axes[i].set_ybound(lower=0, upper=plot_resources.sum(axis=1).max()*1.1)
 
             if cropx:
-                axes[i].set_xlim(right=max_year)
+                axes[i].set_xlim(left=2020, right=max_year)
             else:
                 axes[i].set_xlim(2020, 2050)
 
@@ -1025,7 +1084,7 @@ def vis_GAMS(fleet, fp, filename, param_values, export_png=False, export_pdf=Tru
             # specification, or if the linestyle cycler is implemented via rcParams.
             # Find workaround?
 
-            # axes[i].set_prop_cycle(cycler('linestyle', ['solid',':','-.','--']))
+            axes[i].set_prop_cycle(cycler('linestyle', ['solid',':','-.','--']))
 
             # plot primary material mixes
             plot_data[prods].plot(ax=axes[i], kind='area', stacked=True, lw=0,
@@ -1105,7 +1164,7 @@ def vis_GAMS(fleet, fp, filename, param_values, export_png=False, export_pdf=Tru
     try:
         fig, ax = plt.subplots(1, 1, dpi=300)
 
-        if fleet.new_capac_demand.max()[0] <= 1:
+        if fleet.new_capac_demand.max()[0] <= 100:
             plot_resources *= 1e3
             plot_prim_supply *= 1e3
             units = 'MWh'
