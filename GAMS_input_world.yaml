@@ -20,7 +20,7 @@ tec_add_gradient:
  # agg: 0.35
  # slow: 0.05
  
-bev_capac:
+tec_size:
  baseline:
   A: 17.6
   B: 42.2
@@ -44,55 +44,35 @@ bev_capac:
   # F: 100
   
 
+# asymptote of logistic function for impact and energy intensity
+# relative to A term (initial value)
 B_term_prod:
  def:
-  PROD_EINT:
-   ICE: 
-    full_veh: 1
-   BEV: 
-    batt: 0.7
-    ROV: 1
-  PROD_CINT_CSNT: 
-   ICE: 
-    full_veh: 1
-   BEV:
-    batt: 0.8
-    ROV: 1
- # BEV-optimistic:
-  # PROD_EINT:
-   # ICE: 
-    # full_veh: 0.8
-   # BEV: 
-    # batt: 0.5
-    # ROV: 0.75
-  # PROD_CINT_CSNT: 
-   # ICE: 
-    # full_veh: 0.9
-   # BEV:
-    # batt: 0.3
-    # ROV: 0.75
- # ICEV-optimistic:
-  # PROD_EINT:
-   # ICE: 
-    # full_veh: 0.6
-   # BEV: 
-    # batt: 0.8
-    # ROV: 0.6
-  # PROD_CINT_CSNT: 
-   # ICE: 
-    # full_veh: 0.7
-   # BEV:
-    # batt: 0.7
-    # ROV: 0.8 
-    
+   prod:
+    nrg:
+     ICE: 
+         full_veh: 1
+     BEV: 
+         batt: 0.7
+         ROV: 1
+    GHG: 
+     ICE: 
+      full_veh: 1
+     BEV:
+      batt: 0.8
+      ROV: 1
 B_term_oper_EOL: 
  def: 
-  OPER_EINT:
-   ICE: 1
-   BEV: 1
-  EOLT_CINT:
-   ICE: 1
-   BEV: 1
+   oper:
+    nrg:
+     ICE: 1
+     BEV: 1
+   eol:
+    GHG:
+     ICE: 1
+     BEV: 1
+ 
+
    
 r_term_factors:
    def: 
@@ -122,7 +102,7 @@ u_term_factors:
  # aggr: 0.75
  
   
-veh_oper_dist:
+annaul_use_intensity:
  def: 30000
  
 #pkm_scenario:
