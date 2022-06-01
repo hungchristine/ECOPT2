@@ -37,7 +37,7 @@ Each experiment output is saved in its own folder, and includes the visualizatio
 
 ### Folder structure
 - <code>\data\\</code>: contains input files  for experiment
-- <code>\demo\\</code>: contains input files for demo experiment
+- <code>\demo\\</code>: contains input files for demo experiment using <code>gmspy</code>
 - <code>\output\\</code>: contains results, including visualization, logfile and <code>.gdx</code> files from experiments
 
 
