@@ -238,7 +238,7 @@ class GAMSRunner:
 
         # Run GAMS Optimization
         try:
-            model_run = self.ws.add_job_from_file(fleet.gms_file, job_name='EVD4EUR_'+run_tag) # model_run is type GamsJob
+            model_run = self.ws.add_job_from_file(fleet.gms_file, job_name='ECOPT2_'+run_tag) # model_run is type GamsJob
             self.opt = self.ws.add_options() # opt is of type gams.options.GamsOptions
             self.opt.keep = 0  # Controls keeping or deletion of process directory and scratch files.
             self.opt.logline = 0  # Amount of line tracing to the log file; values of 0-2
@@ -247,7 +247,7 @@ class GAMSRunner:
             self.opt.dumpparms = 0 # GAMS parameter logging; 1: accepted parameters/sets, 2; log of file operations + accepted sets/parameters
             self.opt.forcework = 0  # Force GAMS to process a save file created with a newer GAMS version or with execution errors.
 
-            lst_fp = os.path.abspath(os.path.join(self.export_fp, 'EVD4EUR_A_' + run_tag + '.lst'))
+            lst_fp = os.path.abspath(os.path.join(self.export_fp, 'ECOPT2_A_' + run_tag + '.lst'))
             self.opt.set_output(lst_fp)
             self.opt.putdir = self.export_fp
             self.opt.defines["gdxincname"] = self.db.name  # for auto-loading of database in GAMS model
@@ -318,7 +318,7 @@ class GAMSRunner:
             file_ext = ['.lst', '.pf']
 
             for file in file_ext:
-                shutil.move(os.path.join(os.path.curdir, 'EVD4EUR_'+ run_tag+file),
+                shutil.move(os.path.join(os.path.curdir, 'ECOPT2_'+ run_tag+file),
                             self.export_fp)
 
             # remove the temp opt files the GAMS API creates (without file extension)
