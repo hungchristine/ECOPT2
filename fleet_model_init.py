@@ -207,6 +207,7 @@ class RawDataClass:
 
     newtec_int_shr: float = 0.0018  # from Eurostat; assume remaining is ICE
 
+    collection_rate: Union[float, pd.Series] = 1
     recycle_rate: Union[float, pd.Series] = 0.75
 
     # other parameters
@@ -239,15 +240,16 @@ class ParametersClass:
 
     raw_data: RawDataClass = None
 
-    veh_oper_dist: Union[float, int, List, Dict, pd.Series, pd.DataFrame] = None
+    annual_use_intensity: Union[float, int, List, Dict, pd.Series, pd.DataFrame] = None
     initial_seg_shares: Union[Dict, List] = field(default_factory=lambda:[0.08, 0.21, 0.27, 0.08, 0.03, 0.34])  # Shares from 2017, ICCT report
     initial_tec_shares: Union[Dict, pd.Series, pd.DataFrame] = None
 
-    bev_capac: Union[Dict, List] = field(default_factory=lambda:{'A': 26.6, 'B': 42.2, 'C': 59.9, 'D': 75., 'E':95., 'F':100.})
+    tec_size: Union[Dict, List, pd.Series, pd.DataFrame] = field(default_factory=lambda:{'A': 26.6, 'B': 42.2, 'C': 59.9, 'D': 75., 'E':95., 'F':100.})
     retirement_function: Union[pd.Series, pd.DataFrame] = None
     lifetime_age_distribution: Union[pd.Series, pd.DataFrame] = None
 
     recovery_pct: Union[float, pd.Series, pd.DataFrame] = None
+    recycling_yield: Union[float, pd.Series, pd.DataFrame] = None
 
     def __post_init__(self):
         """
@@ -259,10 +261,11 @@ class ParametersClass:
         """
 
         # convert battery capacities to float
-        if isinstance(self.bev_capac, dict):
-            self.bev_capac = {key: float(value) for key, value in self.bev_capac.items()}
-        elif not isinstance(self.bev_capac, pd.DataFrame):
-            self.bev_capac = [float(value) for value in self.bev_capac]
+        if isinstance(self.tec_size, dict):
+            # set up dict for converting to DataFrame
+            self.tec_size = {key: ([float(value)] if not isinstance(value, list) else (float(val) for val in value)) for key, value in self.tec_size.items() }
+        elif not isinstance(self.tec_size, pd.DataFrame):
+            self.tec_size = [float(value) for value in self.tec_size]
 
         # convert DataFrame to correct format (used in initializing FleetModel from .gdx file)
         if isinstance(self.max_uptake_rate, pd.DataFrame) and not isinstance(self.max_uptake_rate.index, pd.MultiIndex):
@@ -390,7 +393,7 @@ class ParametersClass:
                    'virg_mat_supply': ['mat_cat', 'mat_prod'],
                    'mat_impact_int': ['imp', 'mat_cat', 'mat_prod'],
                    'mat_content': ['tec','mat_cat'],
-                   'batt_portfolio':['seg', 'battery size'],
+                   'batt_portfolio':['newtec', 'seg', 'battery size'],
                    'tec_parameters_raw': ['lcphase','imp', 'tec', 'seg'],
                    'enr_tec_correspondance': ['enr', 'tec'],
                    'cohort_age_correspondance': ['year', 'cohort', 'age'],
@@ -469,17 +472,41 @@ class ParametersClass:
 
         self.exog_tot_stock = self.interpolate_years(self.exog_tot_stock, sets, axis=0)
 
-        if (self.veh_oper_dist is not None) and ((self.raw_data.veh_pkm is not None) or (self.raw_data.pkm_scenario is not None)):
+        if (self.annual_use_intensity is not None) and ((self.raw_data.veh_pkm is not None) or (self.raw_data.pkm_scenario is not None)):
             log.warning('----- Vehicle operating distance overspecified. Both an annual vehicle mileage and an IAM scenario are specified.')
 
         if self.cohort_age_correspondance is None:
             self.cohort_age_correspondance = self.build_cohort_age_correspondance(sets)  # establish self.cohort_age_correspondance
+
+        if isinstance(self.tec_size, list):
+            if len(self.tec_size) == len(sets.seg):
+                self.tec_size = pd.DataFrame(self.tec_size, index=sets.seg)
+            elif len(self.tec_size) == (len(sets.seg) * len(sets.newtec)):
+                mi = pd.MultiIndex.from_product([sets.seg, sets.newtec])
+                self.tec_size = pd.DataFrame(self.tec_size, index=mi)
+            else:
+                log.error('----- Discrepancy in new technology component size correspondance length! Check that all tecs and all segments have a defined component size.')
+        elif isinstance(self.tec_size, dict):
+            # if (all([isinstance(key, tuple) for key in self.tec_size.keys()])):
+            self.tec_size = pd.DataFrame(self.tec_size).T
+        if isinstance(self.tec_size, pd.Series) or isinstance(self.tec_size, pd.DataFrame):
+            if not isinstance(self.tec_size.index, pd.MultiIndex):
+                if (self.tec_size.shape[0] == len(sets.seg)) and (len(sets.newtec)==1):
+                    self.tec_size['newtec'] = sets.newtec * len(sets.seg)
+                    self.tec_size.index.name = 'seg'
+                    self.tec_size.set_index('newtec', append=True, drop=True, inplace=True)
+                    self.tec_size.index = self.tec_size.index.reorder_levels(['newtec', 'seg'])
+                else:
+                    log.error('----- Discrepancy in new technology component size correspondance length! Check that all tecs and all segments have a defined component size.')
+        else:
+            log.error('----- tec_size does not seem to be in an acceptable data format (list, dict, Series, or DataFrame)')
 
         has_required_data = all(attr is not None for attr in (self.raw_data.B_term_prod,
                                                               self.raw_data.B_term_oper_EOL,
                                                               self.raw_data.r_term_factors,
                                                               self.raw_data.u_term_factors
                                                              ))
+
         if self.tec_parameters is not None and has_required_data:
             log.warning('----- tec_parameters is overdefined')
         elif has_required_data:
@@ -492,9 +519,9 @@ class ParametersClass:
             self.manuf_cnstrnt = self.manuf_cnstrnt.mul(self.raw_data.eur_batt_share, axis=0)
 
 
-        # TODO: expand veh_oper_dist to be tec and reg specific (also in GAMS)
+        # TODO: expand annual_use_intensity to be tec and reg specific (also in GAMS)
         if self.raw_data.veh_pkm:
-            self.veh_oper_dist = self.interpolate_years(self.raw_data.veh_pkm, sets).div(self.exog_tot_stock)
+            self.annual_use_intensity = self.interpolate_years(self.raw_data.veh_pkm, sets).div(self.exog_tot_stock)
         # if self.raw_data.pkm_scenario:
         #     # calculate veh oper dist
         #     self.raw_data.passenger_demand = self.raw_data.all_pkm_scen.T[self.raw_data.pkm_scenario]
@@ -505,27 +532,35 @@ class ParametersClass:
         #     self.raw_data.fleet_vkm  = self.raw_data.passenger_demand / self.raw_data.occupancy_rate
         #     self.raw_data.fleet_vkm.index = sets.modelyear
         #     self.raw_data.fleet_vkm.index.name = 'year'
-        #     self.veh_oper_dist = self.raw_data.fleet_vkm / self.exog_tot_stock.T.sum()  # assumes uniform distribution of annual distance travelled vs vehicle age and region
-            if self.veh_oper_dist.mean() > 25e3:
+        #     self.annual_use_intensity = self.raw_data.fleet_vkm / self.exog_tot_stock.T.sum()  # assumes uniform distribution of annual distance travelled vs vehicle age and region
+            if self.annual_use_intensity.mean() > 25e3:
                 log.warning('Warning, calculated annual vehicle mileage is above 25000 km, check fleet_km and exog_tot_stock')
-            elif self.veh_oper_dist.mean() < 1e4:
+            elif self.annual_use_intensity.mean() < 1e4:
                 log.warning('Warning, calculated annual vehicle mileage is less than 10000 km, check fleet_km and exog_tot_stock')
 
-        if isinstance(self.veh_oper_dist, (float, int)):
-            # calculate veh_oper_dist
-            # given a single value for veh_oper_dist, assumes that value applies for every region, year and technology
+        if isinstance(self.annual_use_intensity, (float, int)):
+            # calculate annual_use_intensity
+            # given a single value for annual_use_intensity, assumes that value applies for every region, year and technology
             ind = pd.MultiIndex.from_product([sets.fleetreg, sets.modelyear])
-            self.veh_oper_dist = pd.Series([self.veh_oper_dist for i in range(len(ind))], index=ind)
-        elif isinstance(self.veh_oper_dist, dict):
-            self.veh_oper_dist = pd.Series(self.veh_oper_dist)
-        self.veh_oper_dist.index.names = ['fleetreg','year']
+            self.annual_use_intensity = pd.Series([self.annual_use_intensity for i in range(len(ind))], index=ind)
+        elif isinstance(self.annual_use_intensity, dict):
+            self.annual_use_intensity = pd.Series(self.annual_use_intensity)
+        self.annual_use_intensity.index.names = ['fleetreg','year']
 
-        if self.raw_data.recycle_rate is not None and isinstance(self.raw_data.recycle_rate, float):
-            self.recovery_pct = [[self.raw_data.recycle_rate]*len(sets.mat_cat) for year in range(len(sets.modelyear))]
+        if self.raw_data.collection_rate is not None and isinstance(self.raw_data.collection_rate, float):
+            self.recovery_pct = [[self.raw_data.collection_rate]*len(sets.newtec) for year in range(len(sets.modelyear))]
             self.recovery_pct = pd.DataFrame(self.recovery_pct,
                                              index=sets.modelyear,
-                                             columns=sets.mat_cat)
+                                             columns=sets.newtec)
             self.recovery_pct = self.recovery_pct.T
+
+        if self.raw_data.recycle_rate is not None and isinstance(self.raw_data.recycle_rate, float):
+            self.recycling_yield = [[self.raw_data.recycle_rate]*len(sets.mat_cat) for year in range(len(sets.modelyear))]
+            self.recycling_yield = pd.DataFrame(self.recycling_yield,
+                                             index=sets.modelyear,
+                                             columns=sets.mat_cat)
+            self.recycling_yield = self.recycling_yield.T
+
         if (self.raw_data.enr_glf_terms is not None) and (self.enr_impact_int is not None or self.enr_impact_int_IAM is not None):
             log.warning('----- Source for energy pathways may be overspecified; both enr_glf_terms and enr_impact_int are specified. Using enr_impact_int.')
 
@@ -601,7 +636,6 @@ class ParametersClass:
         """
 
         top_year = int(sets.optyear[-1])  # the last year we are interested in
-        # start_year = int(sets.inityear[0])
         start_year = int(sets.modelyear[0])  # start with the oldest cohort
         prod_year = start_year - int(sets.age[-1])
         ind = []
@@ -611,8 +645,6 @@ class ParametersClass:
                 ind.append([year, prod_year, a, 1])
 
         index = pd.DataFrame(ind)
-        #index = index[index[0]<=2050]
-        # index = index[index[2] <= (top_year + 1)] # we don't need tecnologies manufactured past our time period
         for ind, col in index.iloc[:,:-1].iteritems():
             index.loc(axis=1)[ind] = index.loc(axis=1)[ind].astype(str) # convert to strings as required by GAMS
         index.columns = ['year','prodyear','age', 'level']
@@ -635,20 +667,19 @@ class ParametersClass:
         """
         # build vehicle impacts table from batt_portfolio
         self.raw_data.batt_portfolio.dropna(axis=1, how='all', inplace=True)
-        self.raw_data.prod_df = pd.DataFrame()
+        self.raw_data.prod_df = pd.DataFrame(index=self.tec_size.index, columns=self.raw_data.batt_portfolio.columns)
 
         # assemble production impacts for battery for defined battery capacities
-        for key, value in self.bev_capac.items():
-            self.raw_data.prod_df[key] = self.raw_data.batt_portfolio.loc[key, str(value)]
-        self.raw_data.prod_df = self.raw_data.prod_df.T.set_index('lcphase', append=True, drop=True)
+        for key, value in self.tec_size.iterrows():
+            val = value.loc[0]
+            self.raw_data.prod_df.loc[key] = self.raw_data.batt_portfolio.loc[key].loc[str(val)]
+        self.raw_data.prod_df = self.raw_data.prod_df.set_index('lcphase', append=True, drop=True)
 
-        self.raw_data.prod_df['tec'] = 'BEV'
         self.raw_data.prod_df['comp'] = 'batt'
-        self.raw_data.prod_df.set_index(['tec', 'comp'], append=True, inplace=True)
+        self.raw_data.prod_df.set_index(['comp'], append=True, inplace=True)
 
         self.raw_data.prod_df = self.raw_data.prod_df.stack()
-        self.raw_data.prod_df.index.rename(['seg', 'lcphase', 'tec','comp','imp'], inplace=True)
-        self.raw_data.prod_df.index =  self.raw_data.prod_df.index.reorder_levels(['lcphase', 'imp', 'tec', 'seg', 'comp'])
+        self.raw_data.prod_df.index.rename(['tec','seg', 'lcphase','comp','imp'], inplace=True)
         self.raw_data.prod_df.sort_index(inplace=True)
         try:
             self.raw_data.prod_df.drop('battery weight', axis=0, level='imp', inplace=True)  # remove battery weight (currently not implemented)
@@ -694,6 +725,11 @@ class ParametersClass:
         # Retrieve production impacts factors for chosen battery capacities and place in raw A factors (with component resolution)
         self.build_BEV()  # update self.prod_df with selected battery capacities
         self.raw_data.tec_parameters_raw.sort_index(inplace=True)
+        self.raw_data.prod_df.name = 'a'
+        self.raw_data.prod_df.index = self.raw_data.prod_df.index.reorder_levels(self.raw_data.tec_parameters_raw.index.names)
+        # try:
+        #     self.raw_data.tec_parameters_raw.update(self.raw_data.prod_df)
+        # self.raw_data.tec_parameters_raw = pd.concat([self.raw_data.tec_parameters_raw, self.raw_data.prod_df.to_frame()])
         for index, value in self.raw_data.prod_df.iteritems():
             self.raw_data.tec_parameters_raw.loc[index, 'a'] = value
 
@@ -973,7 +1009,7 @@ class ParametersClass:
             # df.index.rename('year', level=-1, inplace=True)
 
         ind = pd.Index(sets.modelyear, name='year')
-        if axis:
+        if axis==1:
             df.columns = df.columns.astype('str')
         else:
             df.index = df.index.astype('str')
@@ -981,7 +1017,6 @@ class ParametersClass:
         df = df.astype('float64').interpolate(axis=axis, limit_direction='both')
         df = pd.DataFrame(df.stack())
         df = self.order_sets(df)
-        # df.index.rename('year', level=-1, inplace=True)
 
         return df
 

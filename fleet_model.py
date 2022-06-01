@@ -85,7 +85,7 @@ class FleetModel:
         # Instantiate filepaths
         self.home_fp = os.path.dirname(os.path.realpath(__file__))
 
-        self.gms_file = os.path.join(self.home_fp, r'EVD4EUR.gms') # GAMS model file
+        self.gms_file = os.path.join(self.home_fp, r'ECOPT2.gms') # GAMS model file
         self.import_fp = os.path.join(self.home_fp, r'GAMS_input_new.xls')
         self.export_fp = os.path.join(self.home_fp, r'Model run data')
         self.keeper = "{:%d-%m-%y, %H_%M}".format(datetime.now())
@@ -147,6 +147,8 @@ class FleetModel:
         self.parameters.mat_impact_int.index = self.parameters.mat_impact_int.index.droplevel(['mat_cat'])
 
         self.parameters.recovery_pct.index = self.parameters.recovery_pct.index.astype('str')
+        self.parameters.recycling_yield.index = self.parameters.recycling_yield.index.astype('str')
+
 
         self.parameters.virg_mat_supply.index = self.parameters.virg_mat_supply.index.astype('str')
         self.parameters.virg_mat_supply.columns = self.parameters.virg_mat_supply.columns.droplevel(['mat_cat'])
@@ -392,7 +394,7 @@ class FleetModel:
             self.all_impacts = self.all_impacts.unstack(['tec', 'year']).sum().unstack([None, 'tec'])
 
             try:
-                self.recycled_batt = self._v_dict['RECYCLED_BATT']
+                self.recycled_comp = self._v_dict['RECYCLED_COMPONENTS']
                 self.recycled_mat = self._v_dict['RECYCLED_MAT']
                 self.primary_mat = self._v_dict['TOT_PRIMARY_MAT']
                 self.resources = pd.concat([self.primary_mat, self.recycled_mat], axis=0, keys=['primary', 'recycled'])
@@ -448,7 +450,7 @@ class FleetModel:
             self.mat_demand = self._p_dict['MAT_REQ_TOT']
             self.mat_demand = pd.concat([self.mat_demand], axis=1, keys=['total'])
 
-            self.new_capac_demand = self._p_dict['TOT_CAPACITY_ADDED'].T
+            self.new_capac_demand = self._p_dict['TOT_NEWTEC_COMP_ADDED'].T
             self.new_capac_demand.index.rename('modelyear', inplace=True)
             self.new_capac_demand.columns = ['New ' +tec+' demand' for tec in self.new_capac_demand.columns]
 
@@ -457,16 +459,27 @@ class FleetModel:
         except TypeError as e:
             log.warning(f"Could not find post-processing parameter(s). {e}")
 
+        self.production_impacts['lcphase'] = 'Production'
+        self.operation_impacts['lcphase'] = 'Operation'
+        self.eol_impacts['lcphase'] = 'End of life'
 
-        self.veh_oper_dist = self._p_dict['VEH_OPER_DIST']
-        self.veh_oper_dist = self.veh_oper_dist.stack()
-        self.veh_oper_dist.index.rename(['fleetreg','modelyear'], inplace=True)
+        self.production_impacts.set_index('lcphase', append=True, drop=True, inplace=True)
+        self.operation_impacts.set_index('lcphase', append=True, drop=True, inplace=True)
+        self.eol_impacts.set_index('lcphase', append=True, drop=True, inplace=True)
+
+        self.impacts = pd.concat([self.production_impacts,
+                                  self.operation_impacts,
+                                  self.eol_impacts])
+
+        self.annual_use_intensity = self._p_dict['ANNUAL_USE_INTENSITY']
+        self.annual_use_intensity = self.annual_use_intensity.stack()
+        self.annual_use_intensity.index.rename(['fleetreg','modelyear'], inplace=True)
         # TODO: check 'ffill' with different distances
 
-        tmp_dist = self.veh_oper_dist.reindex_like(self.tec_oper_impact_int.reorder_levels(['imp','modelyear', 'fleetreg', 'tec','seg','prodyear','enr','age']), method='ffill')
+        tmp_dist = self.annual_use_intensity.reindex_like(self.tec_oper_impact_int.reorder_levels(['imp','modelyear', 'fleetreg', 'tec','seg','prodyear','enr','age']), method='ffill')
         self.op_impacts = self.tec_oper_impact_int.mul(tmp_dist, axis=0)
         self.full_oper_dist = tmp_dist
-        # self.full_oper_dist = self.veh_oper_dist.reindex(self.tec_oper_impact_int.index, level='modelyear')
+        # self.full_oper_dist = self.annual_use_intensity.reindex(self.tec_oper_impact_int.index, level='modelyear')
         # self.op_impacts = self.tec_oper_impact_int.multiply(self.full_oper_dist)
         # self.op_impacts.index = self.op_impacts.index.droplevel(level=['enr', 'age']) # these columns are unncessary/redundant
         # self.op_impacts = self.op_impacts.sum(level=['tec', 'seg', 'fleetreg', 'prodyear']) # sum the operating impacts over all model years for each cohort
@@ -501,7 +514,11 @@ class FleetModel:
 
         try:
             self.LC_impacts_avg = [self.avg_LCimpacts(i) for i in range(0, 28)]  # quality check - estimate lifecycle impacts of vehicles
+        except Exception as e:
+            print('\n ******************************')
+            log.error(f'----- Error in calculating average life cycle impacts. {e}')
 
+        try:
             add_gpby = self.stock_add.sum(axis=1).unstack('seg').unstack('tec')
             self.add_share = add_gpby.div(add_gpby.sum(axis=1), axis=0)
             self.add_share.dropna(how='all', axis=0, inplace=True) # drop production country (no fleet)

@@ -125,10 +125,10 @@ class GAMSRunner:
             for producer in item:
                 mat.add_record((key, producer))
 
-        veh_oper_dist = gmspy.df2param(self.db, fleet.parameters.veh_oper_dist, ['reg','year'], 'VEH_OPER_DIST')
+        annual_use_intensity = gmspy.df2param(self.db, fleet.parameters.annual_use_intensity, ['reg','year'], 'ANNUAL_USE_INTENSITY')
         exog_tot_stock = gmspy.df2param(self.db, fleet.parameters.exog_tot_stock, ['fleetreg','year'], 'EXOG_TOT_STOCK')
         initial_seg_shares = gmspy.df2param(self.db, fleet.parameters.initial_seg_shares, ['seg'], 'INITIAL_SEG_SHARES')
-        bev_capac = gmspy.df2param(self.db, fleet.parameters.bev_capac, ['seg'], 'BEV_CAPAC')
+        tec_size = gmspy.df2param(self.db, fleet.parameters.tec_size, ['newtec', 'seg'], 'TEC_COMPONENT_CORRESPONDANCE')
 
         lifetime_age_distribution = gmspy.df2param(self.db, fleet.parameters.lifetime_age_distribution, ['age'], 'LIFETIME_AGE_DISTRIBUTION')
         retirement_function = gmspy.df2param(self.db, fleet.parameters.retirement_function, ['age'], 'RETIREMENT_FUNCTION')
@@ -160,7 +160,9 @@ class GAMSRunner:
         mat_content = gmspy.df2param(self.db, fleet.parameters.mat_content, ['newtec','mat_cat','year'], 'MAT_CONTENT')
         mat_impact_int = gmspy.df2param(self.db, fleet.parameters.mat_impact_int, ['imp','mat_prod','year'], 'MAT_IMPACT_INT')
         virg_mat = gmspy.df2param(self.db, fleet.parameters.virg_mat_supply, ['mat_prod','year'], 'VIRG_MAT_SUPPLY')
-        recovery_pct = gmspy.df2param(self.db, fleet.parameters.recovery_pct, ['mat_cat','year'], 'RECOVERY_PCT')
+        recovery_pct = gmspy.df2param(self.db, fleet.parameters.recovery_pct, ['newtec','year'], 'RECOVERY_PCT')
+        recycling_yield = gmspy.df2param(self.db, fleet.parameters.recycling_yield, ['mat_cat','year'], 'RECYCLING_YIELD')
+
 
         try:
             self.db.export(os.path.join(self.export_fp, filename + '_'+timestamp))
