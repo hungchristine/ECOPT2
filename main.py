@@ -28,19 +28,6 @@ import visualization as vis
 # Make timestamp and directory for scenario run results for output files
 now = datetime.now().isoformat(timespec='minutes').replace(':', '_')  # timestamp for run IDs
 
-# Set up logging - both stream to console and to log file
-log_fp = os.path.join(os.path.curdir, 'output', now+'_log.log')
-formatter = logging.Formatter('%(levelname)s [%(name)s] - %(message)s')
-log = logging.getLogger()
-log.setLevel(logging.INFO)
-file_log = logging.FileHandler(log_fp)
-file_log.setLevel(logging.INFO)
-file_log.setFormatter(formatter)
-stream_log = logging.StreamHandler(sys.stdout)
-stream_log.setLevel(logging.INFO)
-stream_log.setFormatter(formatter)
-log.addHandler(file_log)
-log.addHandler(stream_log)
 
 # Housekeeping: set up experiment options of filepaths
 class Experiment(Enum):
@@ -52,6 +39,8 @@ class Experiment(Enum):
     WORLD = 'GAMS_input_world'
 
 experiment_type = Experiment.WORLD #NORMAL # must be one of 'DEMO', 'UNIT', 'NORMAL'
+export_png = True  # visualization file format
+export_pdf = True  # visualization file format
 export = False  # whether to export cross-scenario results
 visualize_input = False # visualize input factors for debugging
 
@@ -65,15 +54,30 @@ else:
     fp = os.path.join(os.path.curdir, 'output','Run_'+now)
 
 input_file = os.path.join(os.path.curdir, yaml_name + '.yaml')
-
-# Make output YAML less ugly, see https://stackoverflow.com/a/30682604
-yaml.SafeDumper.ignore_aliases = lambda *args: True
+log_fp = os.path.join(fp, now+'_log.log')
+formatter = logging.Formatter('%(levelname)s [%(name)s] - %(message)s')
+log = logging.getLogger()
+log.setLevel(logging.INFO)
 
 try:
     os.mkdir(fp)
+    file_log = logging.FileHandler(log_fp)
 except:
     print('\n *****************************************')
     log.error(f'Could not make output folder {fp}!')
+
+# Set up logging - both stream to console and to log file
+
+file_log.setLevel(logging.INFO)
+file_log.setFormatter(formatter)
+stream_log = logging.StreamHandler(sys.stdout)
+stream_log.setLevel(logging.INFO)
+stream_log.setFormatter(formatter)
+log.addHandler(file_log)
+log.addHandler(stream_log)
+
+# Make output YAML less ugly, see https://stackoverflow.com/a/30682604
+yaml.SafeDumper.ignore_aliases = lambda *args: True
 
 def run_experiment():
     """
@@ -173,7 +177,8 @@ def run_experiment():
                 sys.exit()
 
         exceptions = gams_run.db.get_database_dvs()
-        if len(exceptions) > 1:
+        if len(exceptions) > 0:
+            print("GAMS errors as follows:")
             print(exceptions[0].symbol.name)
             print(fm.db.number_symbols)
 
@@ -191,22 +196,23 @@ def run_experiment():
             else:
                 exp_params[key] = value
 
-        # Run visualization
-        try:
-            fm.figure_calculations()  # run extra calculations for cross-experiment figures
-            fig_fp = os.path.join(fp, f'exp_{i}_figs')
-            os.mkdir(fig_fp)
-            log.info("Starting visualization of results")
-            vis.vis_GAMS(fm, fig_fp, run_id, experiment, export_png=True, export_pdf=True)
-            if visualize_input:
-                log.info("Starting visualization of input parameters")
-                vis.vis_input(fm, fp, run_id, experiment, export_png=False, export_pdf=False, max_year=50, cropx=True, suppress_vis=False)
-        except Exception:
-            print('\n *****************************************')
-            log.error("Failed visualization, deleting folder")
-            traceback.print_exc()
-            if (os.path.exists(fp)) and (not os.listdir(fp)):
-                os.rmdir(fp)
+        # Run visualization if GAMS ran without problems
+        if len(exceptions) == 0:
+            try:
+                fm.figure_calculations()  # run extra calculations for cross-experiment figures
+                fig_fp = os.path.join(fp, f'exp_{i}_figs')
+                os.mkdir(fig_fp)
+                log.info("Starting visualization of results")
+                vis.vis_GAMS(fm, fig_fp, run_id, experiment, export_png=export_png, export_pdf=export_pdf)
+                if visualize_input:
+                    log.info("Starting visualization of input parameters")
+                    vis.vis_input(fm, fp, run_id, experiment, export_png=export_png, export_pdf=export_pdf, max_year=2050, cropx=True, suppress_vis=False)
+            except Exception:
+                print('\n *****************************************')
+                log.error("Failed visualization, deleting folder")
+                traceback.print_exc()
+                if (os.path.exists(fp)) and (not os.listdir(fp)):
+                    os.rmdir(fp)
 
         # Save log info
         try:
