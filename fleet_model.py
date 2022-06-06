@@ -474,16 +474,11 @@ class FleetModel:
         self.annual_use_intensity = self._p_dict['ANNUAL_USE_INTENSITY']
         self.annual_use_intensity = self.annual_use_intensity.stack()
         self.annual_use_intensity.index.rename(['fleetreg','modelyear'], inplace=True)
-        # TODO: check 'ffill' with different distances
 
+        # TODO: check 'ffill' with different distances
         tmp_dist = self.annual_use_intensity.reindex_like(self.tec_oper_impact_int.reorder_levels(['imp','modelyear', 'fleetreg', 'tec','seg','prodyear','enr','age']), method='ffill')
         self.op_impacts = self.tec_oper_impact_int.mul(tmp_dist, axis=0)
         self.full_oper_dist = tmp_dist
-        # self.full_oper_dist = self.annual_use_intensity.reindex(self.tec_oper_impact_int.index, level='modelyear')
-        # self.op_impacts = self.tec_oper_impact_int.multiply(self.full_oper_dist)
-        # self.op_impacts.index = self.op_impacts.index.droplevel(level=['enr', 'age']) # these columns are unncessary/redundant
-        # self.op_impacts = self.op_impacts.sum(level=['tec', 'seg', 'fleetreg', 'prodyear']) # sum the operating impacts over all model years for each cohort
-        # self.op_impacts = self.op_impacts.reorder_levels(order=['tec', 'seg', 'fleetreg', 'prodyear']) # reorder MultiIndex to add production impacts
 
         tmp_prod = self.tec_prod_impact_int.reindex_like(self.tec_oper_impact_int.reorder_levels(['imp','tec','seg','prodyear','modelyear','enr','fleetreg','age']), method='ffill')
         tmp_prod.fillna(method='bfill', inplace=True)  # for filling 1999
@@ -566,11 +561,6 @@ class FleetModel:
         self.veh_oper_imp_int_avg.drop(columns='age', inplace=True)
         self.veh_oper_imp_int_avg = self.veh_oper_imp_int_avg.reorder_levels(['imp','tec','enr','seg','fleetreg','age','modelyear','prodyear'])
 
-        # self.avg_oper_dist = self.full_oper_dist.reset_index(level='age')
-        # self.avg_oper_dist = self.avg_oper_dist.astype({'age': 'int32'})
-        # self.avg_oper_dist = self.avg_oper_dist[self.avg_oper_dist.age <= age]  # again, drop ages over lifetime
-        # self.avg_oper_dist = self.avg_oper_dist.set_index([self.avg_oper_dist.index, self.avg_oper_dist.age]) # make same index for joining with self.veh_oper_imp_int_avg
-        # self.avg_oper_dist.drop(columns='age', inplace=True)
         self.full_oper_dist = self.full_oper_dist.reorder_levels(['imp','tec','enr','seg','fleetreg','age','modelyear','prodyear'])
         self.full_oper_dist.index = self.full_oper_dist.index.set_levels(ind.levels[5].astype(int), level=5) # set ages as int
         self.d = self.full_oper_dist.to_frame().join(self.veh_oper_imp_int_avg, lsuffix='_dist')
@@ -581,9 +571,7 @@ class FleetModel:
         self.op_impacts_avg['age'] = self.op_impacts_avg['age'].astype(int)
         self.op_impacts_avg['lifetime op impacts'] = (self.op_impacts_avg['age']+1).mul(self.op_impacts_avg[0])
         self.op_impacts_avg.drop(columns=0, inplace=True)
-        # self.op_impacts_avg.to_csv('op_impacts_avg_with_duplicates.csv')
-        # self.op_impacts_avg = self.op_impacts_avg.reset_index().drop_duplicates().set_index(['tec','seg','fleetreg','age','modelyear','prodyear'])
-        # self.op_impacts_avg.to_csv('op_impacts_avg_without_duplicates.csv')
+
         self.op_impacts_avg.set_index('age', append=True, drop=True, inplace=True)
         self.op_impacts_avg = self.op_impacts_avg.sum(level=['tec','seg','fleetreg','prodyear','age']) # sum the operating impacts over all model years
         self.op_impacts_avg = self.op_impacts_avg.reorder_levels(order=['tec','seg','prodyear','fleetreg','age']) # reorder MultiIndex to add production impacts

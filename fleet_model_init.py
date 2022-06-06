@@ -194,7 +194,7 @@ class RawDataClass:
     all_pkm_scen: pd.DataFrame = None
     veh_pkm: pd.DataFrame = None
     fleet_vkm: pd.DataFrame = None
-    batt_portfolio: pd.DataFrame = None
+    component_portfolio: pd.DataFrame = None
     tec_parameters_raw: pd.DataFrame = None
     B_term_prod: Union[dict, float] = None
     B_term_oper_EOL: Union[dict, float] = None
@@ -202,8 +202,8 @@ class RawDataClass:
     u_term_factors: Union[dict, pd.Series] = None  # {str: float}
     prod_df: pd.DataFrame = None
 
-    veh_avg_age: Union[float, dict] = 11.1 # From ACEA 2019-2020 report
-    veh_age_stdev: Union[float, dict] = 2.21
+    avg_age: Union[float, dict] = 11.1 # From ACEA 2019-2020 report
+    age_stdev: Union[float, dict] = 2.21
 
     newtec_int_shr: float = 0.0018  # from Eurostat; assume remaining is ICE
 
@@ -394,7 +394,7 @@ class ParametersClass:
                    'virg_mat_supply': ['mat_cat', 'mat_prod'],
                    'mat_impact_int': ['imp', 'mat_cat', 'mat_prod'],
                    'mat_content': ['tec','mat_cat'],
-                   'batt_portfolio':['newtec', 'seg', 'battery size'],
+                   'component_portfolio':['newtec', 'seg', 'battery size'],
                    'tec_parameters_raw': ['lcphase','imp', 'tec', 'seg'],
                    'enr_tec_correspondence': ['enr', 'tec'],
                    'cohort_age_correspondence': ['year', 'cohort', 'age'],
@@ -521,32 +521,38 @@ class ParametersClass:
 
 
         # TODO: expand annual_use_intensity to be tec and reg specific (also in GAMS)
+        # calculate annual use intensity. Prioritizes time series from IAMs, either
+        # provided directly (raw_data.veh_pkm) or as a scenario to be selected from a
+        # "portfolio" (all_pkm_scenarios, pkm_scenario), then finally user-specified
+        # constants or time-series (annual_use_intensity)
         if self.raw_data.veh_pkm:
             self.annual_use_intensity = self.interpolate_years(self.raw_data.veh_pkm, sets).div(self.exog_tot_stock)
-        # if self.raw_data.pkm_scenario:
-        #     # calculate veh oper dist
-        #     self.raw_data.passenger_demand = self.raw_data.all_pkm_scen.T[self.raw_data.pkm_scenario]
-        #     self.raw_data.passenger_demand.reset_index()
-        #     self.raw_data.passenger_demand *= 1e9
-        #     self.raw_data.passenger_demand.name = ''
+        elif self.raw_data.pkm_scenario and self.raw_data.all_pkm_scen:
+            # calculate veh oper dist
+            self.raw_data.passenger_demand = self.raw_data.all_pkm_scen.T[self.raw_data.pkm_scenario]
+            self.raw_data.passenger_demand.reset_index()
+            self.raw_data.passenger_demand *= 1e9
+            self.raw_data.passenger_demand.name = ''
 
-        #     self.raw_data.fleet_vkm  = self.raw_data.passenger_demand / self.raw_data.occupancy_rate
-        #     self.raw_data.fleet_vkm.index = sets.modelyear
-        #     self.raw_data.fleet_vkm.index.name = 'year'
-        #     self.annual_use_intensity = self.raw_data.fleet_vkm / self.exog_tot_stock.T.sum()  # assumes uniform distribution of annual distance travelled vs vehicle age and region
+            self.raw_data.fleet_vkm  = self.raw_data.passenger_demand / self.raw_data.occupancy_rate
+            self.raw_data.fleet_vkm.index = sets.modelyear
+            self.raw_data.fleet_vkm.index.name = 'year'
+            self.annual_use_intensity = self.raw_data.fleet_vkm / self.exog_tot_stock.T.sum()  # assumes uniform distribution of annual distance travelled vs vehicle age and region
+
+            # check for unusual values for use intensity (vehicle specific)
             if self.annual_use_intensity.mean() > 25e3:
                 log.warning('Warning, calculated annual vehicle mileage is above 25000 km, check fleet_km and exog_tot_stock')
             elif self.annual_use_intensity.mean() < 1e4:
                 log.warning('Warning, calculated annual vehicle mileage is less than 10000 km, check fleet_km and exog_tot_stock')
-
-        if isinstance(self.annual_use_intensity, (float, int)):
-            # calculate annual_use_intensity
-            # given a single value for annual_use_intensity, assumes that value applies for every region, year and technology
-            ind = pd.MultiIndex.from_product([sets.fleetreg, sets.modelyear])
-            self.annual_use_intensity = pd.Series([self.annual_use_intensity for i in range(len(ind))], index=ind)
-        elif isinstance(self.annual_use_intensity, dict):
-            self.annual_use_intensity = pd.Series(self.annual_use_intensity)
-        self.annual_use_intensity.index.names = ['fleetreg','year']
+        elif self.annual_use_intensity:
+            if isinstance(self.annual_use_intensity, (float, int)):
+                # calculate annual_use_intensity
+                # given a single value for annual_use_intensity, assumes that value applies for every region, year and technology
+                ind = pd.MultiIndex.from_product([sets.fleetreg, sets.modelyear])
+                self.annual_use_intensity = pd.Series([self.annual_use_intensity for i in range(len(ind))], index=ind)
+            elif isinstance(self.annual_use_intensity, dict):
+                self.annual_use_intensity = pd.Series(self.annual_use_intensity)
+            self.annual_use_intensity.index.names = ['fleetreg','year']
 
         if self.raw_data.collection_rate is not None and isinstance(self.raw_data.collection_rate, float):
             self.recovery_pct = [[self.raw_data.collection_rate]*len(sets.newtec) for year in range(len(sets.modelyear))]
@@ -582,7 +588,6 @@ class ParametersClass:
             # build enr_impact_int from generalized logistic function
             mi = pd.MultiIndex.from_product([sets.imp, sets.reg, sets.enr, sets.modelyear], names=['imp', 'enr', 'reg', 'modelyear'])
             self.enr_impact_int = pd.Series(index=mi)
-
 
             # complete enr_impact_int parameter with fossil fuel chain and electricity in production regions
             # using terms for general logisitic function
@@ -652,28 +657,29 @@ class ParametersClass:
 
         return index
 
-    def build_BEV(self):
+    def build_newtec(self):
         """
-        Fetch BEV production impacts based on battery size.
+        Fetch production impacts for new technologies based on component size.
 
-        Select battery size by segment from size-segment combinations,
-        fetch and sum production impacts for battery and rest-of-vehicle.
+        Select component size by segment from size-segment combinations provided
+        in component_portfolio, fetch and sum production impacts for component
+        and rest-of-product/technology.
         Update DataFrame with total production impacts and energy use for
-        BEVs by segment.
+        new technologies by segment.
 
         Returns
         -------
         None.
 
         """
-        # build vehicle impacts table from batt_portfolio
-        self.raw_data.batt_portfolio.dropna(axis=1, how='all', inplace=True)
-        self.raw_data.prod_df = pd.DataFrame(index=self.tec_size.index, columns=self.raw_data.batt_portfolio.columns)
+        # build vehicle impacts table from component_portfolio
+        self.raw_data.component_portfolio.dropna(axis=1, how='all', inplace=True)
+        self.raw_data.prod_df = pd.DataFrame(index=self.tec_size.index, columns=self.raw_data.component_portfolio.columns)
 
         # assemble production impacts for battery for defined battery capacities
         for key, value in self.tec_size.iterrows():
             val = value.loc[0]
-            self.raw_data.prod_df.loc[key] = self.raw_data.batt_portfolio.loc[key].loc[str(val)]
+            self.raw_data.prod_df.loc[key] = self.raw_data.component_portfolio.loc[key].loc[str(val)]
         self.raw_data.prod_df = self.raw_data.prod_df.set_index('lcphase', append=True, drop=True)
 
         self.raw_data.prod_df['comp'] = 'batt'
@@ -698,8 +704,6 @@ class ParametersClass:
         from YAML file (experiment parameter). Aggregate all values in a
         DataFrame for export to GAMS database.
 
-        Parameters
-        ----------
         B_term_prod : float
             Upper asymptote for production impacts; expressed
             as a multiple of A-term.
@@ -724,13 +728,11 @@ class ParametersClass:
         self.raw_data.tec_parameters_raw = self.raw_data.tec_parameters_raw.stack().to_frame('a')
 
         # Retrieve production impacts factors for chosen battery capacities and place in raw A factors (with component resolution)
-        self.build_BEV()  # update self.prod_df with selected battery capacities
+        self.build_newtec()  # update self.prod_df with selected battery capacities
         self.raw_data.tec_parameters_raw.sort_index(inplace=True)
         self.raw_data.prod_df.name = 'a'
         self.raw_data.prod_df.index = self.raw_data.prod_df.index.reorder_levels(self.raw_data.tec_parameters_raw.index.names)
-        # try:
-        #     self.raw_data.tec_parameters_raw.update(self.raw_data.prod_df)
-        # self.raw_data.tec_parameters_raw = pd.concat([self.raw_data.tec_parameters_raw, self.raw_data.prod_df.to_frame()])
+
         for index, value in self.raw_data.prod_df.iteritems():
             self.raw_data.tec_parameters_raw.loc[index, 'a'] = value
 
@@ -804,17 +806,13 @@ class ParametersClass:
         # Weibull: alpha = scale, beta = shape
         # self.veh_lift_cdf = pd.Series(weibull_min.cdf(x, c, loc=0, scale=1), index=sets.age)
         # self.lifetime_age_distribution = pd.Series()
-        # self.raw_data.veh_avg_age = alpha * gamma(1+beta^-1)
-        # self.raw_data.veh_age_stdev^2 = alpha^2 * (gamma(1+2*beta^-1) - gamma(1+beta^-1)^2)
-        # self.veh_lift_cdf = pd.Series(norm.cdf(sets.age_int, self.raw_data.veh_avg_age, self.raw_data.veh_age_stdev), index=sets.age)
+        # self.raw_data.avg_age = alpha * gamma(1+beta^-1)
+        # self.raw_data.age_stdev^2 = alpha^2 * (gamma(1+2*beta^-1) - gamma(1+beta^-1)^2)
+        # self.veh_lift_cdf = pd.Series(norm.cdf(sets.age_int, self.raw_data.avg_age, self.raw_data.age_stdev), index=sets.age)
         # self.veh_lift_cdf.index = self.veh_lift_cdf.index.astype('str')
 
         # Calculate normalized survival function
-        self.lifetime_age_distribution = pd.Series(self.calc_steadystate_vehicle_age_distributions(sets.age_int, self.raw_data.veh_avg_age, self.raw_data.veh_age_stdev), index=sets.age)
-        # self.veh_lift_sc = pd.Series(norm.sf(sets.age_int, self.raw_data.veh_avg_age, self.raw_data.veh_age_stdev), index=sets.age)
-        # self.veh_lift_pdf = pd.Series(norm.pdf(sets.age_int, self.raw_data.veh_avg_age, self.raw_data.veh_age_stdev), index=sets.age)
-
-        # self.veh_lift_pdf.index = self.veh_lift_pdf.index.astype('str')
+        self.lifetime_age_distribution = pd.Series(self.calc_steadystate_vehicle_age_distributions(sets.age_int, self.raw_data.avg_age, self.raw_data.age_stdev), index=sets.age)
 
         self.retirement_function = pd.Series(self.calc_probability_of_vehicle_retirement(sets.age_int, self.lifetime_age_distribution), index=sets.age)
         self.retirement_function.index = self.retirement_function.index.astype('str')
