@@ -74,6 +74,10 @@ def df2param(db, df, domains, name, comment=''):
     except:
         a_param = db.add_parameter_dc(name, domains, comment)
 
+    if isinstance(df, float) or isinstance(df, int):
+        # special case: scalar value
+        a_param.add_record().value = df
+        return a_param
     if isinstance(df, pd.DataFrame) or isinstance(df, pd.Series):
         if df.ndim > 1 and df.shape[1] > 1:
             # if dataframe with more than one column, stack (to make series)
@@ -82,6 +86,7 @@ def df2param(db, df, domains, name, comment=''):
         df = df.to_dict()
     for keys, data in iter(df.items()):
         a_param.add_record(keys).value = data
+
     return a_param
 
 

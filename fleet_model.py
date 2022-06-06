@@ -128,8 +128,8 @@ class FleetModel:
         self.parameters.validate_data(self.sets)
 
         #### filters and parameter aliases ####
-        self.parameters.enr_tec_correspondance = self._process_df_to_series(self.parameters.enr_tec_correspondance)
-        self.parameters.cohort_age_correspondance = self._process_df_to_series(self.parameters.cohort_age_correspondance)
+        self.parameters.enr_tec_correspondence = self._process_df_to_series(self.parameters.enr_tec_correspondence)
+        self.parameters.cohort_age_correspondence = self._process_df_to_series(self.parameters.cohort_age_correspondence)
 
         if type(self.parameters.raw_data.r_term_factors) == float:
             self.parameters.raw_data.r_term_factors = {'BEV': self.parameters.raw_data.r_term_factors, 'ICE': self.parameters.raw_data.r_term_factors}

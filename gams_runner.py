@@ -128,17 +128,17 @@ class GAMSRunner:
         annual_use_intensity = gmspy.df2param(self.db, fleet.parameters.annual_use_intensity, ['reg','year'], 'ANNUAL_USE_INTENSITY')
         exog_tot_stock = gmspy.df2param(self.db, fleet.parameters.exog_tot_stock, ['fleetreg','year'], 'EXOG_TOT_STOCK')
         initial_seg_shares = gmspy.df2param(self.db, fleet.parameters.initial_seg_shares, ['seg'], 'INITIAL_SEG_SHARES')
-        tec_size = gmspy.df2param(self.db, fleet.parameters.tec_size, ['newtec', 'seg'], 'TEC_COMPONENT_CORRESPONDANCE')
+        tec_size = gmspy.df2param(self.db, fleet.parameters.tec_size, ['newtec', 'seg'], 'TEC_SIZE_CORRESPONDENCE')
 
         lifetime_age_distribution = gmspy.df2param(self.db, fleet.parameters.lifetime_age_distribution, ['age'], 'LIFETIME_AGE_DISTRIBUTION')
         retirement_function = gmspy.df2param(self.db, fleet.parameters.retirement_function, ['age'], 'RETIREMENT_FUNCTION')
 
         initial_tec_shares = gmspy.df2param(self.db, fleet.parameters.initial_tec_shares,['tec'],'INITIAL_TEC_SHARES')
 
-        enr_tec_correspondance = gmspy.df2param(self.db, fleet.parameters.enr_tec_correspondance, ['enr', 'tec'], 'ENR_TEC_CORRESPONDANCE')
+        enr_tec_correspondence = gmspy.df2param(self.db, fleet.parameters.enr_tec_correspondence, ['enr', 'tec'], 'ENR_TEC_CORRESPONDENCE')
         enr_impact_int = gmspy.df2param(self.db, fleet.parameters.enr_impact_int, ['imp', 'enr', 'reg', 'year'], 'ENR_IMPACT_INT')
 
-        cohort_age_correspondance = gmspy.df2param(self.db, fleet.parameters.cohort_age_correspondance, ['year','prodyear','age'], 'COHORT_AGE_CORRESPONDANCE')
+        cohort_age_correspondence = gmspy.df2param(self.db, fleet.parameters.cohort_age_correspondence, ['year','prodyear','age'], 'COHORT_AGE_CORRESPONDENCE')
 
         year_par = gmspy.df2param(self.db, fleet.parameters.year_par, ['year'], 'YEAR_PAR')
 
@@ -154,6 +154,8 @@ class GAMSRunner:
         # adding growth constraint for each (new/emerging) tec
         for keys, value in iter(fleet.parameters.max_uptake_rate.items()):
             max_uptake_rate.add_record(keys).value = value
+
+        uptake_constant = gmspy.df2param(self.db, fleet.parameters.uptake_constant, None, 'UPTAKE_CONSTANT')
 
         manuf_cnstrnt = gmspy.df2param(self.db, fleet.parameters.manuf_cnstrnt, ['newtec','year'], 'MANUF_CNSTRNT')
 

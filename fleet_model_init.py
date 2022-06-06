@@ -222,8 +222,8 @@ class ParametersClass:
     """Contains all parameter values for GAMS model (in ready-to-insert form)."""
 
     exog_tot_stock: Union[pd.Series, pd.DataFrame] = None
-    enr_tec_correspondance: Union[pd.Series, pd.DataFrame] = None
-    cohort_age_correspondance: Union[pd.Series, pd.DataFrame] = None
+    enr_tec_correspondence: Union[pd.Series, pd.DataFrame] = None
+    cohort_age_correspondence: Union[pd.Series, pd.DataFrame] = None
     year_par: Union[pd.Series, pd.DataFrame] = None
     tec_parameters: Union[pd.Series, pd.DataFrame] = None
 
@@ -234,6 +234,7 @@ class ParametersClass:
     virg_mat_supply: Union[pd.Series, pd.DataFrame] = None
     mat_impact_int: Union[List, pd.Series, pd.DataFrame] = None
     max_uptake_rate: Union[float, pd.Series, pd.DataFrame] = None
+    uptake_constant: [int, float] = 100
 
     enr_impact_int: Union[pd.Series, pd.DataFrame] = None
     enr_impact_int_IAM: Union[pd.Series, pd.DataFrame] = None # move to rawdataclass?
@@ -395,8 +396,8 @@ class ParametersClass:
                    'mat_content': ['tec','mat_cat'],
                    'batt_portfolio':['newtec', 'seg', 'battery size'],
                    'tec_parameters_raw': ['lcphase','imp', 'tec', 'seg'],
-                   'enr_tec_correspondance': ['enr', 'tec'],
-                   'cohort_age_correspondance': ['year', 'cohort', 'age'],
+                   'enr_tec_correspondence': ['enr', 'tec'],
+                   'cohort_age_correspondence': ['year', 'cohort', 'age'],
                    'enr_impact_int_IAM': ['imp', 'reg', 'enr'],
                    'enr_impact_int': ['imp', 'reg', 'enr'],
                    }
@@ -475,8 +476,8 @@ class ParametersClass:
         if (self.annual_use_intensity is not None) and ((self.raw_data.veh_pkm is not None) or (self.raw_data.pkm_scenario is not None)):
             log.warning('----- Vehicle operating distance overspecified. Both an annual vehicle mileage and an IAM scenario are specified.')
 
-        if self.cohort_age_correspondance is None:
-            self.cohort_age_correspondance = self.build_cohort_age_correspondance(sets)  # establish self.cohort_age_correspondance
+        if self.cohort_age_correspondence is None:
+            self.cohort_age_correspondence = self.build_cohort_age_correspondence(sets)  # establish self.cohort_age_correspondence
 
         if isinstance(self.tec_size, list):
             if len(self.tec_size) == len(sets.seg):
@@ -485,7 +486,7 @@ class ParametersClass:
                 mi = pd.MultiIndex.from_product([sets.seg, sets.newtec])
                 self.tec_size = pd.DataFrame(self.tec_size, index=mi)
             else:
-                log.error('----- Discrepancy in new technology component size correspondance length! Check that all tecs and all segments have a defined component size.')
+                log.error('----- Discrepancy in new technology component size correspondence length! Check that all tecs and all segments have a defined component size.')
         elif isinstance(self.tec_size, dict):
             # if (all([isinstance(key, tuple) for key in self.tec_size.keys()])):
             self.tec_size = pd.DataFrame(self.tec_size).T
@@ -497,7 +498,7 @@ class ParametersClass:
                     self.tec_size.set_index('newtec', append=True, drop=True, inplace=True)
                     self.tec_size.index = self.tec_size.index.reorder_levels(['newtec', 'seg'])
                 else:
-                    log.error('----- Discrepancy in new technology component size correspondance length! Check that all tecs and all segments have a defined component size.')
+                    log.error('----- Discrepancy in new technology component size correspondence length! Check that all tecs and all segments have a defined component size.')
         else:
             log.error('----- tec_size does not seem to be in an acceptable data format (list, dict, Series, or DataFrame)')
 
@@ -624,7 +625,7 @@ class ParametersClass:
         self.calc_veh_lifetime(sets)
 
 
-    def build_cohort_age_correspondance(self, sets):
+    def build_cohort_age_correspondence(self, sets):
         """
         Build production year-cohort-age concordance matrix for use in GAMS (as parameter).
 
