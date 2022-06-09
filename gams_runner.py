@@ -106,6 +106,11 @@ class GAMSRunner:
         grdeq = gmspy.list2set(self.db, fleet.sets.grdeq, 'grdeq')
         sigvar = gmspy.list2set(self.db, fleet.sets.sigvar, 'sigvar')
         veheq = gmspy.list2set(self.db, fleet.sets.veheq, 'veheq')
+        imp = gmspy.list2set(self.db, fleet.sets.imp, 'imp')
+        optimp = gmspy.list2set(self.db, fleet.sets.optimp, 'optimp')
+        imp_cat = gmspy.list2set(self.db, fleet.sets.imp_cat, 'imp_cat')
+        imp_int = gmspy.list2set(self.db, fleet.sets.imp_int, 'imp_int')
+        lcphase = gmspy.list2set(self.db, fleet.sets.lcphase, 'lcphase')
 
         mat_cat = gmspy.list2set(self.db, fleet.sets.mat_cat, 'mat_cat')
         mat_prod = gmspy.list2set(self.db, sum(fleet.sets.mat_prod.values(), []), 'mat_prod')  # concatenate all material producers from all material categories
@@ -120,44 +125,46 @@ class GAMSRunner:
             for producer in item:
                 mat.add_record((key, producer))
 
-        veh_oper_dist = gmspy.df2param(self.db, fleet.parameters.veh_oper_dist, ['year', 'reg'], 'VEH_OPER_DIST')
-        veh_stck_tot = gmspy.df2param(self.db, fleet.parameters.veh_stck_tot, ['year', 'fleetreg'], 'VEH_STCK_TOT')
-        veh_stck_int_seg = gmspy.df2param(self.db, fleet.parameters.veh_stck_int_seg, ['seg'], 'VEH_STCK_INT_SEG')
-        bev_capac = gmspy.df2param(self.db, fleet.parameters.bev_capac, ['seg'], 'BEV_CAPAC')
+        annual_use_intensity = gmspy.df2param(self.db, fleet.parameters.annual_use_intensity, ['reg','year'], 'ANNUAL_USE_INTENSITY')
+        exog_tot_stock = gmspy.df2param(self.db, fleet.parameters.exog_tot_stock, ['fleetreg','year'], 'EXOG_TOT_STOCK')
+        initial_seg_shares = gmspy.df2param(self.db, fleet.parameters.initial_seg_shares, ['seg'], 'INITIAL_SEG_SHARES')
+        tec_size = gmspy.df2param(self.db, fleet.parameters.tec_size, ['newtec', 'seg'], 'TEC_SIZE_CORRESPONDENCE')
 
-        veh_lift_cdf = gmspy.df2param(self.db, fleet.parameters.veh_lift_cdf, ['age'], 'VEH_LIFT_CDF')
-        veh_lift_pdf = gmspy.df2param(self.db, fleet.parameters.veh_lift_pdf, ['age'], 'VEH_LIFT_PDF')
-        veh_lift_age = gmspy.df2param(self.db, fleet.parameters.veh_lift_age, ['age'], 'VEH_LIFT_AGE')
-        veh_lift_mor = gmspy.df2param(self.db, fleet.parameters.veh_lift_mor, ['age'], 'VEH_LIFT_MOR')
+        lifetime_age_distribution = gmspy.df2param(self.db, fleet.parameters.lifetime_age_distribution, ['age'], 'LIFETIME_AGE_DISTRIBUTION')
+        retirement_function = gmspy.df2param(self.db, fleet.parameters.retirement_function, ['age'], 'RETIREMENT_FUNCTION')
 
-        veh_stck_int_tec = gmspy.df2param(self.db, fleet.parameters.veh_stck_int_tec,['tec'],'VEH_STCK_INT_TEC')
+        initial_tec_shares = gmspy.df2param(self.db, fleet.parameters.initial_tec_shares,['tec'],'INITIAL_TEC_SHARES')
 
-        enr_veh = gmspy.df2param(self.db, fleet.parameters.enr_veh, ['enr', 'tec'], 'ENR_VEH')
-        enr_cint = gmspy.df2param(self.db, fleet.parameters.enr_cint, ['enr', 'reg', 'year'], 'ENR_CINT')
+        enr_tec_correspondence = gmspy.df2param(self.db, fleet.parameters.enr_tec_correspondence, ['enr', 'tec'], 'ENR_TEC_CORRESPONDENCE')
+        enr_impact_int = gmspy.df2param(self.db, fleet.parameters.enr_impact_int, ['imp', 'enr', 'reg', 'year'], 'ENR_IMPACT_INT')
 
-        veh_pay = gmspy.df2param(self.db, fleet.parameters.veh_pay, ['prodyear', 'age', 'year'], 'VEH_PAY')
+        cohort_age_correspondence = gmspy.df2param(self.db, fleet.parameters.cohort_age_correspondence, ['year','prodyear','age'], 'COHORT_AGE_CORRESPONDENCE')
 
         year_par = gmspy.df2param(self.db, fleet.parameters.year_par, ['year'], 'YEAR_PAR')
-        veh_partab = gmspy.df2param(self.db, fleet.parameters.veh_partab, ['veheq', 'tec', 'seg', 'sigvar'], 'VEH_PARTAB')
+
+        ##### this one needs impacts
+        tec_parameters = gmspy.df2param(self.db, fleet.parameters.tec_parameters, ['lcphase', 'imp', 'tec', 'seg', 'sigvar'], 'TEC_PARAMETERS')
 
         try:
-            veh_add_grd = self.db.get_parameter('VEH_ADD_GRD')
+            max_uptake_rate = self.db.get_parameter('MAX_UPTAKE_RATE')
         except:
-            veh_add_grd = self.db.add_parameter_dc('VEH_ADD_GRD', ['grdeq', 'newtec'])
+            max_uptake_rate = self.db.add_parameter_dc('MAX_UPTAKE_RATE', ['grdeq', 'newtec'])
 
         # Prep work making add gradient df from given rate constraint
         # adding growth constraint for each (new/emerging) tec
-        for keys, value in iter(fleet.parameters.veh_add_grd.items()):
-            veh_add_grd.add_record(keys).value = value
+        for keys, value in iter(fleet.parameters.max_uptake_rate.items()):
+            max_uptake_rate.add_record(keys).value = value
 
-        # gro_cnstrnt = gmspy.df2param(self.db, fleet.gro_cnstrnt, ['year'], 'GRO_CNSTRNT')
+        uptake_constant = gmspy.df2param(self.db, fleet.parameters.uptake_constant, None, 'UPTAKE_CONSTANT')
 
-        manuf_cnstrnt = gmspy.df2param(self.db, fleet.parameters.manuf_cnstrnt, ['year'], 'MANUF_CNSTRNT')
+        manuf_cnstrnt = gmspy.df2param(self.db, fleet.parameters.manuf_cnstrnt, ['newtec','year'], 'MANUF_CNSTRNT')
 
-        mat_content = gmspy.df2param(self.db, fleet.parameters.mat_content, ['year','mat_cat'], 'MAT_CONTENT')
-        mat_cint = gmspy.df2param(self.db, fleet.parameters.mat_cint, ['year', 'mat_prod'], 'MAT_CINT')
-        virg_mat = gmspy.df2param(self.db, fleet.parameters.virg_mat_supply, ['year','mat_prod'], 'VIRG_MAT_SUPPLY')
-        recovery_pct = gmspy.df2param(self.db, fleet.parameters.recovery_pct, ['year','mat_cat'], 'RECOVERY_PCT')
+        mat_content = gmspy.df2param(self.db, fleet.parameters.mat_content, ['newtec','mat_cat','year'], 'MAT_CONTENT')
+        mat_impact_int = gmspy.df2param(self.db, fleet.parameters.mat_impact_int, ['imp','mat_prod','year'], 'MAT_IMPACT_INT')
+        virg_mat = gmspy.df2param(self.db, fleet.parameters.virg_mat_supply, ['mat_prod','year'], 'VIRG_MAT_SUPPLY')
+        recovery_pct = gmspy.df2param(self.db, fleet.parameters.recovery_pct, ['newtec','year'], 'RECOVERY_PCT')
+        recycling_yield = gmspy.df2param(self.db, fleet.parameters.recycling_yield, ['mat_cat','year'], 'RECYCLING_YIELD')
+
 
         try:
             self.db.export(os.path.join(self.export_fp, filename + '_'+timestamp))
@@ -233,7 +240,7 @@ class GAMSRunner:
 
         # Run GAMS Optimization
         try:
-            model_run = self.ws.add_job_from_file(fleet.gms_file, job_name='EVD4EUR_'+run_tag) # model_run is type GamsJob
+            model_run = self.ws.add_job_from_file(fleet.gms_file, job_name='ECOPT2_'+run_tag) # model_run is type GamsJob
             self.opt = self.ws.add_options() # opt is of type gams.options.GamsOptions
             self.opt.keep = 0  # Controls keeping or deletion of process directory and scratch files.
             self.opt.logline = 0  # Amount of line tracing to the log file; values of 0-2
@@ -242,7 +249,7 @@ class GAMSRunner:
             self.opt.dumpparms = 0 # GAMS parameter logging; 1: accepted parameters/sets, 2; log of file operations + accepted sets/parameters
             self.opt.forcework = 0  # Force GAMS to process a save file created with a newer GAMS version or with execution errors.
 
-            lst_fp = os.path.abspath(os.path.join(self.export_fp, 'EVD4EUR_A_' + run_tag + '.lst'))
+            lst_fp = os.path.abspath(os.path.join(self.export_fp, 'ECOPT2_A_' + run_tag + '.lst'))
             self.opt.set_output(lst_fp)
             self.opt.putdir = self.export_fp
             self.opt.defines["gdxincname"] = self.db.name  # for auto-loading of database in GAMS model
@@ -313,7 +320,7 @@ class GAMSRunner:
             file_ext = ['.lst', '.pf']
 
             for file in file_ext:
-                shutil.move(os.path.join(os.path.curdir, 'EVD4EUR_'+ run_tag+file),
+                shutil.move(os.path.join(os.path.curdir, 'ECOPT2_'+ run_tag+file),
                             self.export_fp)
 
             # remove the temp opt files the GAMS API creates (without file extension)

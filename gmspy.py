@@ -68,10 +68,16 @@ def df2param(db, df, domains, name, comment=''):
 
     """
     ## if df is a single-column dataframe (i.e., series cast as dataframe), the below doesn't work; keys uses the index-column name pair...
+    ## NB: this function assumes that the columns are in the correct order
     try:
         a_param = db.get_parameter(name)
     except:
         a_param = db.add_parameter_dc(name, domains, comment)
+
+    if isinstance(df, float) or isinstance(df, int):
+        # special case: scalar value
+        a_param.add_record().value = df
+        return a_param
     if isinstance(df, pd.DataFrame) or isinstance(df, pd.Series):
         if df.ndim > 1 and df.shape[1] > 1:
             # if dataframe with more than one column, stack (to make series)
@@ -80,6 +86,7 @@ def df2param(db, df, domains, name, comment=''):
         df = df.to_dict()
     for keys, data in iter(df.items()):
         a_param.add_record(keys).value = data
+
     return a_param
 
 
@@ -340,4 +347,3 @@ def _iwantitall(db, ws, gdx_filepath):
             ws = gams.GamsWorkspace()
         db = ws.add_database_from_gdx(gdx_filepath)
     return db
-

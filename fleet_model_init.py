@@ -28,7 +28,11 @@ class SetsClass:
     """ Default values initialize with a two-region system with three
     size segments and two critical material classes each with two producers."""
 
-    tec: List = field(default_factory=lambda:['BEV', 'ICEV'])
+    imp: List = field(default_factory=lambda: ['nrg','GHG', 'AP', 'MTP'])
+    optimp:  List = field(default_factory=lambda: ['GHG'])
+    imp_cat: List = field(default_factory=lambda: ['GHG', 'AP', 'MTP'])
+    imp_int: List = field(default_factory=lambda: ['nrg','GHG', 'AP', 'MTP'])
+    tec: List = field(default_factory=lambda: ['BEV', 'ICEV'])
     enr: List = field(default_factory=lambda: ['FOS', 'ELC'])
     seg: List = field(default_factory=lambda: ['A', 'C', 'F'])
     mat_cat: List = field(default_factory=lambda: ['Li', 'Co'])
@@ -44,11 +48,12 @@ class SetsClass:
     age_int: List = field(default_factory=lambda: [i for i in range(29)])
 
     new: List = field(default_factory=lambda: ['0'])  # static set for new vehicles
-    newtec: List = field(default_factory=lambda:['BEV'])
+    newtec: List = field(default_factory=lambda: ['BEV'])
     demeq: List = field(default_factory=lambda: ['STCK_TOT', 'OPER_DIST', 'OCUP'])
     grdeq: List = field(default_factory=lambda: ['IND', 'ALL'])
     veheq: List = field(default_factory=lambda: ['PROD_EINT', 'PROD_CINT_CSNT', 'OPER_EINT', 'EOLT_CINT'])
     sigvar: List = field(default_factory=lambda: ['A', 'B', 'r', 'u'])
+    lcphase: List = field(default_factory=lambda: ['prod', 'oper', 'eol'])
 
 
     @classmethod
@@ -183,25 +188,26 @@ class RawDataClass:
     Converts e.g., dicts and floats to timeseries in pd.Series format
     """
 
-    #TODO: move the operations from fleet_model here; calculation of veh_partab, glf terms, etc etc
+    #TODO: move the operations from fleet_model here; calculation of tec_parameters, glf terms, etc etc
 
     pkm_scenario: str = None
     all_pkm_scen: pd.DataFrame = None
     veh_pkm: pd.DataFrame = None
     fleet_vkm: pd.DataFrame = None
-    batt_portfolio: pd.DataFrame = None
-    veh_factors: pd.DataFrame = None
+    component_portfolio: pd.DataFrame = None
+    tec_parameters_raw: pd.DataFrame = None
     B_term_prod: Union[dict, float] = None
     B_term_oper_EOL: Union[dict, float] = None
     r_term_factors: Union[dict, pd.Series] = None  # {str: float}
     u_term_factors: Union[dict, pd.Series] = None  # {str: float}
     prod_df: pd.DataFrame = None
 
-    veh_avg_age: Union[float, dict] = 11.1 # From ACEA 2019-2020 report
-    veh_age_stdev: Union[float, dict] = 2.21
+    avg_age: Union[float, dict] = 11.1 # From ACEA 2019-2020 report
+    age_stdev: Union[float, dict] = 2.21
 
-    bev_int_shr: float = 0.0018  # from Eurostat; assume remaining is ICE
+    newtec_int_shr: float = 0.0018  # from Eurostat; assume remaining is ICE
 
+    collection_rate: Union[float, pd.Series] = 1
     recycle_rate: Union[float, pd.Series] = 0.75
 
     # other parameters
@@ -215,36 +221,36 @@ class RawDataClass:
 class ParametersClass:
     """Contains all parameter values for GAMS model (in ready-to-insert form)."""
 
-    veh_stck_tot: Union[pd.Series, pd.DataFrame] = None
-    enr_veh: Union[pd.Series, pd.DataFrame] = None
-    veh_pay: Union[pd.Series, pd.DataFrame] = None
+    exog_tot_stock: Union[pd.Series, pd.DataFrame] = None
+    enr_tec_correspondence: Union[pd.Series, pd.DataFrame] = None
+    cohort_age_correspondence: Union[pd.Series, pd.DataFrame] = None
     year_par: Union[pd.Series, pd.DataFrame] = None
-    veh_partab: Union[pd.Series, pd.DataFrame] = None
+    tec_parameters: Union[pd.Series, pd.DataFrame] = None
 
     # constraints
     manuf_cnstrnt: Union[pd.Series, pd.DataFrame] = None
 
     mat_content: Union[List, pd.Series, pd.DataFrame] = None
     virg_mat_supply: Union[pd.Series, pd.DataFrame] = None
-    mat_cint: Union[List, pd.Series, pd.DataFrame] = None
-    veh_add_grd: Union[float, pd.Series, pd.DataFrame] = None
+    mat_impact_int: Union[List, pd.Series, pd.DataFrame] = None
+    max_uptake_rate: Union[float, pd.Series, pd.DataFrame] = None
+    uptake_constant: [int, float] = 100
 
-    enr_cint: Union[pd.Series, pd.DataFrame] = None
-    enr_cint_IAM: Union[pd.Series, pd.DataFrame] = None # move to rawdataclass?
+    enr_impact_int: Union[pd.Series, pd.DataFrame] = None
+    enr_impact_int_IAM: Union[pd.Series, pd.DataFrame] = None # move to rawdataclass?
 
     raw_data: RawDataClass = None
 
-    veh_oper_dist: Union[float, int, List, Dict, pd.Series, pd.DataFrame] = None
-    veh_stck_int_seg: Union[Dict, List] = field(default_factory=lambda:[0.08, 0.21, 0.27, 0.08, 0.03, 0.34])  # Shares from 2017, ICCT report
-    veh_stck_int_tec: Union[Dict, pd.Series, pd.DataFrame] = None
+    annual_use_intensity: Union[float, int, List, Dict, pd.Series, pd.DataFrame] = None
+    initial_seg_shares: Union[Dict, List] = field(default_factory=lambda:[0.08, 0.21, 0.27, 0.08, 0.03, 0.34])  # Shares from 2017, ICCT report
+    initial_tec_shares: Union[Dict, pd.Series, pd.DataFrame] = None
 
-    bev_capac: Union[Dict, List] = field(default_factory=lambda:{'A': 26.6, 'B': 42.2, 'C': 59.9, 'D': 75., 'E':95., 'F':100.})
-    veh_lift_cdf: Union[pd.Series, pd.DataFrame] = None
-    veh_lift_pdf: Union[pd.Series, pd.DataFrame] = None
-    veh_lift_mor: Union[pd.Series, pd.DataFrame] = None
-    veh_lift_age: Union[pd.Series, pd.DataFrame] = None
+    tec_size: Union[Dict, List, pd.Series, pd.DataFrame] = field(default_factory=lambda:{'A': 26.6, 'B': 42.2, 'C': 59.9, 'D': 75., 'E':95., 'F':100.})
+    retirement_function: Union[pd.Series, pd.DataFrame] = None
+    lifetime_age_distribution: Union[pd.Series, pd.DataFrame] = None
 
     recovery_pct: Union[float, pd.Series, pd.DataFrame] = None
+    recycling_yield: Union[float, pd.Series, pd.DataFrame] = None
 
     def __post_init__(self):
         """
@@ -256,18 +262,19 @@ class ParametersClass:
         """
 
         # convert battery capacities to float
-        if isinstance(self.bev_capac, dict):
-            self.bev_capac = {key: float(value) for key, value in self.bev_capac.items()}
-        elif not isinstance(self.bev_capac, pd.DataFrame):
-            self.bev_capac = [float(value) for value in self.bev_capac]
+        if isinstance(self.tec_size, dict):
+            # set up dict for converting to DataFrame
+            self.tec_size = {key: ([float(value)] if not isinstance(value, list) else (float(val) for val in value)) for key, value in self.tec_size.items() }
+        elif not isinstance(self.tec_size, pd.DataFrame):
+            self.tec_size = [float(value) for value in self.tec_size]
 
         # convert DataFrame to correct format (used in initializing FleetModel from .gdx file)
-        if isinstance(self.veh_add_grd, pd.DataFrame) and not isinstance(self.veh_add_grd.index, pd.MultiIndex):
-            tmp = self.veh_add_grd.stack()
-            self.veh_add_grd = tmp.to_dict()
+        if isinstance(self.max_uptake_rate, pd.DataFrame) and not isinstance(self.max_uptake_rate.index, pd.MultiIndex):
+            tmp = self.max_uptake_rate.stack()
+            self.max_uptake_rate = tmp.to_dict()
 
-        if self.veh_stck_tot.index.name == 'fleetreg':
-            self.veh_stck_tot = self.veh_stck_tot.T
+        if self.exog_tot_stock.index.name == 'fleetreg':
+            self.exog_tot_stock = self.exog_tot_stock.T
 
 
 
@@ -383,16 +390,19 @@ class ParametersClass:
 
         """
         mi_dict = {
-                   'enr_glf_terms':['enr', 'reg', 'enreq'],
+                   'enr_glf_terms':['imp', 'enr', 'reg'],
                    'virg_mat_supply': ['mat_cat', 'mat_prod'],
-                   'mat_cint': ['mat_cat', 'mat_prod'],
-                   'batt_portfolio':['seg', 'battery size'],
-                   'veh_factors': ['veheq', 'tec', 'seg'],
-                   'enr_veh': ['enr', 'tec'],
-                   'veh_pay': ['cohort', 'age', 'year'],
-                   'enr_cint_IAM': ['reg', 'enr'],
-                   'enr_cint': ['reg', 'enr'],
+                   'mat_impact_int': ['imp', 'mat_cat', 'mat_prod'],
+                   'mat_content': ['tec','mat_cat'],
+                   'component_portfolio':['newtec', 'seg', 'battery size'],
+                   'tec_parameters_raw': ['lcphase','imp', 'tec', 'seg'],
+                   'enr_tec_correspondence': ['enr', 'tec'],
+                   'cohort_age_correspondence': ['year', 'cohort', 'age'],
+                   'enr_impact_int_IAM': ['imp', 'reg', 'enr'],
+                   'enr_impact_int': ['imp', 'reg', 'enr'],
+
                    }
+
         # read parameter values in from Excel
         params_dict = {}
         raw_data_dict = {}
@@ -406,9 +416,9 @@ class ParametersClass:
             if (param != 'readme') and (not param.startswith('_')):
                 if param.lower() in mi_dict.keys():
                     # special case: MultiIndex index
-                    # fill in nan values for columns that will be the index
+                    # fill empty spots in columns that will be part of the index
                     value.loc(axis=1)[mi_dict[param.lower()]] = value.loc(axis=1)[mi_dict[param.lower()]].fillna(method='ffill')
-                    value = value.astype({cat: str for cat in mi_dict[param.lower()]})
+                    value = value.astype({cat: str for cat in mi_dict[param.lower()]})  # convert all labels in multiindex to strings (requirement from GAMS)
                     value.set_index(mi_dict[param.lower()], inplace=True, drop=True)
                 elif value.shape[0] == 0:
                     log.info(f"Empty values for {param} in Excel file.")
@@ -416,11 +426,14 @@ class ParametersClass:
                     value = value.iloc[0,1]
                 else:
                     # single-level Index
-                    value.set_index(value.iloc(axis=1)[0].name, inplace=True, drop=True)
+                    value.set_index(value.iloc(axis=1)[0].name, inplace=True, drop=True) # set first column as index
                     value.index = value.index.astype(str)  # ensure all indices are strings (required to work for GAMS)
                     value.columns = value.columns.astype(str)
 
                 if param.lower() in param_attrs:
+                    if isinstance(value, pd.DataFrame) or isinstance(value, pd.Series):
+                        if not value.empty:
+                            value = cls.order_sets(value)
                     params_dict[param.lower()] = value
                 else:
                     # any sheets in Excel that are not ParameterClass fields are sent to RawDataClass
@@ -459,23 +472,47 @@ class ParametersClass:
 
         attrs = dir(self.raw_data)
 
-        self.veh_stck_tot = self.interpolate_years(self.veh_stck_tot, sets, axis=0)
+        self.exog_tot_stock = self.interpolate_years(self.exog_tot_stock, sets, axis=0)
 
-        if (self.veh_oper_dist is not None) and ((self.raw_data.veh_pkm is not None) or (self.raw_data.pkm_scenario is not None)):
+        if (self.annual_use_intensity is not None) and ((self.raw_data.veh_pkm is not None) or (self.raw_data.pkm_scenario is not None)):
             log.warning('----- Vehicle operating distance overspecified. Both an annual vehicle mileage and an IAM scenario are specified.')
 
-        if self.veh_pay is None:
-            self.veh_pay = self.build_veh_pay(sets)  # establish self.veh_pay
+        if self.cohort_age_correspondence is None:
+            self.cohort_age_correspondence = self.build_cohort_age_correspondence(sets)  # establish self.cohort_age_correspondence
+
+        if isinstance(self.tec_size, list):
+            if len(self.tec_size) == len(sets.seg):
+                self.tec_size = pd.DataFrame(self.tec_size, index=sets.seg)
+            elif len(self.tec_size) == (len(sets.seg) * len(sets.newtec)):
+                mi = pd.MultiIndex.from_product([sets.seg, sets.newtec])
+                self.tec_size = pd.DataFrame(self.tec_size, index=mi)
+            else:
+                log.error('----- Discrepancy in new technology component size correspondence length! Check that all tecs and all segments have a defined component size.')
+        elif isinstance(self.tec_size, dict):
+            # if (all([isinstance(key, tuple) for key in self.tec_size.keys()])):
+            self.tec_size = pd.DataFrame(self.tec_size).T
+        if isinstance(self.tec_size, pd.Series) or isinstance(self.tec_size, pd.DataFrame):
+            if not isinstance(self.tec_size.index, pd.MultiIndex):
+                if (self.tec_size.shape[0] == len(sets.seg)) and (len(sets.newtec)==1):
+                    self.tec_size['newtec'] = sets.newtec * len(sets.seg)
+                    self.tec_size.index.name = 'seg'
+                    self.tec_size.set_index('newtec', append=True, drop=True, inplace=True)
+                    self.tec_size.index = self.tec_size.index.reorder_levels(['newtec', 'seg'])
+                else:
+                    log.error('----- Discrepancy in new technology component size correspondence length! Check that all tecs and all segments have a defined component size.')
+        else:
+            log.error('----- tec_size does not seem to be in an acceptable data format (list, dict, Series, or DataFrame)')
 
         has_required_data = all(attr is not None for attr in (self.raw_data.B_term_prod,
                                                               self.raw_data.B_term_oper_EOL,
                                                               self.raw_data.r_term_factors,
                                                               self.raw_data.u_term_factors
                                                              ))
-        if self.veh_partab is not None and has_required_data:
-            log.warning('----- veh_partab is overdefined')
+
+        if self.tec_parameters is not None and has_required_data:
+            log.warning('----- tec_parameters is overdefined')
         elif has_required_data:
-            self.veh_partab = self.build_veh_partab()
+            self.tec_parameters = self.build_tec_parameters()
 
         if self.raw_data.eur_batt_share:
             # multiply manufacturing constraint and critical material supply by eur_batt_share
@@ -484,83 +521,99 @@ class ParametersClass:
             self.manuf_cnstrnt = self.manuf_cnstrnt.mul(self.raw_data.eur_batt_share, axis=0)
 
 
-        # TODO: expand veh_oper_dist to be tec and reg specific (also in GAMS)
+        # TODO: expand annual_use_intensity to be tec and reg specific (also in GAMS)
+        # calculate annual use intensity. Prioritizes time series from IAMs, either
+        # provided directly (raw_data.veh_pkm) or as a scenario to be selected from a
+        # "portfolio" (all_pkm_scenarios, pkm_scenario), then finally user-specified
+        # constants or time-series (annual_use_intensity)
         if self.raw_data.veh_pkm:
-            self.veh_oper_dist = self.interpolate_years(self.raw_data.veh_pkm, sets).div(self.veh_stck_tot)
-        # if self.raw_data.pkm_scenario:
-        #     # calculate veh oper dist
-        #     self.raw_data.passenger_demand = self.raw_data.all_pkm_scen.T[self.raw_data.pkm_scenario]
-        #     self.raw_data.passenger_demand.reset_index()
-        #     self.raw_data.passenger_demand *= 1e9
-        #     self.raw_data.passenger_demand.name = ''
+            self.annual_use_intensity = self.interpolate_years(self.raw_data.veh_pkm, sets).div(self.exog_tot_stock)
+        elif self.raw_data.pkm_scenario and self.raw_data.all_pkm_scen:
+            # calculate veh oper dist
+            self.raw_data.passenger_demand = self.raw_data.all_pkm_scen.T[self.raw_data.pkm_scenario]
+            self.raw_data.passenger_demand.reset_index()
+            self.raw_data.passenger_demand *= 1e9
+            self.raw_data.passenger_demand.name = ''
 
-        #     self.raw_data.fleet_vkm  = self.raw_data.passenger_demand / self.raw_data.occupancy_rate
-        #     self.raw_data.fleet_vkm.index = sets.modelyear
-        #     self.raw_data.fleet_vkm.index.name = 'year'
-        #     self.veh_oper_dist = self.raw_data.fleet_vkm / self.veh_stck_tot.T.sum()  # assumes uniform distribution of annual distance travelled vs vehicle age and region
-            if self.veh_oper_dist.mean() > 25e3:
-                log.warning('Warning, calculated annual vehicle mileage is above 25000 km, check fleet_km and veh_stck_tot')
-            elif self.veh_oper_dist.mean() < 1e4:
-                log.warning('Warning, calculated annual vehicle mileage is less than 10000 km, check fleet_km and veh_stck_tot')
+            self.raw_data.fleet_vkm  = self.raw_data.passenger_demand / self.raw_data.occupancy_rate
+            self.raw_data.fleet_vkm.index = sets.modelyear
+            self.raw_data.fleet_vkm.index.name = 'year'
+            self.annual_use_intensity = self.raw_data.fleet_vkm / self.exog_tot_stock.T.sum()  # assumes uniform distribution of annual distance travelled vs vehicle age and region
 
-        if isinstance(self.veh_oper_dist, (float, int)):
-            # calculate veh_oper_dist
-            # given a single value for veh_oper_dist, assumes that value applies for every region, year and technology
-            ind = pd.MultiIndex.from_product([sets.modelyear, sets.fleetreg])
-            self.veh_oper_dist = pd.Series([self.veh_oper_dist for i in range(len(ind))], index=ind)
-        elif isinstance(self.veh_oper_dist, dict):
-            self.veh_oper_dist = pd.Series(self.veh_oper_dist)
-        self.veh_oper_dist.index.names = ['year', 'fleetreg']
+            # check for unusual values for use intensity (vehicle specific)
+            if self.annual_use_intensity.mean() > 25e3:
+                log.warning('Warning, calculated annual vehicle mileage is above 25000 km, check fleet_km and exog_tot_stock')
+            elif self.annual_use_intensity.mean() < 1e4:
+                log.warning('Warning, calculated annual vehicle mileage is less than 10000 km, check fleet_km and exog_tot_stock')
+        elif self.annual_use_intensity:
+            if isinstance(self.annual_use_intensity, (float, int)):
+                # calculate annual_use_intensity
+                # given a single value for annual_use_intensity, assumes that value applies for every region, year and technology
+                ind = pd.MultiIndex.from_product([sets.fleetreg, sets.modelyear])
+                self.annual_use_intensity = pd.Series([self.annual_use_intensity for i in range(len(ind))], index=ind)
+            elif isinstance(self.annual_use_intensity, dict):
+                self.annual_use_intensity = pd.Series(self.annual_use_intensity)
+            self.annual_use_intensity.index.names = ['fleetreg','year']
+
+        if self.raw_data.collection_rate is not None and isinstance(self.raw_data.collection_rate, float):
+            self.recovery_pct = [[self.raw_data.collection_rate]*len(sets.newtec) for year in range(len(sets.modelyear))]
+            self.recovery_pct = pd.DataFrame(self.recovery_pct,
+                                             index=sets.modelyear,
+                                             columns=sets.newtec)
+            self.recovery_pct = self.recovery_pct.T
 
         if self.raw_data.recycle_rate is not None and isinstance(self.raw_data.recycle_rate, float):
-            self.recovery_pct = [[self.raw_data.recycle_rate]*len(sets.mat_cat) for year in range(len(sets.modelyear))]
-            self.recovery_pct = pd.DataFrame(self.recovery_pct,
+            self.recycling_yield = [[self.raw_data.recycle_rate]*len(sets.mat_cat) for year in range(len(sets.modelyear))]
+            self.recycling_yield = pd.DataFrame(self.recycling_yield,
                                              index=sets.modelyear,
                                              columns=sets.mat_cat)
 
-        if (self.raw_data.enr_glf_terms is not None) and (self.enr_cint is not None or self.enr_cint_IAM is not None):
-            log.warning('----- Source for energy pathways may be overspecified; both enr_glf_terms and enr_cint are specified. Using enr_cint.')
 
-        if self.enr_cint is not None or self.enr_cint_IAM is not None:
-            if self.enr_cint_IAM is not None:
-                self.check_region_sets(self.enr_cint_IAM.index.get_level_values('reg'), 'enr_cint_IAM', sets.reg)
-                # for building enr_cint from IAM pathways (see electricity_clustering.py)
-                self.enr_cint_IAM = self.interpolate_years(self.enr_cint_IAM, sets)
-                self.enr_cint_IAM.index = self.enr_cint_IAM.index.reorder_levels(['enr', 'reg', 'year'])  # match correct set order for enr_cint
+            self.recycling_yield = self.recycling_yield.T
 
-            if self.enr_cint is not None:
-                    self.check_region_sets(self.enr_cint.index.get_level_values('reg'), 'enr_cint', sets.reg)
-                    self.enr_cint = self.interpolate_years(self.enr_cint, sets)
-                    self.enr_cint.index = self.enr_cint.index.reorder_levels(['enr', 'reg', 'year'])
-                    self.enr_cint = pd.concat([self.enr_cint_IAM, self.enr_cint])
+        if (self.raw_data.enr_glf_terms is not None) and (self.enr_impact_int is not None or self.enr_impact_int_IAM is not None):
+            log.warning('----- Source for energy pathways may be overspecified; both enr_glf_terms and enr_impact_int are specified. Using enr_impact_int.')
+
+        if self.enr_impact_int is not None or self.enr_impact_int_IAM is not None:
+            if self.enr_impact_int_IAM is not None:
+                self.check_region_sets(self.enr_impact_int_IAM.index.get_level_values('reg'), 'enr_impact_int_IAM', sets.reg)
+                # for building enr_impact_int directly from IAM pathways (see electricity_clustering.py)
+                self.enr_impact_int_IAM = self.interpolate_years(self.enr_impact_int_IAM, sets)
+                self.enr_impact_int_IAM.index = self.enr_impact_int_IAM.index.reorder_levels(['imp', 'enr', 'reg', 'year'])  # match correct set order for enr_impact_int
+
+            if self.enr_impact_int is not None:
+                self.check_region_sets(self.enr_impact_int.index.get_level_values('reg'), 'enr_impact_int', sets.reg)
+                self.enr_impact_int = self.interpolate_years(self.enr_impact_int, sets)
+                self.enr_impact_int.index = self.enr_impact_int.index.reorder_levels(['imp', 'enr', 'reg', 'year'])
+                self.enr_impact_int = pd.concat([self.enr_impact_int_IAM, self.enr_impact_int])
+
         elif self.raw_data.enr_glf_terms is not None:
             self.check_region_sets(self.raw_data.enr_glf_terms.index.get_level_values('reg'), 'enr_glf_terms', sets.reg)
-            # build enr_cint from generalized logistic function
-            mi = pd.MultiIndex.from_product([sets.reg, sets.enr, sets.modelyear], names=['reg', 'enr', 'modelyear'])
-            self.enr_cint = pd.Series(index=mi)
+            # build enr_impact_int from generalized logistic function
+            mi = pd.MultiIndex.from_product([sets.imp, sets.reg, sets.enr, sets.modelyear], names=['imp', 'enr', 'reg', 'modelyear'])
+            self.enr_impact_int = pd.Series(index=mi)
 
-
-            # complete enr_cint parameter with fossil fuel chain and electricity in production regions
+            # complete enr_impact_int parameter with fossil fuel chain and electricity in production regions
             # using terms for general logisitic function
             for label, row in self.raw_data.enr_glf_terms.iterrows():
                 A = row['A']
                 B = row['B']
                 r = row['r']
                 u = row['u']
-                reg = label[1]
-                enr = label[0]
+                imp = label[0]
+                reg = label[2]
+                enr = label[1]
                 for t in [((2000)+i) for i in range(81)]:
-                    self.enr_cint.loc[(reg, enr, str(t))] = A + (B - A) / (1 + np.exp(- r*(t - u)))
+                    self.enr_impact_int.loc[(imp, enr, reg, str(t))] = A + (B - A) / (1 + np.exp(- r*(t - u)))
 
-            self.enr_cint = self.enr_cint.swaplevel(0, 1) # enr, reg, year
-            self.enr_cint = self.enr_cint.to_frame()
-            self.enr_cint.dropna(how='all', axis=0, inplace=True)
+            self.enr_impact_int = self.enr_impact_int.to_frame()
+            self.enr_impact_int.dropna(how='all', axis=0, inplace=True)
 
-        if (isinstance(self.raw_data.tec_add_gradient, float)) and (self.veh_add_grd is None):
-            self.veh_add_grd = {}
+        if (isinstance(self.raw_data.tec_add_gradient, float)) and (self.max_uptake_rate is None):
+            self.max_uptake_rate = {}
             for element in product(*[sets.grdeq, sets.tec]):
                 if element[1] in sets.newtec:
-                    self.veh_add_grd[element] = self.raw_data.tec_add_gradient
+                    self.max_uptake_rate[element] = self.raw_data.tec_add_gradient
 
         if len(self.virg_mat_supply.columns) in [len(sets.year), len(sets.optyear), len(sets.modelyear)]:
             # if years are in columns, transpose for transferring to GAMS
@@ -568,22 +621,22 @@ class ParametersClass:
 
         oldtec = list(set(sets.tec) - set(sets.newtec))  # get name of incumbent technology; works for single tec
         if len(sets.newtec) == 1:
-            self.veh_stck_int_tec = pd.Series([1-self.raw_data.bev_int_shr, self.raw_data.bev_int_shr], index=oldtec + sets.newtec)
+            self.initial_tec_shares = pd.Series([1-self.raw_data.newtec_int_shr, self.raw_data.newtec_int_shr], index=oldtec + sets.newtec)
         else:
-            if isinstance(self.raw_data.bev_int_shr, dict):
-                all_new_tecs = sum(self.raw_data.bev_int_shr.values())
-                self.veh_stck_int_tec = pd.Series(self.raw_data.bev_int_shr)
-                self.veh_stck_int_tec.loc[oldtec] = 1- all_new_tecs
-            elif isinstance(self.raw_data.bev_int_shr, pd.DataFrame) or isinstance(self.raw_data.bev_int_shr, pd.Series):
-                self.veh_stck_int_tec.loc[oldtec] - 1 - self.veh_stck_int_tec.sum()
+            if isinstance(self.raw_data.newtec_int_shr, dict):
+                all_new_tecs = sum(self.raw_data.newtec_int_shr.values())
+                self.initial_tec_shares = pd.Series(self.raw_data.newtec_int_shr)
+                self.initial_tec_shares.loc[oldtec] = 1- all_new_tecs
+            elif isinstance(self.raw_data.newtec_int_shr, pd.DataFrame) or isinstance(self.raw_data.newtec_int_shr, pd.Series):
+                self.initial_tec_shares.loc[oldtec] - 1 - self.initial_tec_shares.sum()
 
         self.year_par = pd.Series([float(i) for i in sets.year], index=sets.year)
         self.calc_veh_lifetime(sets)
 
 
-    def build_veh_pay(self, sets):
+    def build_cohort_age_correspondence(self, sets):
         """
-        Build production year-cohort concordance matrix for use in GAMS (as parameter).
+        Build production year-cohort-age concordance matrix for use in GAMS (as parameter).
 
         Returns
         -------
@@ -592,61 +645,62 @@ class ParametersClass:
 
         """
 
-        top_year = int(sets.optyear[-1])
-        # start_year = int(sets.inityear[0])
-        start_year = int(sets.cohort[0])
+        top_year = int(sets.optyear[-1])  # the last year we are interested in
+        start_year = int(sets.modelyear[0])  # start with the oldest cohort
         prod_year = start_year - int(sets.age[-1])
         ind = []
         for year in range(start_year, top_year + 1):
             for a in sets.age_int:
                 prod_year = year - a - 1
-                ind.append([prod_year, a, year, 1])
+                ind.append([year, prod_year, a, 1])
 
         index = pd.DataFrame(ind)
-        #index = index[index[0]<=2050]
-        index = index[index[2] <= (top_year + 1)]
         for ind, col in index.iloc[:,:-1].iteritems():
-            index.loc(axis=1)[ind] = index.loc(axis=1)[ind].astype(str)
-        index.columns = ['prodyear', 'age', 'year', 'level']
+            index.loc(axis=1)[ind] = index.loc(axis=1)[ind].astype(str) # convert to strings as required by GAMS
+        index.columns = ['year','prodyear','age', 'level']
 
         return index
 
-
-    def build_BEV(self):
+    def build_newtec(self):
         """
-        Fetch BEV production emissions based on battery size.
+        Fetch production impacts for new technologies based on component size.
 
-        Select battery size by segment from size-segment combinations,
-        fetch and sum production emissions for battery and rest-of-vehicle.
-        Update DataFrame with total production emissions and energy use for
-        BEVs by segment.
+        Select component size by segment from size-segment combinations provided
+        in component_portfolio, fetch and sum production impacts for component
+        and rest-of-product/technology.
+        Update DataFrame with total production impacts and energy use for
+        new technologies by segment.
 
         Returns
         -------
         None.
 
         """
-        # build vehicle impacts table from batt_portfolio
-        self.raw_data.batt_portfolio = self.raw_data.batt_portfolio.T
-        self.raw_data.prod_df = pd.DataFrame()
+        # build vehicle impacts table from component_portfolio
+        self.raw_data.component_portfolio.dropna(axis=1, how='all', inplace=True)
+        self.raw_data.prod_df = pd.DataFrame(index=self.tec_size.index, columns=self.raw_data.component_portfolio.columns)
 
-        # assemble production emissions for battery for defined battery capacities
-        for key, value in self.bev_capac.items():
-            self.raw_data.prod_df[key] = self.raw_data.batt_portfolio[key, str(value)]
-        mi = pd.MultiIndex.from_product([self.raw_data.prod_df.index.to_list(), ['BEV'], ['batt']])
-        self.raw_data.prod_df.index = mi
+        # assemble production impacts for battery for defined battery capacities
+        for key, value in self.tec_size.iterrows():
+            val = value.loc[0]
+            self.raw_data.prod_df.loc[key] = self.raw_data.component_portfolio.loc[key].loc[str(val)]
+        self.raw_data.prod_df = self.raw_data.prod_df.set_index('lcphase', append=True, drop=True)
+
+        self.raw_data.prod_df['comp'] = 'batt'
+        self.raw_data.prod_df.set_index(['comp'], append=True, inplace=True)
+
         self.raw_data.prod_df = self.raw_data.prod_df.stack()
-        self.raw_data.prod_df.index.names = ['veheq', 'tec', 'comp', 'seg']
-        self.raw_data.prod_df.index = self.raw_data.prod_df.index.swaplevel(i=-2, j=-1)
+        self.raw_data.prod_df.index.rename(['tec','seg', 'lcphase','comp','imp'], inplace=True)
         self.raw_data.prod_df.sort_index(inplace=True)
         try:
-            self.raw_data.prod_df.drop('battery weight', axis=0, inplace=True)  # remove (currently not implemented)
+            self.raw_data.prod_df.drop('battery weight', axis=0, level='imp', inplace=True)  # remove battery weight (currently not implemented)
         except KeyError:
             log.info('Could not drop battery weight')
 
-    def build_veh_partab(self):
+
+    def build_tec_parameters(self):
         """
-        Build VEH_PARTAB parameter containing sigmoid function terms.
+        Build TEC_PARAMETERS parameter containing sigmoid function terms.
 
         Fetch current (A-term) data from Excel spreadsheet and battery
         DataFrame. Upper asymptote (B term values) for production and EOL
@@ -654,13 +708,11 @@ class ParametersClass:
         from YAML file (experiment parameter). Aggregate all values in a
         DataFrame for export to GAMS database.
 
-        Parameters
-        ----------
         B_term_prod : float
-            Upper asymptote for production emissions; expressed
+            Upper asymptote for production impacts; expressed
             as a multiple of A-term.
         B_term_oper_EOL : float
-            Upper asymptote for operaion and EOL emissions; expressed
+            Upper asymptote for operation and EOL impacts; expressed
             as a multiple of A-term..
         r_term_factors : dict of {str: float}
             Growth rate term.
@@ -675,15 +727,18 @@ class ParametersClass:
         # TODO: separate A-terms for battery and rest-of-vehicle and apply different b-factors
         # TODO: allow for series of B-term values
 
-        # Fetch sigmoid A terms from RawDataClass
-        self.raw_data.veh_factors.columns.names = ['comp']
-        self.raw_data.veh_factors = self.raw_data.veh_factors.stack().to_frame('a')
+        # Fetch values for sigmoid A terms from RawDataClass and add label
+        self.raw_data.tec_parameters_raw.columns.names = ['comp']
+        self.raw_data.tec_parameters_raw = self.raw_data.tec_parameters_raw.stack().to_frame('a')
 
-        # Retrieve production emission factors for chosen battery capacities and place in raw A factors (with component resolution)
-        self.build_BEV()  # update self.prod_df with selected battery capacities
-        self.raw_data.veh_factors.sort_index(inplace=True)
+        # Retrieve production impacts factors for chosen battery capacities and place in raw A factors (with component resolution)
+        self.build_newtec()  # update self.prod_df with selected battery capacities
+        self.raw_data.tec_parameters_raw.sort_index(inplace=True)
+        self.raw_data.prod_df.name = 'a'
+        self.raw_data.prod_df.index = self.raw_data.prod_df.index.reorder_levels(self.raw_data.tec_parameters_raw.index.names)
+
         for index, value in self.raw_data.prod_df.iteritems():
-            self.raw_data.veh_factors.loc[index, 'a'] = value
+            self.raw_data.tec_parameters_raw.loc[index, 'a'] = value
 
         # Get input for B-multiplication factors (relative to A) from YAML file
         reform = {(firstKey, secondKey, thirdKey): values for firstKey, secondDict in self.raw_data.B_term_prod.items() for secondKey, thirdDict in secondDict.items() for thirdKey, values in thirdDict.items()}
@@ -693,30 +748,33 @@ class ParametersClass:
         temp_df = pd.DataFrame()
 
         b_prod = pd.DataFrame(reform.values(), index=mi)
-        b_prod.index.names = ['veheq', 'tec', 'comp']
+        b_prod = b_prod.stack()
+        b_prod.index.names = ['lcphase', 'imp', 'tec', 'comp']
+        b_prod.name = 'b'
 
         # Apply B-multiplication factors to production A-factors (with component resolution)
-        temp_a = self.raw_data.veh_factors.join(b_prod, on=['veheq', 'tec', 'comp'], how='left')
-        temp_prod_df['B'] = temp_a['a'] * temp_a[0]
+        temp_a = self.raw_data.tec_parameters_raw.join(b_prod, on=['lcphase', 'imp', 'tec', 'comp'], how='left')
+        temp_prod_df['B'] = temp_a['a'] * temp_a['b']
         temp_prod_df.dropna(how='any', axis=0, inplace=True)
 
-        reform = {(firstKey, secondKey): values for firstKey, secondDict in self.raw_data.B_term_oper_EOL.items() for secondKey, values in secondDict.items()}
+        reform = {(firstKey, secondKey, thirdKey): values for firstKey, secondDict in self.raw_data.B_term_oper_EOL.items() for secondKey, thirdDict in secondDict.items() for thirdKey, values in thirdDict.items()}
         mi = pd.MultiIndex.from_tuples(reform.keys())
         b_oper = pd.DataFrame(reform.values(), index=mi, columns=['b'])
+        b_oper.index.names = ['lcphase', 'imp_int', 'tec']
 
         # Apply B-multiplication factors for operation and EOL A-factors
-        temp_oper_df = self.raw_data.veh_factors.join(b_oper, on=['veheq', 'tec'], how='left')
+        temp_oper_df = self.raw_data.tec_parameters_raw.join(b_oper, on=['lcphase', 'imp', 'tec'], how='left')
         temp_oper_df['B'] = temp_oper_df['a'] * temp_oper_df['b']
         temp_oper_df.dropna(how='any', axis=0, inplace=True)
         temp_oper_df.drop(columns=['a', 'b'], inplace=True)
 
 
-        # Aggregate component A values for VEH_PARTAB parameter
-        A = self.raw_data.veh_factors.sum(axis=1)
+        # Aggregate component A values for TEC_PARAMETERS parameter
+        A = self.raw_data.tec_parameters_raw.sum(axis=1)
         A = A.unstack(['comp']).sum(axis=1)
         A.columns = ['A']
 
-        # Begin building final VEH_PARTAB parameter table
+        # Begin building final TEC_PARAMETERS parameter table
         temp_df['A'] = A
         B = pd.concat([temp_prod_df, temp_oper_df], axis=0).dropna(how='any', axis=1)
         B = B.unstack(['comp']).sum(axis=1)
@@ -731,6 +789,7 @@ class ParametersClass:
         temp_df = temp_df.join(temp_u, on=['tec'], how='left')
 
         return temp_df
+
 
 
     def calc_veh_lifetime(self, sets):
@@ -750,22 +809,17 @@ class ParametersClass:
         # Placeholder for Weibull calculations
         # Weibull: alpha = scale, beta = shape
         # self.veh_lift_cdf = pd.Series(weibull_min.cdf(x, c, loc=0, scale=1), index=sets.age)
-        # self.veh_lift_age = pd.Series()
-        # self.raw_data.veh_avg_age = alpha * gamma(1+beta^-1)
-        # self.raw_data.veh_age_stdev^2 = alpha^2 * (gamma(1+2*beta^-1) - gamma(1+beta^-1)^2)
-
-        self.veh_lift_cdf = pd.Series(norm.cdf(sets.age_int, self.raw_data.veh_avg_age, self.raw_data.veh_age_stdev), index=sets.age)
-        self.veh_lift_cdf.index = self.veh_lift_cdf.index.astype('str')
+        # self.lifetime_age_distribution = pd.Series()
+        # self.raw_data.avg_age = alpha * gamma(1+beta^-1)
+        # self.raw_data.age_stdev^2 = alpha^2 * (gamma(1+2*beta^-1) - gamma(1+beta^-1)^2)
+        # self.veh_lift_cdf = pd.Series(norm.cdf(sets.age_int, self.raw_data.avg_age, self.raw_data.age_stdev), index=sets.age)
+        # self.veh_lift_cdf.index = self.veh_lift_cdf.index.astype('str')
 
         # Calculate normalized survival function
-        self.veh_lift_age = pd.Series(self.calc_steadystate_vehicle_age_distributions(sets.age_int, self.raw_data.veh_avg_age, self.raw_data.veh_age_stdev), index=sets.age)
-        self.veh_lift_sc = pd.Series(norm.sf(sets.age_int, self.raw_data.veh_avg_age, self.raw_data.veh_age_stdev), index=sets.age)
-        self.veh_lift_pdf = pd.Series(norm.pdf(sets.age_int, self.raw_data.veh_avg_age, self.raw_data.veh_age_stdev), index=sets.age)
+        self.lifetime_age_distribution = pd.Series(self.calc_steadystate_vehicle_age_distributions(sets.age_int, self.raw_data.avg_age, self.raw_data.age_stdev), index=sets.age)
 
-        self.veh_lift_pdf.index = self.veh_lift_pdf.index.astype('str')
-
-        self.veh_lift_mor = pd.Series(self.calc_probability_of_vehicle_retirement(sets.age_int, self.veh_lift_age), index=sets.age)
-        self.veh_lift_mor.index = self.veh_lift_mor.index.astype('str')
+        self.retirement_function = pd.Series(self.calc_probability_of_vehicle_retirement(sets.age_int, self.lifetime_age_distribution), index=sets.age)
+        self.retirement_function.index = self.retirement_function.index.astype('str')
 
 
     def calc_steadystate_vehicle_age_distributions(self, ages, average_expectancy=10.0, standard_dev=3.0):
@@ -958,14 +1012,14 @@ class ParametersClass:
             # df.index.rename('year', level=-1, inplace=True)
 
         ind = pd.Index(sets.modelyear, name='year')
-        if axis:
+        if axis==1:
             df.columns = df.columns.astype('str')
         else:
             df.index = df.index.astype('str')
         df = df.reindex(labels=ind, axis=axis)
         df = df.astype('float64').interpolate(axis=axis, limit_direction='both')
-        df = df.stack()
-        # df.index.rename('year', level=-1, inplace=True)
+        df = pd.DataFrame(df.stack())
+        df = self.order_sets(df)
 
         return df
 
@@ -984,31 +1038,31 @@ class ParametersClass:
 
         """
 
-        if isinstance(self.veh_stck_int_seg, list):
+        if isinstance(self.initial_seg_shares, list):
             # convert to dict with explicit connection to segments
-            self.veh_stck_int_seg = {seg: share for seg, share in zip(sets.seg, self.veh_stck_int_seg)}
-        if isinstance(self.veh_stck_int_seg, dict):
-            if sum(self.veh_stck_int_seg.values()) != 1:
+            self.initial_seg_shares = {seg: share for seg, share in zip(sets.seg, self.initial_seg_shares)}
+        if isinstance(self.initial_seg_shares, dict):
+            if sum(self.initial_seg_shares.values()) != 1:
                 print('\n *****************************************')
-                log.warning('----- Vehicle segment shares (VEH_STCK_INT_SEG) do not sum to 1!')
-        if isinstance(self.veh_stck_int_tec, (list, pd.Series)):
-            tec_sum = sum(self.veh_stck_int_tec)
-        elif isinstance(self.veh_stck_int_tec, dict):
-            tec_sum = sum(self.veh_stck_int_tec.values())
+                log.warning('----- Vehicle segment shares (INITIAL_SEG_SHARES) do not sum to 1!')
+        if isinstance(self.initial_tec_shares, (list, pd.Series)):
+            tec_sum = sum(self.initial_tec_shares)
+        elif isinstance(self.initial_tec_shares, dict):
+            tec_sum = sum(self.initial_tec_shares.values())
         else:
             print('\n *****************************************')
-            log.warning(f'----- veh_stck_int_tec is an invalid format. It is {type(self.veh_stck_int_tec)}; only dict or list allowed')
+            log.warning(f'----- initial_tec_shares is an invalid format. It is {type(self.initial_tec_shares)}; only dict or list allowed')
             tec_sum = np.nan
         if tec_sum != 1:
             print('\n *****************************************')
-            log.warning('----- Vehicle powertrain technology shares (VEH_STCK_INT_TEC) do not sum to 1!')
-            print(self.veh_stck_int_tec)
+            log.warning('----- Vehicle powertrain technology shares (initial_tec_shares) do not sum to 1!')
+            print(self.initial_tec_shares)
         if any(v is None for k, v in self.__dict__.items()):
             missing = [k for k, v in self.__dict__.items() if v is None]
             print('\n *****************************************')
             log.warning(f'----- The following parameters are missing values: {missing}')
 
-        self.check_region_sets(self.veh_stck_tot.index, 'veh_stck_tot', sets.fleetreg)
+        self.check_region_sets(self.exog_tot_stock.index.get_level_values('fleetreg'), 'exog_tot_stock', sets.fleetreg)
 
     @staticmethod
     def check_region_sets(par_ind, par_name, reg_set):
@@ -1036,3 +1090,54 @@ class ParametersClass:
             log.error(f'Missing region {missing_regs} in parameter {par_name}')
         elif len(set(par_ind) - set(reg_set)):
             log.warning(f'Region {extra_regs} are in parameter {par_name}, but not declared as a set')
+
+    @staticmethod
+    def order_sets(df):
+        """
+        Reorder parameter sets to match LP for feeding to GAMS.
+
+        Parameters
+        ----------
+        df : pandas DataFrame
+            Parameter read in from Excel.
+
+        Returns
+        -------
+        df : pandas DataFrame
+            Parameter with column order consistent with LP.
+
+        """
+        ordered_list = ['veheq',
+                        'grdeq',
+                        'lcphase',
+                        'imp',
+                        'tec',
+                        'newtec',
+                        'mat_cat',
+                        'mat_prod',
+                        'enr',
+                        'seg',
+                        'reg',
+                        'prodreg',
+                        'fleetreg',
+                        'year',
+                        'modelyear',
+                        'optyear',
+                        'prodyear',
+                        'age',
+                        'age_int',
+                        'sigvar',
+                        'A',
+                        'B',
+                        'r',
+                        'u']
+
+        # check if years are in index
+        if df.index.dtype == int:
+            df = df.T
+        df.reset_index(inplace=True)
+        df_collist = df.columns
+        new_collist = [col for col in ordered_list if col in df.columns]
+        if len(new_collist)>0:
+            df.set_index(new_collist, inplace=True)
+        return df

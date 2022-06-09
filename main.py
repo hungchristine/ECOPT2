@@ -28,19 +28,6 @@ import visualization as vis
 # Make timestamp and directory for scenario run results for output files
 now = datetime.now().isoformat(timespec='minutes').replace(':', '_')  # timestamp for run IDs
 
-# Set up logging - both stream to console and to log file
-log_fp = os.path.join(os.path.curdir, 'output', now+'_log.log')
-formatter = logging.Formatter('%(levelname)s [%(name)s] - %(message)s')
-log = logging.getLogger()
-log.setLevel(logging.INFO)
-file_log = logging.FileHandler(log_fp)
-file_log.setLevel(logging.INFO)
-file_log.setFormatter(formatter)
-stream_log = logging.StreamHandler(sys.stdout)
-stream_log.setLevel(logging.INFO)
-stream_log.setFormatter(formatter)
-log.addHandler(file_log)
-log.addHandler(stream_log)
 
 # Housekeeping: set up experiment options of filepaths
 class Experiment(Enum):
@@ -49,8 +36,11 @@ class Experiment(Enum):
     DEMO = 'GAMS_input_demo'
     UNIT = 'unit_test' # unit test consists of static LCA factors # (straight line in lieu of logistic function)
     NORMAL = 'GAMS_input'
+    WORLD = 'GAMS_input_world'
 
-experiment_type = Experiment.DEMO # must be one of 'DEMO', 'UNIT', 'NORMAL'
+experiment_type = Experiment.DEMO #NORMAL # must be one of 'DEMO', 'UNIT', 'NORMAL'
+export_png = True  # visualization file format
+export_pdf = True  # visualization file format
 export = False  # whether to export cross-scenario results
 visualize_input = False # visualize input factors for debugging
 
@@ -64,15 +54,30 @@ else:
     fp = os.path.join(os.path.curdir, 'output','Run_'+now)
 
 input_file = os.path.join(os.path.curdir, yaml_name + '.yaml')
-
-# Make output YAML less ugly, see https://stackoverflow.com/a/30682604
-yaml.SafeDumper.ignore_aliases = lambda *args: True
+log_fp = os.path.join(fp, now+'_log.log')
+formatter = logging.Formatter('%(levelname)s [%(name)s] - %(message)s')
+log = logging.getLogger()
+log.setLevel(logging.INFO)
 
 try:
     os.mkdir(fp)
+    file_log = logging.FileHandler(log_fp)
 except:
     print('\n *****************************************')
     log.error(f'Could not make output folder {fp}!')
+
+# Set up logging - both stream to console and to log file
+
+file_log.setLevel(logging.INFO)
+file_log.setFormatter(formatter)
+stream_log = logging.StreamHandler(sys.stdout)
+stream_log.setLevel(logging.INFO)
+stream_log.setFormatter(formatter)
+log.addHandler(file_log)
+log.addHandler(stream_log)
+
+# Make output YAML less ugly, see https://stackoverflow.com/a/30682604
+yaml.SafeDumper.ignore_aliases = lambda *args: True
 
 def run_experiment():
     """
@@ -125,7 +130,7 @@ def run_experiment():
     shares_2050 = pd.DataFrame()
     add_share = pd.DataFrame()
     stock_comp = pd.DataFrame()
-    full_BEV_yr_df = pd.DataFrame()
+    full_newtec_yr_df = pd.DataFrame()
     totc_df = pd.DataFrame()
 
     # unpack/create all experiments as Cartesian product of all parameter options
@@ -149,9 +154,12 @@ def run_experiment():
         if experiment_type == Experiment.DEMO:
             sets = SetsClass.from_file(os.path.join(os.path.curdir, 'data', 'sets_demo.xlsx'))
             params = ParametersClass.from_file(os.path.join(os.path.curdir, 'data', 'GAMS_input_demo.xlsx'), experiment=experiment)
+        elif experiment_type == Experiment.WORLD:
+            sets = SetsClass.from_file(os.path.join(os.path.curdir, 'data', 'sets_world.xlsx'))
+            params = ParametersClass.from_file(os.path.join(os.path.curdir, 'data', 'GAMS_input_world.xlsx'), experiment=experiment)
         else:
             sets = SetsClass.from_file(os.path.join(os.path.curdir, 'data', 'sets.xlsx'))
-            params = ParametersClass.from_file(os.path.join(os.path.curdir, 'data', 'GAMS_input_demo_test.xlsx'), experiment=experiment)
+            params = ParametersClass.from_file(os.path.join(os.path.curdir, 'data', 'GAMS_input.xlsx'), experiment=experiment)
 
         fm = fleet_model.FleetModel(sets, params)
 
@@ -169,7 +177,8 @@ def run_experiment():
                 sys.exit()
 
         exceptions = gams_run.db.get_database_dvs()
-        if len(exceptions) > 1:
+        if len(exceptions) > 0:
+            print("GAMS errors as follows:")
             print(exceptions[0].symbol.name)
             print(fm.db.number_symbols)
 
@@ -187,34 +196,35 @@ def run_experiment():
             else:
                 exp_params[key] = value
 
-        # Run visualization
-        try:
-            fm.figure_calculations()  # run extra calculations for cross-experiment figures
-            fig_fp = os.path.join(fp, f'exp_{i}_figs')
-            os.mkdir(fig_fp)
-            log.info("Starting visualization of results")
-            vis.vis_GAMS(fm, fig_fp, run_id, experiment, export_png=True, export_pdf=True)
-            if visualize_input:
-                log.info("Starting visualization of input parameters")
-                vis.vis_input(fm, fp, run_id, experiment, export_png=False, export_pdf=False, max_year=50, cropx=True, suppress_vis=False)
-        except Exception:
-            print('\n *****************************************')
-            log.error("Failed visualization, deleting folder")
-            traceback.print_exc()
-            if (os.path.exists(fp)) and (not os.listdir(fp)):
-                os.rmdir(fp)
+        # Run visualization if GAMS ran without problems
+        if len(exceptions) == 0:
+            try:
+                fm.figure_calculations()  # run extra calculations for cross-experiment figures
+                fig_fp = os.path.join(fp, f'exp_{i}_figs')
+                os.mkdir(fig_fp)
+                log.info("Starting visualization of results")
+                vis.vis_GAMS(fm, fig_fp, run_id, experiment, export_png=export_png, export_pdf=export_pdf)
+                if visualize_input:
+                    log.info("Starting visualization of input parameters")
+                    vis.vis_input(fm, fp, run_id, experiment, export_png=export_png, export_pdf=export_pdf, max_year=2050, cropx=True, suppress_vis=False)
+            except Exception:
+                print('\n *****************************************')
+                log.error("Failed visualization, deleting folder")
+                traceback.print_exc()
+                if (os.path.exists(fp)) and (not os.listdir(fp)):
+                    os.rmdir(fp)
 
         # Save log info
         try:
             info[run_tag] = {
                 'input_params': experiment,
                 'output': {
-                     'totc_opt': fm.totc_opt,
+                     'tot_impacts_opt': fm.tot_impacts_opt,
                      'solver status': gams_run.ss,
                      'model status': gams_run.ms,
-                     'first year of 100% BEV market share': fm.full_BEV_year.to_dict(),
-                     'BEV shares in 2030': fm.shares_2030.to_dict(),
-                     'totc in optimization period':fm.totc_opt # collect these from all runs into a dataframe...ditto with shares of BEV/ICE
+                     'first year of 100% newtec market share': fm.full_newtec_year.to_dict(),
+                     'newtec shares in 2030': fm.shares_2030.to_dict(),
+                     'totc in optimization period':fm.tot_impacts_opt # collect these from all runs into a dataframe...ditto with shares of BEV/ICE
                 }
             }
 
@@ -222,14 +232,14 @@ def run_experiment():
             fm.shares_2030.name = run_id
             fm.shares_2050.name = run_id
             fm.add_share.name = run_id
-            fm.veh_stck.name = run_id
+            fm.tot_stock.name = run_id
 
-            totc_df.loc['totc_opt', run_id] = fm.totc_opt
-            stock_comp[run_id] = fm.veh_stck.stack() # fleet stock composition
+            totc_df.loc['tot_impacts_opt', run_id] = fm.tot_impacts_opt
+            stock_comp[run_id] = fm.tot_stock.stack() # fleet stock composition
             shares_2030[run_id] = fm.shares_2030.stack().stack() # market shares in 2030
             shares_2050[run_id] = fm.shares_2050.stack().stack()  # market shares in 2050
             add_share[run_id] = fm.add_share.stack().stack()  # market shares
-            full_BEV_yr_df[run_id] = fm.full_BEV_year  # first year of full newtec penetration
+            full_newtec_yr_df[run_id] = fm.full_newtec_year  # first year of full newtec penetration
 
             # Display the info for this run
             log.info('\n'+repr(info[run_tag])+'\n')
@@ -244,11 +254,11 @@ def run_experiment():
         yaml.safe_dump(info, f)
 
     # Return last fleet object for troubleshooting
-    return fm, run_id_list, shares_2030, shares_2050, add_share, stock_comp, full_BEV_yr_df, totc_df
+    return fm, run_id_list, shares_2030, shares_2050, add_share, stock_comp, full_newtec_yr_df, totc_df
 
 
 """ Run the full experiment portfolio; also returns last instance of FleetModel object for troubleshooting"""
-fm, run_id_list, shares_2030, shares_2050, add_share, stock_comp, full_BEV_yr_df, totc_df = run_experiment()
+fm, run_id_list, shares_2030, shares_2050, add_share, stock_comp, full_newtec_yr_df, totc_df = run_experiment()
 
 
 """ Perform calculations across the experiments"""
@@ -273,18 +283,18 @@ if len(run_id_list) > 1:
 
     with gzip.open(baseline_file, 'rb') as f:
         d = pickle.load(f)  # load FleetModel instance
-        default_totc_opt = d.totc_opt
+        default_totc_opt = d.tot_impacts_opt
 
     try:
-        totc_df.loc['Abs. difference from totc_opt'] = default_totc_opt - totc_df.loc['totc_opt']
-        totc_df.loc['%_change_in_totc_opt'] = (default_totc_opt - totc_df.loc['totc_opt'])/default_totc_opt
+        totc_df.loc['Abs. difference from tot_impacts_opt'] = default_totc_opt - totc_df.loc['tot_impacts_opt']
+        totc_df.loc['%_change_in_totc_opt'] = (default_totc_opt - totc_df.loc['tot_impacts_opt'])/default_totc_opt
     except:
         print('\n *****************************************')
         log.info("No comparison to default performed")
 
     # Plotting
-    if not full_BEV_yr_df.isnull().all().all():
-        full_BEV_yr_df.plot()
+    if not full_newtec_yr_df.isnull().all().all():
+        full_newtec_yr_df.plot()
     else:
         log.info('100% market share of BEVs is not achieved in any scenario')
 
@@ -293,7 +303,7 @@ if export:
     print('\n ********** Exporting cross-experiment results to pickle and Excel ************** \n')
     pickle_name = 'overview_run_' + now + '.pkl'
     with open(pickle_name, 'wb') as f:
-        pickle.dump([shares_2030, shares_2050, add_share, stock_comp, full_BEV_yr_df, totc_df], f)
+        pickle.dump([shares_2030, shares_2050, add_share, stock_comp, full_newtec_yr_df, totc_df], f)
 
     excel_name = 'cumulative_scenario_output'+now+'.xlsx'
     with pd.ExcelWriter(excel_name) as writer:
@@ -301,7 +311,7 @@ if export:
         shares_2050.to_excel(writer,sheet_name='tec_shares_in_2050')
         add_share.to_excel(writer,sheet_name='add_shares')
         stock_comp.to_excel(writer,sheet_name='total_stock')
-        full_BEV_yr_df.to_excel(writer,sheet_name='1st_year_full_BEV')
+        full_newtec_yr_df.to_excel(writer,sheet_name='1st_year_full_newtec')
         totc_df.to_excel(writer,sheet_name='totc')
 
     log.info(f'Exported cross-experiment results to {pickle_name} and {excel_name}')

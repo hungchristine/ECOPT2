@@ -102,7 +102,7 @@ missing_countries = list(set(EEU_ISO2 + WEU_ISO2) - set(df.index.tolist()))
 
 #%% Import country data and shapefile from Natural Earth, filter for the countries in our study
 
-fp_map = os.path.join(os.path.curdir, 'Data', 'maps', 'ne_10m_admin_0_countries.shp')
+fp_map = os.path.join(os.path.curdir, 'data', 'maps', 'ne_10m_admin_0_countries.shp')
 country_shapes = gpd.read_file(fp_map)
 
 # Replace ISO_A2 code for France and Norway
@@ -1412,12 +1412,15 @@ groupby_new_mixes = new_mixes.set_index('Cluster', append=True).groupby(['Cluste
 groupby_new_mixes.to_csv('new_mixes_grouped.csv')
 
 
-#%%
+#%% Insert cluster footprints into ECOPT2 input file
 # prepare cluster footprints for feeding into GAMS
 cluster_footprints.dropna(axis=1, how='all', inplace=True)
 cluster_footprints.index = ['LOW', 'II', 'MID', 'IV', 'HIGH']
-cluster_footprints[''] = 'ELC'
-cluster_footprints = cluster_footprints.set_index('', append=True)
+cluster_footprints.index.name = 'reg'
+cluster_footprints['enr'] = 'ELC'
+cluster_footprints['imp'] = 'GHG'
+cluster_footprints = cluster_footprints.set_index(['imp', 'enr'], append=True)
+cluster_footprints.index = cluster_footprints.index.reorder_levels(['imp', 'reg', 'enr'])
 cluster_footprints = cluster_footprints / 1000
 
 cluster_footprints.to_csv(os.path.join(data_fp, 'el_footprints_pathways.csv'))
@@ -1425,11 +1428,11 @@ fp = os.path.join(data_fp, 'GAMS_input.xlsx')
 with pd.ExcelWriter(fp, mode='a') as writer:
     workBook = writer.book
     try:
-        workBook.remove(workBook['enr_cint_IAM'])
+        workBook.remove(workBook['enr_emiss_int_IAM'])
     except:
             print("Worksheet does not exist")
     finally:
-        cluster_footprints.to_excel(writer, 'enr_cint_IAM', startrow=1)
+        cluster_footprints.to_excel(writer, 'enr_emiss_int_IAM', startrow=1)
         writer.save()
 
 #%%
