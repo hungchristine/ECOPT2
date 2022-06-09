@@ -38,7 +38,7 @@ class Experiment(Enum):
     NORMAL = 'GAMS_input'
     WORLD = 'GAMS_input_world'
 
-experiment_type = Experiment.WORLD #NORMAL # must be one of 'DEMO', 'UNIT', 'NORMAL'
+experiment_type = Experiment.DEMO #NORMAL # must be one of 'DEMO', 'UNIT', 'NORMAL'
 export_png = True  # visualization file format
 export_pdf = True  # visualization file format
 export = False  # whether to export cross-scenario results
