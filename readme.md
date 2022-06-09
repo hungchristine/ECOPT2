@@ -12,13 +12,15 @@ In the virtual environment, install the [GAMS Python API](https://www.gams.com/l
 
 [Clone](https://docs.github.com/en/github/creating-cloning-and-archiving-repositories/cloning-a-repository-from-github/cloning-a-repository)  this repository to your local machine to install ECOPT<sup>2</sup>.
 
-## Dependencies
+## Main dependencies
 - gams
 - pandas
 - scipy
 - numpy
 - matplotlib
+- cycler
 - pyYAML
+- dataclasses
 
 ## Usage
 
@@ -28,21 +30,27 @@ Users provide input via Excel spreadsheets and a YAML file:
 - <b>GAMS_input.xlsx:</b> Provides exogeneous data to feed the LP model. Each tab in the spreadsheet is named to match parameter names in ECOPT<sup>2</sup>.  Further details are provided in the sample file in this repository. 
 - <b>GAMS_input.yaml:</b> File defining values for parameters for experiments. Multiple values can be defined for each parameter; ECOPT<sup>2</sup> will perform experiments covering all combinations of all parameter values provided. Parameter values are provided by listing the parameter name (must match name in Python code and/or LP ), an experiment alias, and the parameter values as a scalar, list or dictionary (see e.g., [here](https://realpython.com/python-yaml/) for a tutorial on YAML syntax)
 
-
-
 ### Running experiment(s)
-Run models using main.py. In this file, you can specify the experiment type (e.g., demo, unit test or normal). Included in this repository is a demo experiment for a simple, stylized scenario, which is set up to run by default. Users can also specify what file format to export result figures in (.png or .pdf), whether to visualize input parameters for troubleshooting, and whether to export cross-experiment results.
+Run models using main.py. In this file, you can specify the experiment type (e.g., demo, unit test or normal) and visualization options. Included in this repository is a demo experiment for a simple, stylized scenario, which is set up to run by default. Users can also specify what file format to export result figures in (.png or .pdf), whether to visualize input parameters for troubleshooting, and whether to export cross-experiment results.
 
 Each experiment output is saved in its own folder, and includes the visualization output, a log file, the GAMS result file in .gdx format and a pickle containing the experiment's FleetModel object.
 
+### Files
+- <code>ECOPT2.gms</code>: linear program (LP) model implemented in GAMS.
+- <code>main.py</code>: user-specified experiment definition, file paths and visualization options.
+- <code>fleet_model_init.py</code>: contains SetsClass and ParametersClass dataclasses (subclasses of FleetModel). Loads user input data from Excel and YAML files, performs necessary data handling and rudimentary quality checks.
+- <code>fleet_model.py</code>: defines FleetModel class. With functionality for data exchange from GAMS data structures to FleetModel object
+- <code>gams_runner.py</code>: interface to GAMS. Initializes GAMS workspace and loads FleetModel object to GAMS data structures using <code>gmspy</code>. Runs LP (<code>ECOPT2.gms</code>).
+- <code>visualization.py</code>: performs result visualization and, optionally, visualization of input data for debugging
+
 ### Folder structure
-- <code>\data\\</code>: contains input files  for experiment
-- <code>\demo\\</code>: contains input files for demo experiment using <code>gmspy</code>
-- <code>\output\\</code>: contains results, including visualization, logfile and <code>.gdx</code> files from experiments
+- <code>\data\\</code>: contains input files for experiment
+- <code>\demo\\</code>: contains demo experiment for <code>gmspy</code>
+- <code>\output\\</code>: contains results, including visualization, logfile and <code>.gdx</code> files from experiments. Figures can be exported as .png and/or .pdf.
 
 
 ### Helper scripts
-- <code>electricity_clustering.py</code>: calculate impact intensity of national/regional electricity mixes based on generation technologies and create clusters of regions with similarly intensive electricity mixes
+- <code>electricity_clustering.py</code>: calculate impact intensity of national/regional electricity mixes based on generation technologies and create clusters of regions with similarly intensive electricity mixes; projects (macro)regional trends in electricity mixes from IAMs to individual states. Has dependencies: <code>country_converter</code>, <code>geopandas</code> and <code>jenkspy</code>
 - <code>iam_parser.py</code>: general utility for parsing data from integrated assessment models using the [IAMC data format](https://pyam-iamc.readthedocs.io/en/stable/data.html#:~:text=Over%20the%20past%20decade%2C%20the,of%20the%20Sustainable%20Development%20Goals.) for time series
 - <code>gmspy.py</code>: utility code for bilateral data exchange between Python and GAMS
  
