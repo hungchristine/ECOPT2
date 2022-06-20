@@ -60,7 +60,11 @@ log = logging.getLogger()
 log.setLevel(logging.INFO)
 
 try:
-    os.mkdir(fp)
+    if os.path.isdir('output'):
+        os.mkdir(fp)
+    else:
+        os.mkdir('output')
+        os.mkdir(fp)
     file_log = logging.FileHandler(log_fp)
 except:
     print('\n *****************************************')

@@ -373,6 +373,7 @@ class FleetModel:
             self.tec_oper_impact_int = self._p_dict['TEC_OPER_IMPACT_INT']
             self.tec_oper_impact_int = self.tec_oper_impact_int.stack().to_frame()
             self.tec_oper_impact_int.index.names = ['imp','tec', 'enr', 'seg', 'fleetreg', 'modelyear', 'prodyear', 'age']
+            self.tec_oper_impact_int = self.tec_oper_impact_int.reorder_levels(['imp','modelyear', 'fleetreg', 'tec','seg','prodyear','enr','age'])
         except:
             log.warning('Invalid input for tec_oper_impact_int')
 
@@ -459,37 +460,41 @@ class FleetModel:
         except TypeError as e:
             log.warning(f"Could not find post-processing parameter(s). {e}")
 
-        self.production_impacts['lcphase'] = 'Production'
-        self.operation_impacts['lcphase'] = 'Operation'
-        self.eol_impacts['lcphase'] = 'End of life'
+        try:
+            self.production_impacts['lcphase'] = 'Production'
+            self.operation_impacts['lcphase'] = 'Operation'
+            self.eol_impacts['lcphase'] = 'End of life'
 
-        self.production_impacts.set_index('lcphase', append=True, drop=True, inplace=True)
-        self.operation_impacts.set_index('lcphase', append=True, drop=True, inplace=True)
-        self.eol_impacts.set_index('lcphase', append=True, drop=True, inplace=True)
+            self.production_impacts.set_index('lcphase', append=True, drop=True, inplace=True)
+            self.operation_impacts.set_index('lcphase', append=True, drop=True, inplace=True)
+            self.eol_impacts.set_index('lcphase', append=True, drop=True, inplace=True)
 
-        self.impacts = pd.concat([self.production_impacts,
-                                  self.operation_impacts,
-                                  self.eol_impacts])
+            self.impacts = pd.concat([self.production_impacts,
+                                      self.operation_impacts,
+                                      self.eol_impacts])
 
-        self.annual_use_intensity = self._p_dict['ANNUAL_USE_INTENSITY']
-        self.annual_use_intensity = self.annual_use_intensity.stack()
-        self.annual_use_intensity.index.rename(['fleetreg','modelyear'], inplace=True)
+            self.annual_use_intensity = self._p_dict['ANNUAL_USE_INTENSITY']
+            self.annual_use_intensity = self.annual_use_intensity.stack()
+            self.annual_use_intensity.index.rename(['fleetreg','modelyear'], inplace=True)
+            self.annual_use_intensity = self.annual_use_intensity.reorder_levels(['modelyear','fleetreg'])
 
-        # TODO: check 'ffill' with different distances
-        tmp_dist = self.annual_use_intensity.reindex_like(self.tec_oper_impact_int.reorder_levels(['imp','modelyear', 'fleetreg', 'tec','seg','prodyear','enr','age']), method='ffill')
-        self.op_impacts = self.tec_oper_impact_int.mul(tmp_dist, axis=0)
-        self.full_oper_dist = tmp_dist
+            tmp_dist = self.annual_use_intensity.reindex_like(self.tec_oper_impact_int, method='ffill')
+            self.op_impacts = self.tec_oper_impact_int.mul(tmp_dist, axis=0)
+            self.op_impacts_cumulative = self.op_impacts.sum(level=['imp','fleetreg','tec','seg','prodyear'], axis=0)
+            self.full_oper_dist = tmp_dist
 
-        tmp_prod = self.tec_prod_impact_int.reindex_like(self.tec_oper_impact_int.reorder_levels(['imp','tec','seg','prodyear','modelyear','enr','fleetreg','age']), method='ffill')
-        tmp_prod.fillna(method='bfill', inplace=True)  # for filling 1999
-        self.LC_impacts = self.op_impacts.add(self.tec_prod_impact_int.reindex_like(self.op_impacts.reorder_levels(['imp','tec','seg','prodyear','enr','fleetreg','age','modelyear']), method='ffill'))
-        self.LC_impacts.fillna(method='bfill', inplace=True) # for filling 1999
-        self.LC_impacts = self.LC_impacts.squeeze()
-        self.LC_impacts.index = self.LC_impacts.index.droplevel(['enr','prodyear'])
+            tmp_prod = self.tec_prod_impact_int.reindex_like(self.tec_oper_impact_int.reorder_levels(['imp','tec','seg','prodyear','modelyear','enr','fleetreg','age']), method='ffill')
+            tmp_prod.fillna(method='bfill', inplace=True)  # for filling pre-2000 cohorts
 
-        self.enr_impact_int = self._p_dict['ENR_IMPACT_INT']
-        self.enr_impact_int = self.enr_impact_int.stack()
-        self.enr_impact_int.index.rename(['imp','enr', 'reg', 'year'], inplace=True)
+            self.LC_impacts = self.op_impacts_cumulative.add(
+                self.tec_prod_impact_int.reindex_like(self.op_impacts_cumulative, method='ffill'))
+            self.LC_impacts = self.LC_impacts.squeeze()
+
+            self.enr_impact_int = self._p_dict['ENR_IMPACT_INT']
+            self.enr_impact_int = self.enr_impact_int.stack()
+            self.enr_impact_int.index.rename(['imp','enr', 'reg', 'year'], inplace=True)
+        except Exception as e:
+            log.error(f"Error in calculating cohort life cycle impacts. {e}")
 
         log.info('Finished importing results from GAMS run')
 

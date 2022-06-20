@@ -50,7 +50,7 @@ class GAMSRunner:
     _load_input_to_GAMS
         Utility method to load input to GAMS workspace and create .gdx file
     get_output_from_GAMS(gams_db, output_var)
-        Load output from GAMS .gdx file
+        Load output from GAMS .gdx file. Deprecated.
     run_GAMS(fleet, run_tag, filename)
         Run experiment in GAMS
     """
